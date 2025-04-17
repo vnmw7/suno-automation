@@ -67,10 +67,18 @@ driver.execute_script("arguments[0].value = 'test';", first_textarea)
 
 time.sleep(0.5)
 
-public_bttn = "//div[contains(@class, 'relative inline-block font-sans font-medium text-center before:absolute before:inset-0 before:pointer-events-none before:rounded-[inherit] before:border before:border-transparent before:bg-transparent after:absolute after:inset-0 after:pointer-events-none after:rounded-[inherit] after:bg-transparent after:opacity-0 enabled:hover:after:opacity-100 transition duration-75 before:transition before:duration-75 after:transition after:duration-75 select-none cursor-pointer text-[17px] leading-[24px] rounded-full aspect-square p-2.5 text-foreground-primary enabled:before:hover:bg-overlay-onPrimary disabled:brightness-50 bg-transparent')][1]"
+public_bttn = "//div[@tabindex='0' and contains(@class, 'relative') and contains(@class, 'inline-flex') and contains(@class, 'rounded-full') and contains(@class, 'cursor-pointer') and contains(@class, 'h-4') and contains(@class, 'w-7')][1]"
 
 public_bttn = wait.until(EC.element_to_be_clickable((By.XPATH, public_bttn)))
 public_bttn.click()
+
+time.sleep(0.5)
+
+song_div = "//div[@role='row' and contains(@class, 'react-aria-GridListItem')][1]"
+song_div = wait.until(EC.visibility_of_element_located((By.XPATH, song_div)))
+song_id = song_div.get_attribute("data-key")
+
+print(f"song id: {song_id}")
 
 time.sleep(2)
 
