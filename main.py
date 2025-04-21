@@ -1,3 +1,4 @@
+import sqlite3
 import time
 
 from selenium import webdriver
@@ -6,14 +7,54 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+sql_connection = sqlite3.connect("database/suno_automation.db")
+cursor = sql_connection.cursor()
+cursor.execute(
+    """
+        CREATE TABLE IF NOT EXISTS songs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            song_id TEXT NOT NULL
+        )
+    """
+)
+sql_connection.commit()
+
 driver = webdriver.Chrome()
 driver.maximize_window()
+
+wait = WebDriverWait(driver, 20)
+
+driver.get("https://copilot.microsoft.com/")
+
+prompt_input = wait.until(EC.visibility_of_element_located((By.ID, "userInput")))
+prompt_input.send_keys(Keys.CONTROL + "a")
+prompt_input.send_keys(Keys.DELETE)
+time.sleep(0.5)
+
+prompt_input.send_keys(
+    "Generate a song prompt to be used in Suno AI. Your output should be {Title:'Output Title Here', Prompt:'Output Prompt Here'}"
+)
+prompt_input.send_keys(Keys.RETURN)
+
+time.sleep(20)
+
+ai_message = wait.until(
+    EC.visibility_of_element_located(
+        (By.XPATH, "//div[contains(@class, 'group/ai-message-item')]")
+    )
+)
+full_response_text = ai_message.get_attribute("textContent")
+if full_response_text:
+    print("\n-------------------- Full Text Extracted --------------------")
+    print(full_response_text)
+    print("---------------------------------------------------------------\n")
+else:
+    print("\n--- No textContent found in the AI response container ---")
+    full_response_text = ""
 
 driver.get(
     "https://accounts.suno.com/sign-in?redirect_url=https%3A%2F%2Fsuno.com%2Fcreate"
 )
-
-wait = WebDriverWait(driver, 20)
 
 google_auth_xpath = "//button[.//img[@alt='Sign in with Google']]"
 
@@ -81,5 +122,7 @@ song_id = song_div.get_attribute("data-key")
 print(f"song id: {song_id}")
 
 time.sleep(2)
+
+sql_connection.close()
 
 driver.quit()
