@@ -49,24 +49,50 @@ full_response_text = ai_message.get_attribute("textContent")
 if full_response_text:
     print("\n-------------------- Full Text Extracted --------------------")
     print(f"'{full_response_text}'")
-    print("---------------------------------------------------------------\\n")
-
+    print(
+        "---------------------------------------------------------------\\n"
+    )  # Try to find JSON in code block
     json_match = re.search(
-        r"```json\\n(\{.*?\\n\})\n```", full_response_text, re.DOTALL
+        r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", full_response_text, re.DOTALL
     )
-    if not json_match:
-        print("Did not find JSON in ```json block, trying general search...")
-        json_match = re.search(r"(\{.*?})", full_response_text, re.DOTALL)
 
-    if json_match:
+    # If no JSON in code block, try to find direct JSON format in text
+    if not json_match:
+        print("Did not find JSON in code block, trying direct JSON search...")
+        json_match = re.search(
+            r"\{[\s\S]*?\"?Title\"?\s*:\s*\"([^\"]+)\"[\s\S]*?\"?Prompt\"?\s*:\s*\"([^\"]+)\"[\s\S]*?\}",
+            full_response_text,
+            re.DOTALL,
+        )
+
+        # If direct JSON format found, extract title and prompt directly
+        if json_match:
+            title = json_match.group(1).strip()
+            prompt = json_match.group(2).strip()
+            print(f"Extracted Title directly: {title}")
+            print(f"Extracted Prompt directly: {prompt}")
+
+    # Process JSON if found in code block
+    elif json_match:
         json_string = json_match.group(1)
         print(f"Found potential JSON string: '{json_string}'")
         try:
+            # Replace various quote types and handle potential formatting issues
             json_string_corrected = json_string.replace("'", '"')
+            # Make sure keys are properly quoted
+            json_string_corrected = re.sub(
+                r"([{,])\s*(\w+):", r'\1"\2":', json_string_corrected
+            )
             print(f"Corrected JSON string: '{json_string_corrected}'")
+
             data = json.loads(json_string_corrected)
-            title = data.get("Title")
-            prompt = data.get("Prompt")
+            # Check for case-insensitive keys
+            possible_title_keys = ["Title", "title", "TITLE"]
+            possible_prompt_keys = ["Prompt", "prompt", "PROMPT"]
+
+            title = next((data.get(k) for k in possible_title_keys if k in data), "")
+            prompt = next((data.get(k) for k in possible_prompt_keys if k in data), "")
+
             if title and prompt:
                 print(f"Extracted Title: {title}")
                 print(f"Extracted Prompt: {prompt}")
@@ -216,7 +242,10 @@ create_bttn = wait.until(
 )
 create_bttn.click()
 
-time.sleep(5)
+# Wait for manual captcha solving
+print("CAPTCHA detected! Please solve the captcha manually.")
+input("Press Enter after solving the captcha to continue...")
+print("Continuing with automation...")
 
 public_bttn = "//div[@tabindex='0' and contains(@class, 'relative') and contains(@class, 'inline-flex') and contains(@class, 'rounded-full') and contains(@class, 'cursor-pointer') and contains(@class, 'h-4') and contains(@class, 'w-7')][1]"
 
