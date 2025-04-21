@@ -26,7 +26,7 @@ driver.maximize_window()
 
 wait = WebDriverWait(driver, 20)
 
-driver.get("https://copilot.microsoft.com/chats/uszRbPwYSCYRpTKYnxma2")
+driver.get("https://copilot.microsoft.com/chats/new")
 
 prompt_input = wait.until(EC.visibility_of_element_located((By.ID, "userInput")))
 prompt_input.send_keys(Keys.CONTROL + "a")
@@ -123,7 +123,6 @@ print(f"Waiting for Google button with XPath: {google_auth_xpath}")
 google_auth_bttn = wait.until(EC.element_to_be_clickable((By.XPATH, google_auth_xpath)))
 google_auth_bttn.click()
 
-
 time.sleep(5)
 
 gmail_address = "vthlddgpadauhx277@gmail.com"
@@ -151,7 +150,7 @@ time.sleep(2)
 password_field.send_keys(acc_password)
 password_field.send_keys(Keys.RETURN)
 
-time.sleep(0.5)
+time.sleep(3)
 
 # -------------=------------------
 # ----- this is to add title -----
@@ -165,10 +164,10 @@ title_bttn = wait.until(
 )
 title_bttn.click()
 
-time.sleep(0.5)
+time.sleep(3)
 
 title_input = wait.until(
-    EC.element_to_be_clickable(
+    EC.visibility_of_element_located(
         (
             By.XPATH,
             "//input[contains(@class, 'font-serif') and contains(@class, 'font-light') and contains(@class, 'text-2xl') and contains(@class, 'bg-transparent') and contains(@class, 'outline-none') and contains(@class, 'w-full') and contains(@class, 'py-[2px]') and contains(@class, 'flex-1')]",
@@ -199,13 +198,25 @@ escaped_prompt = json.dumps(prompt)
 
 driver.execute_script(f"arguments[0].value = {escaped_prompt};", first_textarea)
 
-time.sleep(1)
+time.sleep(3)
 
 set_value = first_textarea.get_attribute("value")
 print(f"Textarea value after setting: {set_value}")
 
-time.sleep(0.5)
+time.sleep(3)
 
+# Press the create button
+create_bttn = wait.until(
+    EC.element_to_be_clickable(
+        (
+            By.XPATH,
+            "//button[contains(@class, 'relative') and contains(@class, 'inline-block') and contains(@class, 'font-sans') and contains(@class, 'text-center') and contains(@class, 'cursor-pointer') and contains(@class, 'px-8') and contains(@class, 'py-2.5') and contains(@class, 'rounded-full') and contains(@class, 'bg-foreground-primary') and contains(@class, 'text-xl') and contains(@class, 'font-medium') and contains(@class, 'text-white')]",
+        )
+    )
+)
+create_bttn.click()
+
+time.sleep(5)
 
 public_bttn = "//div[@tabindex='0' and contains(@class, 'relative') and contains(@class, 'inline-flex') and contains(@class, 'rounded-full') and contains(@class, 'cursor-pointer') and contains(@class, 'h-4') and contains(@class, 'w-7')][1]"
 
