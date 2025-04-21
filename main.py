@@ -1,3 +1,5 @@
+import json
+import re
 import sqlite3
 import time
 
@@ -24,7 +26,7 @@ driver.maximize_window()
 
 wait = WebDriverWait(driver, 20)
 
-driver.get("https://copilot.microsoft.com/")
+driver.get("https://copilot.microsoft.com/chats/uszRbPwYSCYRpTKYnxma2")
 
 prompt_input = wait.until(EC.visibility_of_element_located((By.ID, "userInput")))
 prompt_input.send_keys(Keys.CONTROL + "a")
@@ -47,7 +49,33 @@ full_response_text = ai_message.get_attribute("textContent")
 if full_response_text:
     print("\n-------------------- Full Text Extracted --------------------")
     print(full_response_text)
-    print("---------------------------------------------------------------\n")
+    print("---------------------------------------------------------------\\n")
+
+    # Extract JSON block using regex
+    json_match = re.search(r"\{.*?\}", full_response_text, re.DOTALL)
+
+    if json_match:
+        json_string = json_match.group(0)
+        try:
+            data = json.loads(json_string)
+            title = data.get("Title")
+            prompt = data.get("Prompt")
+            if title and prompt:
+                print(f"Extracted Title: {title}")
+                print(f"Extracted Prompt: {prompt}")
+            else:
+                print("\\n--- Could not find Title or Prompt keys in the JSON ---")
+                title = ""
+                prompt = ""
+        except json.JSONDecodeError:
+            print("\\n--- Could not parse the extracted JSON string ---")
+            title = ""
+            prompt = ""
+    else:
+        print("\\n--- Could not find JSON block in the response ---")
+        title = ""
+        prompt = ""
+
 else:
     print("\n--- No textContent found in the AI response container ---")
     full_response_text = ""
