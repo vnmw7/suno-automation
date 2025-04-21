@@ -151,6 +151,33 @@ time.sleep(2)
 password_field.send_keys(acc_password)
 password_field.send_keys(Keys.RETURN)
 
+time.sleep(0.5)
+
+# -------------=------------------
+# ----- this is to add title -----
+title_bttn = wait.until(
+    EC.element_to_be_clickable(
+        (
+            By.XPATH,
+            "//button[contains(@class, 'flex-1') and contains(@class, 'flex') and contains(@class, 'flex-row') and contains(@class, 'items-center') and contains(@class, 'gap-2')]",
+        )
+    )
+)
+title_bttn.click()
+
+time.sleep(0.5)
+
+title_input = wait.until(
+    EC.element_to_be_clickable(
+        (
+            By.XPATH,
+            "//input[contains(@class, 'font-serif') and contains(@class, 'font-light') and contains(@class, 'text-2xl') and contains(@class, 'bg-transparent') and contains(@class, 'outline-none') and contains(@class, 'w-full') and contains(@class, 'py-[2px]') and contains(@class, 'flex-1')]",
+        )
+    )
+)
+
+title_input.send_keys(title)
+title_input.send_keys(Keys.RETURN)
 
 time.sleep(0.5)
 
@@ -178,6 +205,7 @@ set_value = first_textarea.get_attribute("value")
 print(f"Textarea value after setting: {set_value}")
 
 time.sleep(0.5)
+
 
 public_bttn = "//div[@tabindex='0' and contains(@class, 'relative') and contains(@class, 'inline-flex') and contains(@class, 'rounded-full') and contains(@class, 'cursor-pointer') and contains(@class, 'h-4') and contains(@class, 'w-7')][1]"
 
