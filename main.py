@@ -48,37 +48,70 @@ ai_message = wait.until(
 full_response_text = ai_message.get_attribute("textContent")
 if full_response_text:
     print("\n-------------------- Full Text Extracted --------------------")
-    print(full_response_text)
+    print(f"'{full_response_text}'")
     print("---------------------------------------------------------------\\n")
 
-    # Extract JSON block using regex
-    json_match = re.search(r"\{.*?\}", full_response_text, re.DOTALL)
+    json_match = re.search(
+        r"```json\\n(\{.*?\\n\})\n```", full_response_text, re.DOTALL
+    )
+    if not json_match:
+        print("Did not find JSON in ```json block, trying general search...")
+        json_match = re.search(r"(\{.*?})", full_response_text, re.DOTALL)
 
     if json_match:
-        json_string = json_match.group(0)
+        json_string = json_match.group(1)
+        print(f"Found potential JSON string: '{json_string}'")
         try:
-            data = json.loads(json_string)
+            json_string_corrected = json_string.replace("'", '"')
+            print(f"Corrected JSON string: '{json_string_corrected}'")
+            data = json.loads(json_string_corrected)
             title = data.get("Title")
             prompt = data.get("Prompt")
             if title and prompt:
                 print(f"Extracted Title: {title}")
                 print(f"Extracted Prompt: {prompt}")
             else:
-                print("\\n--- Could not find Title or Prompt keys in the JSON ---")
+                print(
+                    "\\n--- Could not find Title or Prompt keys in the JSON --- Error keys:",
+                    data.keys(),
+                )
                 title = ""
                 prompt = ""
-        except json.JSONDecodeError:
-            print("\\n--- Could not parse the extracted JSON string ---")
+        except json.JSONDecodeError as e:
+            print(f"\\n--- Could not parse the extracted JSON string: {e} ---")
+            title = ""
+            prompt = ""
+        except Exception as e:
+            print(
+                f"\\n--- An unexpected error occurred during JSON processing: {e} ---"
+            )
             title = ""
             prompt = ""
     else:
-        print("\\n--- Could not find JSON block in the response ---")
-        title = ""
-        prompt = ""
+        print(
+            "\\n--- Could not find JSON block in the response --- Trying to extract from raw text if possible"
+        )
+        title_match = re.search(r"Title:\\s*'?([^'\\n]+)'?", full_response_text)
+        prompt_match = re.search(r"Prompt:\\s*'?([^'\\n]+)'?", full_response_text)
+        if title_match and prompt_match:
+            title = title_match.group(1).strip()
+            prompt = prompt_match.group(1).strip()
+            print(f"Fallback - Extracted Title: {title}")
+            print(f"Fallback - Extracted Prompt: {prompt}")
+        else:
+            print("Fallback extraction failed.")
+            title = ""
+            prompt = ""
 
 else:
-    print("\n--- No textContent found in the AI response container ---")
+    print("\\n--- No textContent found in the AI response container ---")
     full_response_text = ""
+    title = ""
+    prompt = ""
+
+if prompt is None:
+    print("Error: Prompt is None after extraction attempts. Setting to empty string.")
+    prompt = ""
 
 driver.get(
     "https://accounts.suno.com/sign-in?redirect_url=https%3A%2F%2Fsuno.com%2Fcreate"
@@ -114,6 +147,7 @@ time.sleep(2)
 password_field = wait.until(
     EC.element_to_be_clickable((By.XPATH, "//input[@type='password']"))
 )
+time.sleep(2)
 password_field.send_keys(acc_password)
 password_field.send_keys(Keys.RETURN)
 
@@ -132,7 +166,16 @@ first_textarea.send_keys(Keys.CONTROL + "a")
 first_textarea.send_keys(Keys.DELETE)
 time.sleep(0.5)
 
-driver.execute_script("arguments[0].value = 'test';", first_textarea)
+print(f"Attempting to set textarea with prompt: {prompt}")
+
+escaped_prompt = json.dumps(prompt)
+
+driver.execute_script(f"arguments[0].value = {escaped_prompt};", first_textarea)
+
+time.sleep(1)
+
+set_value = first_textarea.get_attribute("value")
+print(f"Textarea value after setting: {set_value}")
 
 time.sleep(0.5)
 
