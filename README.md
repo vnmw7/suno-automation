@@ -8,3 +8,9 @@
     python -m venv .venv
     .venv\Scripts\Activate.ps1  
     ```
+
+- Install python packages
+
+    ```
+    pip install -r requirements
+    ```
