@@ -5,7 +5,7 @@ import nodriver
 
 async def main():
     browser = await nodriver.start()
-    page = await browser.get("http://nowsecure.nl#relax")  # Changed URL
+    page = await browser.get("https://suno.com")  # Changed URL
 
     # Wait for page to fully load
     await asyncio.sleep(2)
