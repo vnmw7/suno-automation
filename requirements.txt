@@ -1,2 +1,5 @@
 nodriver
 selenium_driverless
+openai
+browserforge
+camoufox

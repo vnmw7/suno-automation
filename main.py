@@ -1,38 +1,14 @@
-import asyncio
+from llm_chat_utils import create_song_structure, get_verse_ranges
 
-from selenium_driverless import webdriver
-from selenium_driverless.types.by import By
+book_name = "Genesis"
+book_chapter = 1
 
+prompt = f"Split {book_name} {book_chapter} in Christian NIV Bible into 2 sections of similar size which stand alone. If the chapter is between 30 and 45 verses long, split into 3 sections instead, and if the chapter is less than 15 verses, split into one section instead. If the chapter is between 45 and 60 verses long, split into 4 sections instead. If the chapter is over 60 verses long, split into 5 sections instead. give the range of versus separated by commas. Provide the output as numbers in oneline, nothing extra like explanations. Do not iclude the thinking and thought process to save output tokens."
 
-async def main():
-    options = webdriver.ChromeOptions()
-    # options.add_argument("--headless=new") # turn on headless mode to hide the browser UI
+verse_ranges = get_verse_ranges(prompt)
+print(f"Verse ranges: {verse_ranges}")
 
-    async with webdriver.Chrome(options=options) as driver:
-        await driver.get("http://nowsecure.nl#relax", wait_load=True)
+prompt = f"Outline {book_name} {book_chapter}:{verse_ranges[0]} in the bible as a song structure of 4-6 naturally segmented verses, choruses or bridges. Don't write out the text. Never split one verse across stanzas. Never reuse verses. Give no introduction, conclusion or explanation, simply give scripture ranges separated by commas. For each, Label your stanzas inside brackets[] followed by a colon : and followed by only verse range like 5-14, each separated by comma in a single line. give nothing else. example: [Chorus]:18-28,[Bridge]:29-35"
 
-        # Chrome DevTools Protocol
-        await driver.wait_for_cdp("Page.domContentEventFired", timeout=30)
-
-        checkbox_xpath = "(//input[@type='checkbox'])[2]"
-        timeout_seconds = 10
-
-        checkbox_elem = await driver.find_element(
-            By.XPATH, checkbox_xpath, timeout_seconds
-        )
-
-        is_selected = await checkbox_elem.is_selected()
-        print(f"Checkbox selected: {is_selected}")
-        await checkbox_elem.click(move_to=True)
-        is_selected_after = await checkbox_elem.is_selected()
-        print(f"Checkbox selected after click: {is_selected_after}")
-
-        alert = await driver.switch_to.alert
-        print(alert.text)
-        await alert.accept()
-
-        print(await driver.title)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+song_structure = create_song_structure(prompt)
+print(f"Song structure: {song_structure}")
