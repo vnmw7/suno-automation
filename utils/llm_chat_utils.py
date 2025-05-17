@@ -1,4 +1,9 @@
+import os
+
+from dotenv import load_dotenv  # type: ignore
 from openai import OpenAI
+
+load_dotenv()
 
 
 def send_api_request(
@@ -8,7 +13,7 @@ def send_api_request(
 
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
-        api_key="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",
+        api_key=os.getenv("LLM_API_KEY"),
     )
     messages = [{"role": "user", "content": message}]
     completion = client.chat.completions.create(

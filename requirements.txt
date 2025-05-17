@@ -3,3 +3,4 @@ selenium_driverless
 openai
 browserforge
 camoufox
+python-dotenv

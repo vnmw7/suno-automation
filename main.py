@@ -1,4 +1,4 @@
-from llm_chat_utils import create_song_structure, get_verse_ranges
+from utils.llm_chat_utils import create_song_structure, get_verse_ranges
 
 book_name = "Genesis"
 book_chapter = 1
