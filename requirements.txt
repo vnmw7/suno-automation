@@ -5,3 +5,4 @@ browserforge
 camoufox
 python-dotenv
 pythonbible
+supabase
