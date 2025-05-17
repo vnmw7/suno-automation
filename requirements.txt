@@ -4,3 +4,4 @@ openai
 browserforge
 camoufox
 python-dotenv
+pythonbible
