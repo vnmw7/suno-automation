@@ -1,9 +1,22 @@
+import json
 import os
 
+import requests
 from dotenv import load_dotenv  # type: ignore
 from openai import OpenAI
 
 load_dotenv()
+
+
+def get_rate_limits():
+    api_key = os.getenv("LLM_API_KEY")
+
+    response = requests.get(
+        url="https://openrouter.ai/api/v1/auth/key",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+
+    print(json.dumps(response.json(), indent=2))
 
 
 def send_api_request(
@@ -33,3 +46,6 @@ def llm_general_query(
 ):
     response = send_api_request(prompt)
     return response
+
+
+get_rate_limits()

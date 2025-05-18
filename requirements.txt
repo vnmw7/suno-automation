@@ -6,3 +6,4 @@ camoufox
 python-dotenv
 pythonbible
 supabase
+pandas
