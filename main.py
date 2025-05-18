@@ -1,42 +1,96 @@
+import json
+
 from lib.supabase import supabase
-from utils.llm_chat_utils import create_song_structure, get_verse_ranges
+from utils.bible_utils import split_chapter_into_sections
+from utils.converter import bookname_to_abrv
+from utils.llm_chat_utils import create_song_structure
 
 book_name = "Genesis"
 book_chapter = 1
 
-prompt = f"Split {book_name} {book_chapter} in Christian NIV Bible into 2 sections of similar size which stand alone. If the chapter is between 30 and 45 verses long, split into 3 sections instead, and if the chapter is less than 15 verses, split into one section instead. If the chapter is between 45 and 60 verses long, split into 4 sections instead. If the chapter is over 60 verses long, split into 5 sections instead. give the range of versus separated by commas. Provide the output as numbers in oneline, nothing extra like explanations. Do not iclude the thinking and thought process to save output tokens."
+split_chapter = split_chapter_into_sections(book_name, str(book_chapter))
 
-verse_ranges = get_verse_ranges(prompt)
-verse_ranges = verse_ranges.split(",")
-print(type(verse_ranges))
-print(f"Verse ranges: {verse_ranges}")
+# prompt = f"Split {book_name} {book_chapter} in Christian NIV Bible into {split_chapter} sections of similar size which stand alone. Give the range of verses separated by commas. Provide the output as numbers in oneline, nothing extra like explanations. Do not iclude the thinking and thought process to save output tokens."
 
-prompt = f"Outline {book_name} {book_chapter}:{verse_ranges[0]} in the bible as a song structure of 4-6 naturally segmented verses, choruses or bridges. Don't write out the text. Never split one verse across stanzas. Never reuse verses. Give no introduction, conclusion or explanation, simply give scripture ranges separated by commas. For each, Label your stanzas inside brackets[] followed by a colon : and followed by only verse range like 5-14, each separated by comma in a single line. give nothing else. example: [Chorus]:18-28,[Bridge]:29-35"
+# verse_ranges = get_verse_ranges(prompt)
+# verse_ranges = verse_ranges.split(",")
+# print(type(verse_ranges))
+# print(f"Verse ranges: {verse_ranges}")
+
+# print(f"First verse range: {verse_ranges[0]}")
+
+# prompt = f"Outline the Book of '{book_name}' Chapter '{book_chapter}' Verses '{verse_ranges[0]}' in the bible as a song structure of 4-6 naturally segmented verses, choruses or bridges. Don't write out the text. Never split one verse across stanzas. Never reuse verses. Give no introduction, conclusion or explanation, simply give scripture ranges separated by commas. For each, Label your stanzas inside brackets[] followed by a colon : and followed by only verse range like 5-14, each separated by comma in a single line. give nothing else. example: [Chorus]:18-28,[Bridge]:29-35"
+
+prompt = "Make a song structure using the Book of Genesis chapter 1, strictly from verses 1-5 in the Bible only. The song will have 4-6 naturally segmented either verses, choruses or bridges. Strictly do not overlap nor reuse the verses in each segment. Strictly the output should be in json format: {'stanza label': 'bible verse range number only', 'stanza label': 'bible verse range number only'}. Do not provide any explanation only the json output."
 
 song_structure = create_song_structure(prompt)
+print(f"Song structure: {song_structure}")
 
 song_structure_dict = {}
-if isinstance(song_structure, str):
-    sections = song_structure.split(",")
-    for section in sections:
-        section = section.strip()
-        if ":" in section:
-            label, verse_range = section.split(":", 1)
-            label = label.strip()
-            if label.startswith("[") and label.endswith("]"):
-                label = label[1:-1]
-            song_structure_dict[label] = verse_range.strip()
+try:
+    if isinstance(song_structure, str):
+        if song_structure.startswith("```") and song_structure.endswith("```"):
+            song_structure_cleaned = song_structure[3:-3].strip()
+            if song_structure_cleaned.startswith("json"):
+                song_structure_cleaned = song_structure_cleaned[4:].strip()
+        else:
+            song_structure_cleaned = song_structure
 
-print(f"Song structure: {song_structure}")
-print(f"Song structure: {song_structure_dict}")
+        song_structure_json_string = song_structure_cleaned.replace("'", '"')
+    else:
+        song_structure_json_string = json.dumps(song_structure)
 
-response = (
-    supabase.table("bible_verses_tbl")
-    .select("verse_text")
-    .eq("book", "ACT")
-    .eq("chapter", 10)
-    .eq("start_verse", 1)
-    .limit(1)
-    .execute()
-)
-print(response.data[0]["verse_text"] if response.data else None)
+    parsed_song_structure = json.loads(song_structure_json_string)
+
+    if not isinstance(parsed_song_structure, dict):
+        print(
+            f"Warning: Parsed song structure is not a dictionary. Received: {type(parsed_song_structure)}"
+        )
+    else:
+        book_abrv = bookname_to_abrv(book_name)
+        for label, verse_range_str in parsed_song_structure.items():
+            verse_range_str = verse_range_str.strip()
+            verses_in_label = {}
+
+            start_verse_num_str, end_verse_num_str = "", ""
+            if "-" in verse_range_str:
+                start_verse_num_str, end_verse_num_str = verse_range_str.split("-")
+            else:
+                start_verse_num_str = end_verse_num_str = verse_range_str
+
+            try:
+                start_verse = int(start_verse_num_str)
+                end_verse = int(end_verse_num_str)
+
+                for verse_num in range(start_verse, end_verse + 1):
+                    response = (
+                        supabase.table("bible_verses_tbl")
+                        .select("verse_text")
+                        .eq("book", book_abrv)
+                        .eq("chapter", book_chapter)
+                        .eq("start_verse", verse_num)
+                        .limit(1)
+                        .execute()
+                    )
+                    verse_text = (
+                        response.data[0]["verse_text"]
+                        if response.data and len(response.data) > 0
+                        else f"Verse {verse_num} not found"
+                    )
+                    verses_in_label[str(verse_num)] = verse_text
+                song_structure_dict[label] = verses_in_label
+            except ValueError:
+                print(
+                    f"Warning: Could not parse verse range '{verse_range_str}' for label '{label}'"
+                )
+                song_structure_dict[label] = {
+                    "error": f"Invalid verse range: {verse_range_str}"
+                }
+except json.JSONDecodeError:
+    print(f"Error: Could not decode song_structure JSON. Content: '{song_structure}'")
+    song_structure_dict = {"error": "Failed to decode JSON song structure"}
+except Exception as e:
+    print(f"An unexpected error occurred while processing song structure: {e}")
+    song_structure_dict = {"error": f"Unexpected error: {e}"}
+
+print(f"Song structure dict: {song_structure_dict}")

@@ -22,7 +22,7 @@ def send_api_request(
             "X-Title": "<YOUR_SITE_NAME>",  # Optional. Site title for rankings on openrouter.ai.
         },
         extra_body={},
-        model="google/gemma-3-27b-it:free",
+        model="meta-llama/llama-3.3-8b-instruct:free",
         messages=messages,
     )
     return completion.choices[0].message.content

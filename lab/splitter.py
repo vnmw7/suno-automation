@@ -22,22 +22,22 @@ try:
     book_display_name = str(book).replace("Book.", "")
 
     # Test with Book enum
-    verse_ranges_enum = split_chapter_into_sections(book, str(book_chapter))
+    num_sections_enum = split_chapter_into_sections(book, str(book_chapter))
     print(
-        f"Verse ranges for {book_display_name} {book_chapter} (using enum): {verse_ranges_enum}"
+        f"Number of sections for {book_display_name} {book_chapter} (using enum): {num_sections_enum}"
     )
 
     # Test with string name
-    verse_ranges_string = split_chapter_into_sections("Genesis", str(book_chapter))
+    num_sections_string = split_chapter_into_sections("Genesis", str(book_chapter))
     print(
-        f"Verse ranges for Genesis {book_chapter} (using string): {verse_ranges_string}"
+        f"Number of sections for Genesis {book_chapter} (using string): {num_sections_string}"
     )
 
     # Test another book with enum
     book2 = Book.JOHN
     book_chapter2 = 3
-    verse_ranges_john = split_chapter_into_sections(book2, str(book_chapter2))
-    print(f"Verse ranges for JOHN {book_chapter2}: {verse_ranges_john}")
+    num_sections_john = split_chapter_into_sections(book2, str(book_chapter2))
+    print(f"Number of sections for JOHN {book_chapter2}: {num_sections_john}")
 
 except bible_utils.ChapterSplitError as e:
     print(f"Error: {e}")
