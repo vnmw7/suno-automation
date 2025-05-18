@@ -28,25 +28,8 @@ def send_api_request(
     return completion.choices[0].message.content
 
 
-def get_verse_ranges(
+def llm_general_query(
     prompt: str,
 ):
-    """
-    Gets verse ranges.
-    Example Output: ['1-10', '11-20', '21-31']
-    """
-
-    response = send_api_request(prompt)
-    return response
-
-
-def create_song_structure(
-    prompt: str,
-):
-    """
-    Gets verse ranges.
-    Example Output: [Verse 1]:1-2,[Chorus]:3-5,[Verse 2]:6-8,[Bridge]:9-10
-    """
-
     response = send_api_request(prompt)
     return response

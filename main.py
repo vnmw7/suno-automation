@@ -3,7 +3,7 @@ import json
 from lib.supabase import supabase
 from utils.bible_utils import split_chapter_into_sections
 from utils.converter import bookname_to_abrv
-from utils.llm_chat_utils import create_song_structure
+from utils.llm_chat_utils import llm_general_query
 
 book_name = "Genesis"
 book_chapter = 1
@@ -23,7 +23,7 @@ split_chapter = split_chapter_into_sections(book_name, str(book_chapter))
 
 prompt = "Make a song structure using the Book of Genesis chapter 1, strictly from verses 1-5 in the Bible only. The song will have 4-6 naturally segmented either verses, choruses or bridges. Strictly do not overlap nor reuse the verses in each segment. Strictly the output should be in json format: {'stanza label': 'bible verse range number only', 'stanza label': 'bible verse range number only'}. Do not provide any explanation only the json output."
 
-song_structure = create_song_structure(prompt)
+song_structure = llm_general_query(prompt)
 print(f"Song structure: {song_structure}")
 
 song_structure_dict = {}
@@ -94,3 +94,8 @@ except Exception as e:
     song_structure_dict = {"error": f"Unexpected error: {e}"}
 
 print(f"Song structure dict: {song_structure_dict}")
+
+prompt = f"Analyze the overall Bible passage is positive or negative: {song_structure_dict}. Strictly the output should be 0 or 1 only. 0 for negative and 1 for positive. Do not provide any explanation only the number."
+
+passage_tone = llm_general_query(prompt)
+print(f"Passage tone: {passage_tone}")
