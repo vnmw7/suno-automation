@@ -62,20 +62,6 @@ def separate_books():
     return style_dataframes, bible_book_dataframes
 
 
-# style_dataframes, bible_book_dataframes = separate_books()
-
-# print("--- Style DataFrames ---")
-# for name, df_style in style_dataframes.items():
-#     print(f"\n--- DataFrame for: {name} ---")
-#     print(df_style)
-
-# print("\n\n--- Bible Book DataFrames ---")
-
-# for name, book_df in bible_book_dataframes.items():
-#     print(f"\n--- DataFrame for: {name} ---")
-#     print(book_df.head())
-
-
 def get_style_by_chapter(book_name, chapter_number, tone):
     style_dataframes, bible_book_dataframes = separate_books()
 
@@ -106,3 +92,18 @@ def get_style_by_chapter(book_name, chapter_number, tone):
         style = [s.strip() for s in style if s.strip()]
 
     return style
+
+
+if __name__ == "__main__":
+    style_dataframes, bible_book_dataframes = separate_books()
+
+    print("--- Style DataFrames ---")
+    for name, df_style in style_dataframes.items():
+        print(f"\n--- DataFrame for: {name} ---")
+        print(df_style)
+
+    print("\n\n--- Bible Book DataFrames ---")
+
+    for name, book_df in bible_book_dataframes.items():
+        print(f"\n--- DataFrame for: {name} ---")
+        print(book_df.head())

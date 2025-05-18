@@ -1,62 +1,33 @@
-import json
 import os
 
-import requests
 from dotenv import load_dotenv  # type: ignore
 from openai import APIError, OpenAI  # Import APIError
 
 load_dotenv()
 
 
-def get_rate_limits():
-    api_key = os.getenv("LLM_API_KEY")
-    if not api_key:
-        print("Error: LLM_API_KEY not found in environment variables.")
-        return
-
-    try:
-        response = requests.get(
-            url="https://openrouter.ai/api/v1/auth/key",
-            headers={"Authorization": f"Bearer {api_key}"},
-        )
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        print("Rate limit info:")  # Added for clarity
-        print(json.dumps(response.json(), indent=2))
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching rate limits: {e}")
-    except json.JSONDecodeError:
-        print(
-            f"Error decoding rate limit JSON response: {response.text if response else 'No response'}"
-        )
-
-
 def send_api_request(
     message: str,
 ):
     """This is an API for LLM chats."""
-    api_key = os.getenv("LLM_API_KEY")
+    api_key = os.getenv("AIMLAPI_KEY")  # Changed to AIMLAPI_KEY
     if not api_key:
-        print("Error: LLM_API_KEY not found for send_api_request.")
+        print(
+            "Error: AIMLAPI_KEY not found for send_api_request."
+        )  # Updated error message
         return None
 
     client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
+        base_url="https://api.aimlapi.com/v1",  # Changed to AIMLAPI base_url
         api_key=api_key,
     )
     messages = [{"role": "user", "content": message}]
 
-    print(
-        "Sending request to LLM with model: google/gemma-3-1b-it:free"
-    )  # Corrected f-string
+    print("Sending request to LLM with model: gpt-4o")
 
     try:
         completion = client.chat.completions.create(
-            extra_headers={
-                "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "<YOUR_SITE_URL>"),
-                "X-Title": os.getenv("OPENROUTER_SITE_NAME", "<YOUR_SITE_NAME>"),
-            },
-            extra_body={},
-            model="meta-llama/llama-3.3-8b-instruct:free",
+            model="gpt-4o",  # Changed to gpt-4o
             messages=messages,
         )
         print(
@@ -95,7 +66,7 @@ def send_api_request(
         return None
 
 
-def llm_general_query(
+def aimlapi_general_query(
     prompt: str,
 ):
     response_content = send_api_request(prompt)
@@ -108,12 +79,12 @@ def llm_general_query(
 
 if __name__ == "__main__":
     # Moved get_rate_limits() call to main execution block
-    get_rate_limits()
+    # get_rate_limits()
     # Example test query
-    # print("\nTesting llm_general_query:")
-    # test_prompt = "Tell me a short joke."
-    # test_response = llm_general_query(test_prompt)
-    # if test_response:
-    #     print(f"Response for '{test_prompt}': {test_response}")
-    # else:
-    #     print(f"No response for '{test_prompt}'")
+    print("\nTesting llm_general_query:")
+    test_prompt = "Tell me a short joke."
+    test_response = aimlapi_general_query(test_prompt)
+    if test_response:
+        print(f"Response for '{test_prompt}': {test_response}")
+    else:
+        print(f"No response for '{test_prompt}'")
