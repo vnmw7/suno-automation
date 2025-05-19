@@ -107,13 +107,4 @@ def llm_general_query(
 
 
 if __name__ == "__main__":
-    # Moved get_rate_limits() call to main execution block
     get_rate_limits()
-    # Example test query
-    # print("\nTesting llm_general_query:")
-    # test_prompt = "Tell me a short joke."
-    # test_response = llm_general_query(test_prompt)
-    # if test_response:
-    #     print(f"Response for '{test_prompt}': {test_response}")
-    # else:
-    #     print(f"No response for '{test_prompt}'")
