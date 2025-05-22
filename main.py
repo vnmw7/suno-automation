@@ -143,7 +143,6 @@ for section_title, verses_dict in song_structure_verses.items():
 intermediate_lyrics = "\n".join(lyrics_parts)
 lyrics = re.sub(r"\n{3,}", "\n", intermediate_lyrics)
 lyrics = re.sub(r"\n", "\n\n", lyrics)
-# Remove the new line after ":" in section titles
 lyrics = re.sub(r"(\[.*?\]:)\n+", r"\1\n", lyrics)
 
 print(lyrics)
