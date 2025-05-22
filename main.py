@@ -1,11 +1,14 @@
+from browserforge.fingerprints import Screen
+from camoufox.sync_api import Camoufox
 import json
+import re
 
 from lib.supabase import supabase
 from utils.assign_styles import get_style_by_chapter
 from utils.bible_utils import split_chapter_into_sections
-from utils.converter import bookname_to_abrv
 from utils.llm_chat_backup import aimlapi_general_query
 from utils.llm_chat_utils import llm_general_query
+from utils.converter import bookname_to_abrv, song_structure_to_lyrics_structure
 
 book_name = "Genesis"
 book_chapter = 1
@@ -77,7 +80,7 @@ if response.data is not None and len(response.data) > 0:
         passage_tone = 0
         styles = []
 
-        prompt = f"Outline the Book of '{book_name}' Chapter '{book_chapter}' Verses '{verse_ranges[0]}' in the bible as a song structure of 4-6 naturally segmented verses, choruses or bridges. Don't write out the text. Never split one verse across stanzas. Never reuse verses. Give no introduction, conclusion or explanation, simply give scripture ranges separated by commas. For each, Label your stanzas inside brackets[] followed by a colon : and followed by only verse range like 5-14, each separated by comma in a single line. give nothing else. example: [Chorus]:18-28,[Bridge]:29-35"
+        prompt = f"Outline the Book of '{book_name}' Chapter '{book_chapter}' Verses '{verse_range}' in the bible as a song structure of 4-6 naturally segmented verses, choruses or bridges. Don't write out the text. Never split one verse across stanzas. Never reuse verses. Give no introduction, conclusion or explanation, simply give scripture ranges separated by commas. For each, Label your stanzas inside brackets[] followed by a colon : and followed by only verse range like 5-14, each separated by comma in a single line. give nothing else. example: [Chorus]:18-28,[Bridge]:29-35"
 
         prompt = "Make a song structure using the Book of Genesis chapter 1, strictly from verses 1-5 in the Bible only. The song will have 4-6 naturally segmented either verses, choruses or bridges. Strictly do not overlap nor reuse the verses in each segment. Strictly the output should be in json format: {'stanza label': 'bible verse range number only', 'stanza label': 'bible verse range number only'}. Do not provide any explanation only the json output."
 
@@ -87,80 +90,7 @@ if response.data is not None and len(response.data) > 0:
             song_structure = aimlapi_general_query(prompt)
         print(f"Song structure: {song_structure}")
 
-        song_structure_dict = {}
-        db_song_structure_payload = song_structure
-        try:
-            if isinstance(song_structure, str):
-                if song_structure.startswith("```") and song_structure.endswith("```"):
-                    song_structure_cleaned = song_structure[3:-3].strip()
-                    if song_structure_cleaned.startswith("json"):
-                        song_structure_cleaned = song_structure_cleaned[4:].strip()
-                else:
-                    song_structure_cleaned = song_structure
-
-                song_structure_json_string = song_structure_cleaned.replace("'", '"')
-            else:
-                song_structure_json_string = json.dumps(song_structure)
-
-            parsed_song_structure = json.loads(song_structure_json_string)
-
-            if not isinstance(parsed_song_structure, dict):
-                print(
-                    f"Warning: Parsed song structure is not a dictionary. Received: {type(parsed_song_structure)}"
-                )
-            else:
-                db_song_structure_payload = parsed_song_structure
-                book_abrv = bookname_to_abrv(book_name)
-                for label, verse_range_str in parsed_song_structure.items():
-                    verse_range_str = verse_range_str.strip()
-                    verses_in_label = {}
-
-                    start_verse_num_str, end_verse_num_str = "", ""
-                    if "-" in verse_range_str:
-                        start_verse_num_str, end_verse_num_str = verse_range_str.split(
-                            "-"
-                        )
-                    else:
-                        start_verse_num_str = end_verse_num_str = verse_range_str
-
-                    try:
-                        start_verse = int(start_verse_num_str)
-                        end_verse = int(end_verse_num_str)
-
-                        for verse_num in range(start_verse, end_verse + 1):
-                            response = (
-                                supabase.table("bible_verses_tbl")
-                                .select("verse_text")
-                                .eq("book", book_abrv)
-                                .eq("chapter", book_chapter)
-                                .eq("start_verse", verse_num)
-                                .limit(1)
-                                .execute()
-                            )
-                            verse_text = (
-                                response.data[0]["verse_text"]
-                                if response.data and len(response.data) > 0
-                                else f"Verse {verse_num} not found"
-                            )
-                            verses_in_label[str(verse_num)] = verse_text
-                        song_structure_dict[label] = verses_in_label
-                    except ValueError:
-                        print(
-                            f"Warning: Could not parse verse range '{verse_range_str}' for label '{label}'"
-                        )
-                        song_structure_dict[label] = {
-                            "error": f"Invalid verse range: {verse_range_str}"
-                        }
-        except json.JSONDecodeError:
-            print(
-                f"Error: Could not decode song_structure JSON. Content: '{song_structure}'"
-            )
-            song_structure_dict = {"error": "Failed to decode JSON song structure"}
-            # db_song_structure_payload remains the raw song_structure string
-        except Exception as e:
-            print(f"An unexpected error occurred while processing song structure: {e}")
-            song_structure_dict = {"error": f"Unexpected error: {e}"}
-            # db_song_structure_payload remains the raw song_structure string
+        song_structure_dict = song_structure
 
         print(f"Song structure dict: {song_structure_dict}")
 
@@ -177,10 +107,78 @@ if response.data is not None and len(response.data) > 0:
 
         supabase.table("song_structure_tbl").update(
             {
-                "song_structure": db_song_structure_payload,
+                "song_structure": str(song_structure_dict),
                 "tone": int(passage_tone),
                 "styles": styles,
             }
         ).eq("book_name", book_name).eq("chapter", book_chapter).eq(
             "verse_range", verse_range
         ).execute()
+
+song_structure_dict = (
+    supabase.table("song_structure_tbl")
+    .select("song_structure")
+    .eq("book_name", book_name)
+    .eq("chapter", book_chapter)
+    .execute()
+)
+
+song_structure_json_string = song_structure_dict.data[0]["song_structure"]
+parsed_song_structure = json.loads(song_structure_json_string)
+
+song_structure_verses = song_structure_to_lyrics_structure(
+    parsed_song_structure, book_name, book_chapter
+)
+print(f"Converted song structure verses: {song_structure_verses}")
+
+lyrics_parts = []
+for section_title, verses_dict in song_structure_verses.items():
+    lyrics_parts.append(f"[{section_title}]:")
+    for verse_num, verse_text in verses_dict.items():
+        processed_text = verse_text.strip()
+        processed_text = re.sub(r"\s*([.;])\s*", r"\1\n\n", processed_text)
+        processed_text = re.sub(r"^\s+(?=\S)", "", processed_text, flags=re.MULTILINE)
+        lyrics_parts.append(processed_text)
+
+intermediate_lyrics = "\n".join(lyrics_parts)
+lyrics = re.sub(r"\n{3,}", "\n", intermediate_lyrics)
+lyrics = re.sub(r"\n", "\n\n", lyrics)
+# Remove the new line after ":" in section titles
+lyrics = re.sub(r"(\[.*?\]:)\n+", r"\1\n", lyrics)
+
+print(lyrics)
+
+
+os_list = ["windows", "macos", "linux"]
+font_list = ["Arial", "Helvetica", "Times New Roman"]
+constrains = Screen(max_width=1920, max_height=1080)
+
+
+with Camoufox(
+    os=os_list,
+    fonts=font_list,
+    screen=constrains,
+    humanize=True,
+    main_world_eval=True,
+    geoip=True,
+) as browser:
+    page = browser.new_page(locale="en-US")
+    page.goto("https://suno.com")
+    page.wait_for_timeout(2000)
+    page.wait_for_load_state("load")
+    page.click('button:has(span:has-text("Sign in"))')
+    page.wait_for_timeout(2000)
+    page.click('button:has(img[alt="Sign in with Google"])')
+    page.wait_for_timeout(2000)
+    page.type('input[type="email"]', "pbNJ1sznC2Gr@gmail.com")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(2000)
+    page.wait_for_load_state("load")
+    page.wait_for_timeout(2000)
+    page.type('input[type="password"]', "&!8G26tlbsgO")
+    page.keyboard.press("Enter")
+    page.wait_for_load_state("load")
+    page.click('button:has(span:has-text("Custom"))')
+    page.wait_for_timeout(2000)
+    page.type('textarea[data-testid="lyrics-input-textarea"]', "pbNJ1sznC2Gr@gmail.com")
+    page.wait_for_timeout(2000)
