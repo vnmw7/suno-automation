@@ -154,8 +154,6 @@ constrains = Screen(max_width=1920, max_height=1080)
 
 
 with Camoufox(
-    os=os_list,
-    fonts=font_list,
     screen=constrains,
     humanize=True,
     main_world_eval=True,
@@ -165,6 +163,8 @@ with Camoufox(
     page.goto("https://suno.com")
     page.wait_for_timeout(2000)
     page.wait_for_load_state("load")
+    count = page.locator('button:has(span:has-text("Sign in"))').count()
+    print(f"Number of elements with 'test title': {count}")
     page.click('button:has(span:has-text("Sign in"))')
     page.wait_for_timeout(2000)
     page.click('button:has(img[alt="Sign in with Google"])')
@@ -176,8 +176,71 @@ with Camoufox(
     page.wait_for_timeout(2000)
     page.type('input[type="password"]', "&!8G26tlbsgO")
     page.keyboard.press("Enter")
+    page.wait_for_timeout(2000)
     page.wait_for_load_state("load")
+    page.wait_for_timeout(2000)
     page.click('button:has(span:has-text("Custom"))')
     page.wait_for_timeout(2000)
-    page.type('textarea[data-testid="lyrics-input-textarea"]', "pbNJ1sznC2Gr@gmail.com")
+    page.type('textarea[data-testid="lyrics-input-textarea"]', lyrics)
     page.wait_for_timeout(2000)
+    page.type('textarea[data-testid="tag-input-textarea"]', "test, song, lyrics")
+    page.wait_for_timeout(2000)
+    page.type('input[placeholder="Enter song title"]', "test title")
+    page.wait_for_timeout(2000)
+    page.click('button:has(span:has-text("Create"))')
+    page.wait_for_timeout(2000)
+    print("Waiting for 2 seconds before checking the number of elements...")
+    page.goto("https://suno.com/me", wait_until="domcontentloaded", timeout=30000)
+    print(f"Navigation to /me initiated. Current URL: {page.url}")
+    page.wait_for_url("https://suno.com/me**", timeout=20000)
+    locator = page.locator('span.text-foreground-primary[title="test title"]')
+    locator.first.wait_for(state="attached", timeout=10000)
+    count = locator.count()
+    page.wait_for_timeout(2000)
+    locator.nth(2).click(button="right")
+    page.wait_for_timeout(2000)
+
+    context_menu_content = page.locator(
+        "div[data-radix-menu-content][data-state='open']"
+    )
+    context_menu_content.wait_for(state="visible", timeout=15000)
+    page.wait_for_timeout(500)
+
+    download_submenu_trigger = context_menu_content.locator(
+        '[data-testid="download-sub-trigger"]'
+    )
+    download_submenu_trigger.wait_for(state="visible", timeout=5000)
+    download_submenu_trigger.hover()
+
+    download_trigger_id = download_submenu_trigger.get_attribute("id")
+    if not download_trigger_id:
+        raise Exception(
+            "Download trigger item does not have an ID. Cannot reliably locate submenu."
+        )
+
+    download_submenu_panel = page.locator(
+        f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
+    )
+
+    download_submenu_panel.wait_for(state="visible", timeout=10000)
+
+    mp3_audio_item = download_submenu_panel.locator(
+        "div[role='menuitem']:has-text('MP3 Audio')"
+    )
+
+    mp3_audio_item.wait_for(state="visible", timeout=5000)
+
+    mp3_audio_item.click()
+    page.wait_for_timeout(2000)
+
+    download_bttn = page.locator('button:has(span:has-text("Download Anyway"))')
+
+    with page.expect_download(timeout=30000) as download_info:
+        download_bttn.click()
+    download = download_info.value
+
+    download_path = f"./{download.suggested_filename}"
+    download.save_as(download_path)
+    print(f"Clicked 'MP3 Audio'. Download started and saved to: {download_path}")
+
+    page.wait_for_timeout(3000)
