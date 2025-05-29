@@ -8,3 +8,4 @@ pythonbible
 supabase
 pandas
 camoufox[geoip] 
+"fastapi[standard]"
