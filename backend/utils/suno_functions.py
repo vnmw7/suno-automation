@@ -31,6 +31,7 @@ def login_suno():
             user_data_dir="user-data-dir",
             os=("windows"),
             config=config,
+            humanize=True,
             i_know_what_im_doing=True,
         ) as browser:
             page = browser.new_page()
