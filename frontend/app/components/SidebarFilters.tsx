@@ -1,14 +1,12 @@
 // app/components/SidebarFilters.tsx
 import TestamentFilter from "./TestamentFilter";
 import BookFilter from "./BookFilter"; // Changed from GenreFilter
-import ChaptersFilter from "./ChaptersFilter";
 import { FilterIcon } from "./ui/icon";
 import type { BibleBook } from "~/routes/main"; // Ensure this path is correct
 
 interface FilterData {
   testaments: ("Old Testament" | "New Testament")[];
   bookNames: string[]; // Changed from genres
-  maxChapters: number;
 }
 
 export interface ActiveFilters {
@@ -20,12 +18,14 @@ export interface ActiveFilters {
 
 interface SidebarFiltersProps {
   filters: FilterData;
+  maxChapters: number;
   activeFilters: ActiveFilters;
   onFilterChange: (newFilter: Partial<ActiveFilters>) => void;
 }
 
 export default function SidebarFilters({
   filters,
+  maxChapters,
   activeFilters,
   onFilterChange,
 }: SidebarFiltersProps) {
@@ -52,20 +52,13 @@ export default function SidebarFilters({
             bookName: activeFilters.bookName === bookName ? null : bookName,
           })
         }
-      />
-      <ChaptersFilter
-        maxChapters={filters.maxChapters}
-        currentRange={activeFilters.chapterRange}
-        onRangeChange={(range: [number, number]) =>
-          onFilterChange({ chapterRange: range })
-        }
-      />
+      />{" "}
       <button
         onClick={() =>
           onFilterChange({
             testament: null,
-            bookName: null, // Corrected: was genre
-            chapterRange: [0, filters.maxChapters],
+            bookName: null,
+            chapterRange: [0, maxChapters],
           })
         }
         className="w-full mt-4 px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-100 text-sm"

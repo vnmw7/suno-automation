@@ -1,0 +1,212 @@
+diff name:ublock-annoyances lines:3 checksum:1694def71d
+d4 1
+a4 1
+! Diff-Path: ../patches/2025.6.3.778.patch#ublock-annoyances
+diff name:ublock-badware lines:5 checksum:28f345bf0d
+d3 2
+a4 2
+! Last modified: Tue, 03 Jun 2025 09:21:47 +0000
+! Diff-Path: ../patches/2025.6.3.778.patch#ublock-badware
+d4535 1
+diff name:ublock-filters lines:43 checksum:da84905d65
+d3 2
+a4 2
+! Last modified: Tue, 03 Jun 2025 12:48:40 +0000
+! Diff-Path: ../patches/2025.6.3.778.patch#ublock-filters
+d8861 1
+a8861 1
+f1stream.*,fapinporn.com,fapptime.com,fastreams.live,faucethero.com,favoyeurtube.net,fbstream.*,fc2db.com,fembed.com,femdom-joi.com,fenixsite.net,file4go.*,filegram.to,fileone.tv,film1k.com,filmeonline2023.net,filmesonlinex.org,filmesonlinexhd.biz,filmovitica.com,filmymaza.blogspot.com,filmyzilla.*,filthy.family,findav.*,findporn.*,fixfinder.click,flickzap.com,flixmaza.*,flizmovies.*,flostreams.xyz,flyfaucet.com,footyhunter.lol,forex-trnd.com,forumchat.club,forumlovers.club,freemoviesonline.biz,freeomovie.co.in,freeomovie.to,freeporncomic.net,freepornhdonlinegay.com,freeproxy.io,freeshot.live,freetvsports.*,freeuse.me,freeusexporn.com,fsharetv.cc,fsicomics.com,fullymaza.*##^script[data-cfasync]:has-text(/h=decodeURIComponent|popundersPerIP/)
+d8889 1
+a8889 1
+f1stream.*,fapinporn.com,fapptime.com,fastreams.live,faucethero.com,favoyeurtube.net,fbstream.*,fc2db.com,fembed.com,femdom-joi.com,fenixsite.net,file4go.*,filegram.to,fileone.tv,film1k.com,filmeonline2023.net,filmesonlinex.org,filmesonlinexhd.biz,filmovitica.com,filmymaza.blogspot.com,filmyzilla.*,filthy.family,findav.*,findporn.*,fixfinder.click,flickzap.com,flixmaza.*,flizmovies.*,flostreams.xyz,flyfaucet.com,footyhunter.lol,forex-trnd.com,forumchat.club,forumlovers.club,freemoviesonline.biz,freeomovie.co.in,freeomovie.to,freeporncomic.net,freepornhdonlinegay.com,freeproxy.io,freeshot.live,freetvsports.*,freeuse.me,freeusexporn.com,fsharetv.cc,fsicomics.com,fullymaza.*##+js(rmnt, script, /h=decodeURIComponent|popundersPerIP/)
+d9035 1
+a9035 1
+10convert.com,2girls1cup.ca,animez.org,besthdgayporn.com,bigojav.com,bookfrom.net,ddd-smart.net,dojing.net,drivenime.com,favoyeurtube.net,fucksporn.com,fullxcinema1.com,gdrivelatinohd.net,gigmature.com,hentairead.io,homemoviestube.com,javboys.*,javbraze.com,javchill.com,javhat.tv,javhd.today,javhdz.today,javseen.tv,javup.org,kaliscan.me,kisscos.net,kmansin09.*,leermanga.net,mangajikan.com,mangamovil.net,naijauncut.com,nicomanga.com,nudeslegion.com,onlinework4all.com,otomi-games.com,piratehaven.xyz,poapan.xyz,porn00.org,pornohubonline.com,pornxp.com,raw1001.net,rawinu.com,safefileku.com,sexdiaryz.*,shemale6.com,shemaleup.net,socigames.com,streamup.ws,tatli.biz,teenager365.com,theblank.net,transflix.net,turboimagehost.com,weloma.art,welovemanga.one,worthcrete.com##+js(acs, document.createElement, /l\.parentNode\.insertBefore\(s/)
+a9047 1
+||private-hide.com^
+d9371 1
+a9371 1
+aiblog.tv,amateurblog.tv,dojing.net,filegram.to,gravureblog.tv,krx18.com,latinblog.tv,mangaforfree.com,nekopoi.*,pornx.to,savefiles.com,silverblog.tv,socialblog.tv,starblog.tv,streampoi.com,streamtape.*,up4stream.com,ups2up.fun,xblog.tv,xmegadrive.com##^script:has-text(wpadmngr.com)
+d9373 1
+a9373 1
+aiblog.tv,amateurblog.tv,dojing.net,filegram.to,gravureblog.tv,krx18.com,latinblog.tv,mangaforfree.com,nekopoi.*,pornx.to,savefiles.com,silverblog.tv,socialblog.tv,starblog.tv,streampoi.com,streamtape.*,up4stream.com,ups2up.fun,xblog.tv,xmegadrive.com##+js(rmnt, script, wpadmngr.com)
+d9380 2
+a9381 2
+/^https?:\/\/[-a-z]{5,13}\.[a-z]{3,}\/[0-9a-z]{1,20}\?(?=[A-Za-z]{0,21}\d?)(?=[0-9a-z]{0,21}[A-Z])[0-9A-Za-z]{15,24}=(?=[%a-z]*[0-9A-Z])[%0-9A-Za-z]{35,2000}$/$xhr,3p,match-case,method=get,header=via:/^2\.\d (apache|nginx)$/,to=~com|~dev|~net|~org|~edu|~gov|~tv
+/^https?:\/\/[-a-z]{5,13}\.[a-z]{3,}\/[0-9a-z]{1,20}\?(?=[A-Za-z]{0,21}\d?)(?=[0-9a-z]{0,21}[A-Z])[0-9A-Za-z]{15,24}=(?=[%a-z]*[0-9A-Z])[%0-9A-Za-z]{35,2000}$/$xhr,3p,match-case,method=get,header=Via:/^2\.\d (apache|nginx)$/,to=~com|~dev|~net|~org|~edu|~gov|~tv
+d9397 4
+a9400 5
+hyhd.org##+js(aopr, aclib)
+hyhd.org##+js(aopr, Adcash)
+hyhd.org##+js(nowoif, _blank)
+hyhd.org##+js(acs, document.write, .js?_=)
+/^https?:\/\/(?:\w+\.){1,2}[a-z]{2,}\/[a-f0-9]{32}\.js\?_=17\d{8}$/$script,1p,strict1p,match-case
+d9529 1
+a9529 1
+babehubonlyfansly.com,backyardpapa.com,baithak.news,baixedetudo.com.br,balkanteka.net,bandstand.ph,batman.city,bcanepaltu.com,bcanotesnepal.com,bcsnoticias.mx,bdix.app,bdokan.com,bdsomadhan.com,bdstarshop.com,beaddiagrams.com,bearchasingart.com,beatree.cn,bedavahesap.org,beisbolinvernal.com,bengalxpress.in,beasttips.com,berlin-teltow.de,beruhmtemedien.com,bestofarea.com,bettingexchange.it,bi-girl.net,bibliotecadecorte.com,bibliotecahermetica.com.br,bidersnotu.com,bif24.pl,biftutech.com,bigdata-social.com,bimshares.com,bishalghale.com.np,bitcotasks.com,bitlikutu.com,bittukitech.in,bitview.cloud,bitzite.com,blog.motionisland.com,blog24.me,blogk.com,blogue.tech,bloooog.it,bloxyscripts.com,bluebuddies.com,bluecoreinside.com,blurayufr.cam,bogowieslowianscy.pl,bookpraiser.com,booksbybunny.com,boredgiant.com,botinnifit.com,boundlessnecromancer.com,boxaoffrir.com,boxingvideo.org,boxofficebusiness.in,boyfuck.me,boystube.link,braziliannr.com,brevi.eu,brian70.tw,bright-b.com,brightpets.org,broadbottomvillage.co.uk,brokensilenze.net,brulosophy.com,brushednickel.biz,bshifast.live,bsmaurya.com,bugswave.com,businesstrend.jp,buzzpit.net,byswiizen.fr##+js(trusted-suppress-native-method, eval, '"/chp_?ad/"')
+d9543 1
+a9543 1
+pabryyt.one,palofw-lab.com,paminy.com,pandaatlanta.com,pandanote.info,pantube.top,paolo9785.com,papafoot.click,papahd.club,paris-tabi.com,parisporn.org,parking-map.info,pasatiemposparaimprimir.com,pasokau.com,passionatecarbloggers.com,passportaction.com,pc-guru.it,pc-hobby.com,pc-spiele-wiese.de,pcgamedownload.net,pcgameszone.com,pdfstandards.net,pepar.net,personefamose.it,petitestef.com,pflege-info.net,phoenix-manga.com,phonefirmware.com,physics101.co.za,picgiraffe.com,pilsner.nu,piratemods.com,piximfix.com,plantatreenow.com,plc4free.com,pliroforiki-edu.gr,poapan.xyz,poco.rcccn.in,pogga.org,pokeca-chart.com,pondit.xyz,ponsel4g.com,poplinks.*,porlalibreportal.com,pornfeel.com,porninblack.com,portaldoaz.org,portaldosreceptores.org,portalyaoi.com,postazap.com,posturecorrectorshop-online.com,practicalkida.com,prague-blog.co.il,praveeneditz.com,premierftp.com,prensa.click,prensaesports.com,pressemedie.dk,pressurewasherpumpdiagram.com,pricemint.in,primemovies.pl,prismmarketingco.com,proapkdown.com,projuktirkotha.com,promiblogs.de,promimedien.com,promisingapps.com,protestia.com,psicotestuned.info,psychology-spot.com,publicdomainq.net,publicdomainr.net,publicidadtulua.com,pupuweb.com,putlog.net,pynck.com##+js(trusted-suppress-native-method, eval, '"/chp_?ad/"')
+d23708 1
+a23708 1
+footybite.to,rargb.to,totalsportek.*,totalsportekhd.com##+js(aeld, , open)
+a23953 1
+kungfutv.net##+js(aeld, DOMContentLoaded, window.open)
+diff name:ublock-privacy lines:3 checksum:bf79322545
+d4 1
+a4 1
+! Diff-Path: ../patches/2025.6.3.778.patch#ublock-privacy
+diff name:ublock-quick-fixes lines:10 checksum:1de62a4708
+d3 2
+a4 2
+! Last modified: Tue, 03 Jun 2025 10:15:49 +0000
+! Diff-Path: ../patches/2025.6.3.778.patch#ublock-quick-fixes
+d90 2
+a91 1
+japscan.lol##+js(trusted-suppress-native-method, Document.prototype.getElementsByClassName, '"/^ZL/"', prevent, /stackDepth:4.+ inlineScript/)
+d93 1
+a93 1
+japscan.lol##+js(trusted-suppress-native-method, Document.prototype.getElementById, '"/^ZL/"', prevent, /stackDepth:4.+ inlineScript/)
+diff name:ublock-unbreak lines:3 checksum:43de3cb751
+d4 1
+a4 1
+! Diff-Path: ../patches/2025.6.3.778.patch#ublock-unbreak
+diff name:easylist lines:88 checksum:957638cf8c
+d4 2
+a5 2
+! Last modified: Tue, 03 Jun 2025 09:51:11 +0000
+! Diff-Path: ../patches/2025.6.3.778.patch#easylist
+a102 1
+/aclib.js$script
+a16183 1
+||4dc005d17a.com^
+a17090 1
+||ads1-adqva.com^
+a18684 1
+||augustpinch.com^
+a18911 1
+||aycompleted.com^
+a20770 1
+||cemeteryloinrespirator.com^
+a21161 1
+||classicnumeralsascertained.com^
+a21700 1
+||controversykeenworkshop.com^
+a21993 1
+||crocodail-dandy.com^
+a22090 1
+||cuckoosad.com^
+a22514 1
+||decisionlace.com^
+a22828 1
+||digestivebackwards.com^
+a23652 1
+||ebeaelte.com^
+a24253 1
+||etotreatwithdify.com^
+a24638 1
+||fbdata-edt.com^
+a24950 1
+||flansactidaced.com^
+a24978 1
+||flickering-buy.com^
+a25045 1
+||flypartly.com^
+a25056 1
+||fmljbodtnweou.com^
+a25495 1
+||fzfjyjoyncdq.com^
+a26201 1
+||gpwkcgvhjobnua.com^
+a26293 1
+||greenhouserewrite.com^
+a26330 1
+||grimlycask.com^
+a28006 1
+||investalepregnancy.com^
+a28618 1
+||jucasture.com^
+a29493 1
+||lementwrencespri.com^
+a30360 1
+||manuscriptfelt.com^
+a30481 1
+||mbaikugfhqqy.com^
+a30818 1
+||mirthbeat.com^
+a32621 1
+||ooyrvktsxj.com^
+a34093 1
+||praystakeinstinct.com^
+a34981 1
+||qwswpauj.xyz^
+a35373 1
+||reifmaguari.top^
+a35455 1
+||rentorshal.com^
+a36138 1
+||ryaqlywkoola.top^
+a36157 1
+||s16a.biz^
+a36337 1
+||scalpdisqualify.com^
+a37088 1
+||smartadsflow.top^
+a37524 1
+||stallsubscribe.com^
+a39024 1
+||trkdefbmedia.eu^
+a40261 1
+||vutajjarcah.com^
+a40735 1
+||windyplentiful.com^
+diff name:easyprivacy lines:3 checksum:6eaef52558
+d5 1
+a5 1
+! Diff-Path: ../patches/2025.6.3.778.patch#easyprivacy
+ ›Å(      h?hh?kHBÕh?C   L    ~FETCH,:https://ublockorigin.github.io/uAssetsCDN/patches/2025.6.3.449.patch strongly-framed 1 security-info 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 request-method GET request-Accept-Encoding gzip, deflate, br, zstd response-head HTTP/2 200 
+server: GitHub.com
+content-type: application/octet-stream
+x-origin-cache: HIT
+last-modified: Tue, 03 Jun 2025 12:59:21 GMT
+access-control-allow-origin: *
+etag: "683ef1a9-23e5"
+expires: Tue, 03 Jun 2025 13:35:02 GMT
+cache-control: max-age=600
+x-proxy-cache: HIT
+x-github-request-id: 5134:1A77C:3D751A:430664:683EF7AD
+accept-ranges: bytes
+date: Tue, 03 Jun 2025 15:02:00 GMT
+via: 1.1 varnish
+age: 381
+x-served-by: cache-mnl9726-MNL
+x-cache: HIT
+x-cache-hits: 60
+x-timer: S1748962921.789003,VS0,VE2
+vary: Accept-Encoding
+x-fastly-request-id: 1aea36a5fcb3e8096edf3933f574d46ffe02712c
+content-length: 9189
+X-Firefox-Spdy: h2
+ original-response-headers server: GitHub.com
+content-type: application/octet-stream
+x-origin-cache: HIT
+last-modified: Tue, 03 Jun 2025 12:59:21 GMT
+access-control-allow-origin: *
+etag: "683ef1a9-23e5"
+expires: Tue, 03 Jun 2025 13:35:02 GMT
+cache-control: max-age=600
+x-proxy-cache: HIT
+x-github-request-id: 5134:1A77C:3D751A:430664:683EF7AD
+accept-ranges: bytes
+date: Tue, 03 Jun 2025 15:02:00 GMT
+via: 1.1 varnish
+age: 381
+x-served-by: cache-mnl9726-MNL
+x-cache: HIT
+x-cache-hits: 60
+x-timer: S1748962921.789003,VS0,VE2
+vary: Accept-Encoding
+x-fastly-request-id: 1aea36a5fcb3e8096edf3933f574d46ffe02712c
+content-length: 9189
+X-Firefox-Spdy: h2
+ ctid 1 net-response-time-onstart 835 net-response-time-onstop 901   #Â

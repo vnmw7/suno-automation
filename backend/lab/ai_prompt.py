@@ -1,14 +1,26 @@
-from browserforge.fingerprints import Screen
-from camoufox.sync_api import Camoufox
+import sys
+import os
 import json
 import re
 
-from lib.supabase import supabase
-from utils.assign_styles import get_style_by_chapter
-from utils.bible_utils import split_chapter_into_sections
-from utils.llm_chat_backup import aimlapi_general_query
-from utils.llm_chat_utils import llm_general_query
-from utils.converter import bookname_to_abrv, song_structure_to_lyrics_structure
+from browserforge.fingerprints import Screen
+from camoufox.sync_api import Camoufox
+
+if __name__ == "__main__" and not __package__:
+    # When running this script directly, add the project root to sys.path
+    # to allow absolute imports like 'from backend.lib.supabase import supabase'.
+    # __file__ is .../backend/lab/ai_prompt.py
+    # project_root is .../ (suno-automation directory)
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
+from backend.lib.supabase import supabase
+from backend.utils.assign_styles import get_style_by_chapter
+from backend.utils.bible_utils import split_chapter_into_sections
+from backend.utils.llm_chat_backup import aimlapi_general_query
+from backend.utils.llm_chat_utils import llm_general_query
+from backend.utils.converter import song_structure_to_lyrics_structure
 
 book_name = "Genesis"
 book_chapter = 1
@@ -161,11 +173,19 @@ with Camoufox(
 ) as browser:
     page = browser.new_page(locale="en-US")
     page.goto("https://suno.com")
-    page.wait_for_timeout(2000)
-    page.wait_for_load_state("load")
-    count = page.locator('button:has(span:has-text("Sign in"))').count()
-    print(f"Number of elements with 'test title': {count}")
-    page.click('button:has(span:has-text("Sign in"))')
+    page.wait_for_load_state("networkidle")  # Wait for network to be idle
+
+    sign_in_button_selector = 'button:has(span:has-text("Sign in"))'
+    page.wait_for_selector(
+        sign_in_button_selector, state="visible", timeout=60000
+    )  # Increased timeout
+    page.wait_for_selector(
+        sign_in_button_selector, state="enabled", timeout=60000
+    )  # Ensure it's enabled
+
+    count = page.locator(sign_in_button_selector).count()
+    print(f"Number of elements with 'Sign in': {count}")  # Corrected log message
+    page.click(sign_in_button_selector)
     page.wait_for_timeout(2000)
     page.click('button:has(img[alt="Sign in with Google"])')
     page.wait_for_timeout(2000)
@@ -175,72 +195,73 @@ with Camoufox(
     page.wait_for_load_state("load")
     page.wait_for_timeout(2000)
     page.type('input[type="password"]', "&!8G26tlbsgO")
-    page.keyboard.press("Enter")
-    page.wait_for_timeout(2000)
-    page.wait_for_load_state("load")
-    page.wait_for_timeout(2000)
-    page.click('button:has(span:has-text("Custom"))')
-    page.wait_for_timeout(2000)
-    page.type('textarea[data-testid="lyrics-input-textarea"]', lyrics)
-    page.wait_for_timeout(2000)
-    page.type('textarea[data-testid="tag-input-textarea"]', "test, song, lyrics")
-    page.wait_for_timeout(2000)
-    page.type('input[placeholder="Enter song title"]', "test title")
-    page.wait_for_timeout(2000)
-    page.click('button:has(span:has-text("Create"))')
-    page.wait_for_timeout(2000)
-    print("Waiting for 2 seconds before checking the number of elements...")
-    page.goto("https://suno.com/me", wait_until="domcontentloaded", timeout=30000)
-    print(f"Navigation to /me initiated. Current URL: {page.url}")
-    page.wait_for_url("https://suno.com/me**", timeout=20000)
-    locator = page.locator('span.text-foreground-primary[title="test title"]')
-    locator.first.wait_for(state="attached", timeout=10000)
-    count = locator.count()
-    page.wait_for_timeout(2000)
-    locator.nth(2).click(button="right")
-    page.wait_for_timeout(2000)
+    # page.keyboard.press("Enter")
+    # page.wait_for_timeout(2000)
+    # page.wait_for_load_state("load")
+    # page.wait_for_timeout(2000)
+    # page.click('button:has(span:has-text("Custom"))')
+    # page.wait_for_timeout(2000)
+    # page.type('textarea[data-testid="lyrics-input-textarea"]', lyrics)
+    # page.wait_for_timeout(2000)
+    # page.type('textarea[data-testid="tag-input-textarea"]', "test, song, lyrics")
+    # page.wait_for_timeout(2000)
+    # page.type('input[placeholder="Enter song title"]', "test title")
+    # page.wait_for_timeout(2000)
+    # page.click('button:has(span:has-text("Create"))')
+    # page.wait_for_timeout(2000)
+    # print("Waiting for 2 seconds before checking the number of elements...")
+    # page.goto("https://suno.com/me", wait_until="domcontentloaded", timeout=30000)
+    # print(f"Navigation to /me initiated. Current URL: {page.url}")
+    # page.wait_for_url("https://suno.com/me**", timeout=20000)
+    # locator = page.locator('span.text-foreground-primary[title="test title"]')
+    # locator.first.wait_for(state="attached", timeout=10000)
+    # count = locator.count()
+    # page.wait_for_timeout(2000)
+    # locator.nth(2).click(button="right")
+    # page.wait_for_timeout(2000)
 
-    context_menu_content = page.locator(
-        "div[data-radix-menu-content][data-state='open']"
-    )
-    context_menu_content.wait_for(state="visible", timeout=15000)
-    page.wait_for_timeout(500)
+    # context_menu_content = page.locator(
+    #     "div[data-radix-menu-content][data-state='open']"
+    # )
+    # context_menu_content.wait_for(state="visible", timeout=15000)
+    # page.wait_for_timeout(500)
 
-    download_submenu_trigger = context_menu_content.locator(
-        '[data-testid="download-sub-trigger"]'
-    )
-    download_submenu_trigger.wait_for(state="visible", timeout=5000)
-    download_submenu_trigger.hover()
+    # download_submenu_trigger = context_menu_content.locator(
+    #     '[data-testid="download-sub-trigger"]'
+    # )
+    # download_submenu_trigger.wait_for(state="visible", timeout=5000)
+    # download_submenu_trigger.hover()
 
-    download_trigger_id = download_submenu_trigger.get_attribute("id")
-    if not download_trigger_id:
-        raise Exception(
-            "Download trigger item does not have an ID. Cannot reliably locate submenu."
-        )
+    # download_trigger_id = download_submenu_trigger.get_attribute("id")
+    # if not download_trigger_id:
+    #     raise Exception(
+    #         "Download trigger item does not have an ID. Cannot reliably locate submenu."
+    #     )
 
-    download_submenu_panel = page.locator(
-        f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
-    )
+    # download_submenu_panel = page.locator(
+    #     f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
+    # )
 
-    download_submenu_panel.wait_for(state="visible", timeout=10000)
+    # download_submenu_panel.wait_for(state="visible", timeout=10000)
 
-    mp3_audio_item = download_submenu_panel.locator(
-        "div[role='menuitem']:has-text('MP3 Audio')"
-    )
+    # mp3_audio_item = download_submenu_panel.locator(
+    #     "div[role='menuitem']:has-text('MP3 Audio')"
+    # )
 
-    mp3_audio_item.wait_for(state="visible", timeout=5000)
+    # mp3_audio_item.wait_for(state="visible", timeout=5000)
 
-    mp3_audio_item.click()
-    page.wait_for_timeout(2000)
+    # mp3_audio_item.click()
+    # page.wait_for_timeout(2000)
 
-    download_bttn = page.locator('button:has(span:has-text("Download Anyway"))')
+    # download_bttn = page.locator('button:has(span:has-text("Download Anyway"))')
 
-    with page.expect_download(timeout=30000) as download_info:
-        download_bttn.click()
-    download = download_info.value
+    # with page.expect_download(timeout=30000) as download_info:
+    #     download_bttn.click()
+    # download = download_info.value
 
-    download_path = f"./{download.suggested_filename}"
-    download.save_as(download_path)
-    print(f"Clicked 'MP3 Audio'. Download started and saved to: {download_path}")
+    # download_path = f"./{download.suggested_filename}"
+    # download.save_as(download_path)
+    # print(f"Clicked 'MP3 Audio'. Download started and saved to: {download_path}")
 
     page.wait_for_timeout(3000)
+    page.close()

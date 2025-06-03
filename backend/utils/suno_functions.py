@@ -26,7 +26,7 @@ config = {
 def login_suno():
     try:
         with Camoufox(
-            headless=False,  # Keep False for debugging, consider True for production
+            headless=True,
             persistent_context=True,
             user_data_dir="user-data-dir",
             os=("windows"),
@@ -37,7 +37,7 @@ def login_suno():
             page = browser.new_page()
             print("Navigating to suno.com...")
             page.goto("https://suno.com")
-            # Consider replacing fixed timeouts with waits for specific elements/events
+            print("Waiting for page to load...")
             page.wait_for_timeout(2000)
             page.wait_for_load_state("load")
             print("Page loaded.")
@@ -65,23 +65,17 @@ def login_suno():
                 print(
                     "Sign-in button not visible. Assuming already signed in or an issue."
                 )
-                # You might want to add further checks here to confirm if actually logged in
-                return True  # Return True if already signed in (or button not found)
+
+                return True
 
     except Exception as e:
         print(f"An error occurred in login_suno: {e}")
         print(traceback.format_exc())
-        # Option 1: Re-raise the exception. FastAPI will then likely return a 500 error.
-        # raise
-        # Option 2: Return False to indicate failure to the calling FastAPI endpoint.
-        # This would result in 'false' in the JSON response if your FastAPI endpoint returns this.
-        return False  # Or handle as appropriate, but None is causing 'null'
 
-    # Fallback return, though ideally, all paths within try/except should be covered.
-    # Given the structure above, this might be unreachable if try always returns or raises.
-    # If an unexpected path leads here, it indicates a logic flow issue.
+        return False
+
     print("Reached end of login_suno function unexpectedly (after try-except).")
-    return False  # Or True, depending on desired default for unexpected completion.
+    return False
 
 
 if __name__ == "__main__":

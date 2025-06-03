@@ -1,35 +1,29 @@
 // app/routes/bible.books.tsx
 import { useState } from "react";
-import { json } from "@remix-run/node";
 import { useLoaderData, MetaFunction } from "@remix-run/react";
 import SidebarFilters from "~/components/SidebarFilters";
 import BookCard from "../components/BookCard";
 import BookDetailsView from "../components/BookDetailsView";
 import { Dropdown } from "../components/ui/dropdown";
-import { ListIcon, ViewGridIcon, BookOpenIcon } from "../components/ui/icon"; // Assuming you create these
+import { ListIcon, ViewGridIcon, BookOpenIcon } from "../components/ui/icon";
+import { supabase } from "~/lib/supabase";
 
-// Define Book and Filter types
 export interface BibleBook {
-  // Exporting for use in BookCard and BookDetailsView
   id: string;
   name: string;
   testament: "Old Testament" | "New Testament";
   chapters: number;
   summary: string;
-  author?: string; // Optional additional info
-  writtenDate?: string; // Optional
-  genre?: string; // Keep genre for book information
+  author?: string;
+  writtenDate?: string;
 }
 
 interface FilterData {
   testaments: ("Old Testament" | "New Testament")[];
-  bookNames: string[]; // Changed from genres
-  maxChapters: number;
+  bookNames: string[];
 }
 
-// NIV Bible book data
 const bibleBooksNIV: BibleBook[] = [
-  // Old Testament
   {
     id: "gen",
     name: "Genesis",
@@ -37,7 +31,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 50,
     summary: "Creation, early human history, and the patriarchs.",
     author: "Moses (traditionally)",
-    genre: "Law (Torah/Pentateuch)",
   },
   {
     id: "exo",
@@ -46,7 +39,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 40,
     summary: "Israel's deliverance from Egypt and the giving of the Law.",
     author: "Moses (traditionally)",
-    genre: "Law (Torah/Pentateuch)",
   },
   {
     id: "lev",
@@ -55,7 +47,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 27,
     summary: "Laws and regulations for worship and holy living.",
     author: "Moses (traditionally)",
-    genre: "Law (Torah/Pentateuch)",
   },
   {
     id: "num",
@@ -64,7 +55,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 36,
     summary: "The Israelites' journey through the wilderness.",
     author: "Moses (traditionally)",
-    genre: "Law (Torah/Pentateuch)",
   },
   {
     id: "deu",
@@ -73,7 +63,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 34,
     summary: "Moses' farewell speeches and a restatement of the Law.",
     author: "Moses (traditionally)",
-    genre: "Law (Torah/Pentateuch)",
   },
   {
     id: "jos",
@@ -81,7 +70,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 24,
     summary: "The conquest and division of Canaan.",
-    genre: "Historical Books",
   },
   {
     id: "jud",
@@ -89,7 +77,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 21,
     summary: "The period of the judges in Israel.",
-    genre: "Historical Books",
   },
   {
     id: "rut",
@@ -97,7 +84,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 4,
     summary: "A story of loyalty and redemption.",
-    genre: "Historical Books",
   },
   {
     id: "1sa",
@@ -105,7 +91,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 31,
     summary: "The rise of the Israelite monarchy (Saul and David).",
-    genre: "Historical Books",
   },
   {
     id: "2sa",
@@ -113,7 +98,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 24,
     summary: "The reign of King David.",
-    genre: "Historical Books",
   },
   {
     id: "1ki",
@@ -121,7 +105,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 22,
     summary: "The reign of Solomon and the division of the kingdom.",
-    genre: "Historical Books",
   },
   {
     id: "2ki",
@@ -129,7 +112,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 25,
     summary: "The history of the divided kingdom until the exile.",
-    genre: "Historical Books",
   },
   {
     id: "1ch",
@@ -138,7 +120,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 29,
     summary:
       "A priestly perspective on the history of Israel, focusing on David.",
-    genre: "Historical Books",
   },
   {
     id: "2ch",
@@ -147,7 +128,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 36,
     summary:
       "A priestly perspective on the history of Judah, focusing on Solomon and the Temple.",
-    genre: "Historical Books",
   },
   {
     id: "ezr",
@@ -155,7 +135,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 10,
     summary: "The return from exile and the rebuilding of the Temple.",
-    genre: "Historical Books",
   },
   {
     id: "neh",
@@ -163,7 +142,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 13,
     summary: "The rebuilding of Jerusalem's walls.",
-    genre: "Historical Books",
   },
   {
     id: "est",
@@ -171,7 +149,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 10,
     summary: "God's deliverance of the Jewish people through Esther.",
-    genre: "Historical Books",
   },
   {
     id: "job",
@@ -179,7 +156,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 42,
     summary: "A righteous man's suffering and his struggle with faith.",
-    genre: "Poetry & Wisdom",
   },
   {
     id: "psa",
@@ -187,7 +163,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 150,
     summary: "A collection of prayers, hymns, and poems.",
-    genre: "Poetry & Wisdom",
   },
   {
     id: "pro",
@@ -195,7 +170,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 31,
     summary: "A collection of wise sayings and instructions.",
-    genre: "Poetry & Wisdom",
   },
   {
     id: "ecc",
@@ -203,7 +177,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 12,
     summary: "Reflections on the meaning of life.",
-    genre: "Poetry & Wisdom",
   },
   {
     id: "sos",
@@ -211,7 +184,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 8,
     summary: "A love poem celebrating marital love.",
-    genre: "Poetry & Wisdom",
   },
   {
     id: "isa",
@@ -219,7 +191,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 66,
     summary: "Prophecies about judgment, comfort, and the coming Messiah.",
-    genre: "Major Prophets",
   },
   {
     id: "jer",
@@ -227,7 +198,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 52,
     summary: "Prophecies of judgment on Judah and calls for repentance.",
-    genre: "Major Prophets",
   },
   {
     id: "lam",
@@ -235,7 +205,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 5,
     summary: "Laments over the destruction of Jerusalem.",
-    genre: "Major Prophets",
   },
   {
     id: "eze",
@@ -243,7 +212,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 48,
     summary: "Prophecies of judgment and future restoration for Israel.",
-    genre: "Major Prophets",
   },
   {
     id: "dan",
@@ -251,7 +219,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 12,
     summary: "Stories of faithfulness in exile and apocalyptic visions.",
-    genre: "Major Prophets",
   },
   {
     id: "hos",
@@ -259,7 +226,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 14,
     summary: "God's unfailing love for unfaithful Israel.",
-    genre: "Minor Prophets",
   },
   {
     id: "joe",
@@ -267,7 +233,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 3,
     summary: "The Day of the Lord and the outpouring of the Spirit.",
-    genre: "Minor Prophets",
   },
   {
     id: "amo",
@@ -275,7 +240,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 9,
     summary: "Prophecies of social justice and judgment.",
-    genre: "Minor Prophets",
   },
   {
     id: "oba",
@@ -283,7 +247,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 1,
     summary: "Judgment on Edom.",
-    genre: "Minor Prophets",
   },
   {
     id: "jon",
@@ -291,7 +254,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 4,
     summary: "A prophet's reluctance and God's compassion for Nineveh.",
-    genre: "Minor Prophets",
   },
   {
     id: "mic",
@@ -299,7 +261,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 7,
     summary: "Prophecies of judgment and hope for a righteous ruler.",
-    genre: "Minor Prophets",
   },
   {
     id: "nah",
@@ -307,7 +268,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 3,
     summary: "Prophecy of Nineveh's destruction.",
-    genre: "Minor Prophets",
   },
   {
     id: "hab",
@@ -315,7 +275,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 3,
     summary: "A prophet's dialogue with God about injustice and faith.",
-    genre: "Minor Prophets",
   },
   {
     id: "zep",
@@ -323,7 +282,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 3,
     summary: "The Day of the Lord and future blessing.",
-    genre: "Minor Prophets",
   },
   {
     id: "hag",
@@ -331,7 +289,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 2,
     summary: "Encouragement to rebuild the Temple.",
-    genre: "Minor Prophets",
   },
   {
     id: "zec",
@@ -339,7 +296,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 14,
     summary: "Visions of the future and the coming Messiah.",
-    genre: "Minor Prophets",
   },
   {
     id: "mal",
@@ -347,7 +303,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "Old Testament",
     chapters: 4,
     summary: "A call to faithfulness and the promise of Elijah's return.",
-    genre: "Minor Prophets",
   },
   // New Testament
   {
@@ -358,7 +313,6 @@ const bibleBooksNIV: BibleBook[] = [
     summary:
       "The life, teachings, death, and resurrection of Jesus Christ, presented to a Jewish audience.",
     author: "Matthew",
-    genre: "Gospel",
   },
   {
     id: "mar",
@@ -368,7 +322,6 @@ const bibleBooksNIV: BibleBook[] = [
     summary:
       "The life, teachings, death, and resurrection of Jesus Christ, emphasizing his actions.",
     author: "Mark",
-    genre: "Gospel",
   },
   {
     id: "luk",
@@ -378,7 +331,6 @@ const bibleBooksNIV: BibleBook[] = [
     summary:
       "A detailed account of the life and ministry of Jesus, written for a Gentile audience.",
     author: "Luke",
-    genre: "Gospel",
   },
   {
     id: "joh",
@@ -387,7 +339,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 21,
     summary: "A theological presentation of Jesus as the Son of God.",
     author: "John",
-    genre: "Gospel",
   },
   {
     id: "act",
@@ -397,7 +348,6 @@ const bibleBooksNIV: BibleBook[] = [
     summary:
       "The early history of the Christian church and the spread of the Gospel.",
     author: "Luke",
-    genre: "Historical Books (NT)",
   },
   {
     id: "rom",
@@ -406,7 +356,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 16,
     summary: "A systematic explanation of Christian doctrine.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "1co",
@@ -415,7 +364,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 16,
     summary: "Paul's instructions to the church in Corinth on various issues.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "2co",
@@ -424,7 +372,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 13,
     summary: "Paul's defense of his apostleship and call for reconciliation.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "gal",
@@ -433,7 +380,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 6,
     summary: "Justification by faith and freedom in Christ.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "eph",
@@ -442,7 +388,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 6,
     summary: "The unity of believers in Christ and the nature of the church.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "phi",
@@ -451,7 +396,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 4,
     summary: "Joy, humility, and Christ-likeness.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "col",
@@ -460,7 +404,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 4,
     summary: "The supremacy of Christ and warnings against false teachings.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "1th",
@@ -469,7 +412,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 5,
     summary: "Encouragement and instruction regarding Christ's return.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "2th",
@@ -478,7 +420,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 3,
     summary: "Further clarification on Christ's return and godly living.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "1ti",
@@ -487,7 +428,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 6,
     summary: "Instructions on church leadership and conduct.",
     author: "Paul",
-    genre: "Pastoral Epistle",
   },
   {
     id: "2ti",
@@ -496,7 +436,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 4,
     summary: "Paul's final encouragement to Timothy to remain faithful.",
     author: "Paul",
-    genre: "Pastoral Epistle",
   },
   {
     id: "tit",
@@ -505,7 +444,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 3,
     summary: "Instructions on church order and sound doctrine.",
     author: "Paul",
-    genre: "Pastoral Epistle",
   },
   {
     id: "phm",
@@ -514,7 +452,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 1,
     summary: "A plea for forgiveness and reconciliation.",
     author: "Paul",
-    genre: "Pauline Epistle",
   },
   {
     id: "heb",
@@ -522,7 +459,6 @@ const bibleBooksNIV: BibleBook[] = [
     testament: "New Testament",
     chapters: 13,
     summary: "The superiority of Christ and the new covenant.",
-    genre: "General Epistle",
   },
   {
     id: "jam",
@@ -531,7 +467,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 5,
     summary: "Practical Christian living and the importance of good works.",
     author: "James",
-    genre: "General Epistle",
   },
   {
     id: "1pe",
@@ -540,7 +475,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 5,
     summary: "Encouragement to suffering Christians.",
     author: "Peter",
-    genre: "General Epistle",
   },
   {
     id: "2pe",
@@ -550,7 +484,6 @@ const bibleBooksNIV: BibleBook[] = [
     summary:
       "Warnings against false teachers and encouragement to grow in faith.",
     author: "Peter",
-    genre: "General Epistle",
   },
   {
     id: "1jo",
@@ -560,7 +493,6 @@ const bibleBooksNIV: BibleBook[] = [
     summary:
       "Fellowship with God, love for one another, and assurance of salvation.",
     author: "John",
-    genre: "General Epistle",
   },
   {
     id: "2jo",
@@ -569,7 +501,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 1,
     summary: "Warning against false teachers and emphasis on truth and love.",
     author: "John",
-    genre: "General Epistle",
   },
   {
     id: "3jo",
@@ -578,7 +509,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 1,
     summary: "Commendation for hospitality and warning against opposition.",
     author: "John",
-    genre: "General Epistle",
   },
   {
     id: "jud_nt", // Changed ID to be unique
@@ -587,7 +517,6 @@ const bibleBooksNIV: BibleBook[] = [
     chapters: 1,
     summary: "A call to contend for the faith against false teachings.",
     author: "Jude",
-    genre: "General Epistle",
   },
   {
     id: "rev",
@@ -597,19 +526,17 @@ const bibleBooksNIV: BibleBook[] = [
     summary:
       "Prophetic visions concerning the end times and Christ's ultimate victory.",
     author: "John",
-    genre: "Apocalyptic",
   },
 ];
 
 const filterOptions: FilterData = {
   testaments: ["Old Testament", "New Testament"],
-  bookNames: bibleBooksNIV.map((book) => book.name), // Populate with all book names
-  maxChapters: Math.max(...bibleBooksNIV.map((book) => book.chapters)), // Calculate max chapters dynamically
+  bookNames: bibleBooksNIV.map((book) => book.name),
 };
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Books of the Bible | Browse & Filter" },
+    { title: "Automation" },
     {
       name: "description",
       content:
@@ -619,8 +546,62 @@ export const meta: MetaFunction = () => {
 };
 
 export async function loader() {
-  // In a real app, this might come from a database or a more structured data source
-  return json({ books: bibleBooksNIV, filters: filterOptions }); // Use bibleBooksNIV
+  try {
+    // Call the RPC function to get distinct books
+    const { data: rpcData, error } = await supabase.rpc("get_distinct_books");
+
+    if (error) {
+      console.error("Supabase RPC error:", error);
+      return { books: bibleBooksNIV, filters: filterOptions };
+    }
+
+    if (!rpcData || rpcData.length === 0) {
+      console.warn(
+        "No distinct books data found from RPC, returning static data."
+      );
+      return { books: bibleBooksNIV, filters: filterOptions };
+    }
+
+    const booksData = rpcData.map((item: { book_name: string }) => ({
+      book: item.book_name,
+    }));
+
+    console.log("Fetched distinct books data:", booksData);
+
+    // The booksData is already an array of unique objects, so we can directly extract book names
+    const uniqueBooks = booksData.map((item: { book: string }) => item.book);
+
+    const dynamicBooks: BibleBook[] = uniqueBooks.map(
+      (bookName: string, index: number) => {
+        const staticBook = bibleBooksNIV.find(
+          (book) =>
+            book.name.toLowerCase() === bookName.toLowerCase() ||
+            book.name.toLowerCase().includes(bookName.toLowerCase()) ||
+            bookName.toLowerCase().includes(book.name.toLowerCase())
+        );
+
+        return {
+          id: staticBook?.id || `book_${index}`,
+          name: bookName,
+          testament: staticBook?.testament || "Old Testament",
+          chapters: staticBook?.chapters || 1,
+          summary: staticBook?.summary || `Book of ${bookName}`,
+          author: staticBook?.author,
+          writtenDate: staticBook?.writtenDate,
+        };
+      }
+    );
+    const dynamicFilterOptions: FilterData = {
+      testaments: ["Old Testament", "New Testament"],
+      bookNames: dynamicBooks.map((book) => book.name),
+    };
+
+    return { books: dynamicBooks, filters: dynamicFilterOptions };
+  } catch (error) {
+    console.error("Error fetching books:", error);
+
+    return { books: bibleBooksNIV, filters: filterOptions };
+  }
 }
 
 export default function BibleBooksPage() {
@@ -629,16 +610,18 @@ export default function BibleBooksPage() {
     null
   );
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
-  const [sortOrder, setSortOrder] = useState<string>("default"); // Added for sorting
+  const [sortOrder, setSortOrder] = useState<string>("default");
+
+  const maxChapters = Math.max(...books.map((book) => book.chapters));
 
   const [activeFilters, setActiveFilters] = useState<{
     testament: "Old Testament" | "New Testament" | null;
-    bookName: string | null; // Changed from genre
+    bookName: string | null;
     chapterRange: [number, number];
   }>({
     testament: null,
-    bookName: null, // Changed from genre
-    chapterRange: [0, filters.maxChapters],
+    bookName: null,
+    chapterRange: [0, maxChapters],
   });
 
   const filteredBooks = books.filter((book) => {
@@ -666,11 +649,9 @@ export default function BibleBooksPage() {
         return a.name.localeCompare(b.name);
       case "default":
       default:
-        // Assuming dummyBooks is already in canonical order.
-        // For a more robust solution, you might need an explicit order field.
         return (
-          books.findIndex((book) => book.id === a.id) -
-          books.findIndex((book) => book.id === b.id)
+          books.findIndex((book: BibleBook) => book.id === a.id) -
+          books.findIndex((book: BibleBook) => book.id === b.id)
         );
     }
   });
@@ -680,22 +661,21 @@ export default function BibleBooksPage() {
       <header className="mb-8 text-center">
         <div className="inline-flex items-center text-sky-700 mb-2">
           <BookOpenIcon className="w-10 h-10 mr-3" />
-          <h1 className="text-4xl font-bold">Books of the Bible</h1>
+          <h1 className="text-4xl font-bold">Song Automation</h1>
         </div>
-        <p className="text-slate-600">
-          Browse, filter, and learn about the books of the Holy Scripture.
-        </p>
+        <p className="text-slate-600">This is for automation purposes only.</p>
       </header>
 
       <div className="flex flex-col md:flex-row gap-8 flex-grow">
+        {" "}
         <SidebarFilters
           filters={filters}
+          maxChapters={maxChapters}
           activeFilters={activeFilters}
           onFilterChange={(newFilters) =>
             setActiveFilters((prev) => ({ ...prev, ...newFilters }))
           }
         />
-
         <main className="w-full md:w-3/4">
           {/* Sort & View Options Bar */}
           <div className="bg-white p-3 rounded-md shadow-sm flex justify-between items-center mb-6 border border-slate-200">
@@ -703,12 +683,12 @@ export default function BibleBooksPage() {
               <Dropdown
                 label="Sort By"
                 options={[
-                  { value: "default", label: "Canonical Order" }, // Assuming initial data is canonical
+                  { value: "default", label: "Canonical Order" },
                   { value: "chapters_asc", label: "Chapters: Low to High" },
                   { value: "chapters_desc", label: "Chapters: High to Low" },
                   { value: "name_asc", label: "Name: A-Z" },
                 ]}
-                onSelect={(value: string) => setSortOrder(value)} // Updated to setSortOrder
+                onSelect={(value: string) => setSortOrder(value)}
                 buttonClassName="bg-slate-100 hover:bg-slate-200 text-slate-700"
                 menuClassName="bg-white border-slate-200"
                 itemClassName="hover:bg-sky-50"
