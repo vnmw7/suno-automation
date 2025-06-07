@@ -117,4 +117,7 @@ def split_chapter_into_sections(book_name, book_chapter_str: str) -> int:
         if start_verse_for_current_section > total_verses and i < num_sections - 1:
             break
 
+    print(
+        f"Chapter {book_name} {book_chapter} split into {num_sections} sections: {sections_output}"
+    )
     return num_sections

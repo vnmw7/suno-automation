@@ -25,6 +25,17 @@ def login():
     return {is_successful}
 
 
+@app.post("/generate-verse-ranges")
+def generate_verse_ranges(book_name: str, book_chapter: int):
+    from utils.ai_functions import generate_verse_ranges
+
+    try:
+        generate_verse_ranges(book_name, book_chapter)
+        return {"message": "Verse ranges generated successfully."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 if __name__ == "__main__":
     import uvicorn
 

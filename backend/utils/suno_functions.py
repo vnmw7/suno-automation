@@ -1,5 +1,5 @@
 from camoufox.sync_api import Camoufox
-import traceback  # Import traceback for better error logging
+import traceback
 
 
 config = {

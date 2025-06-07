@@ -62,6 +62,67 @@ export async function get_verse_range(bookAbbr: string, chapter: string) {
   }
 }
 
+export async function generate_verse_range(bookAbbr: string, chapter: string) {
+  if (!bookAbbr) {
+    return { error: "Book abbreviation is required", data: null };
+  }
+
+  // Create a reverse mapping from abbreviation to full book name
+  const abbrToFullName: { [key: string]: string } = {};
+  for (const fullName in bookAbbreviations) {
+    if (Object.prototype.hasOwnProperty.call(bookAbbreviations, fullName)) {
+      abbrToFullName[
+        bookAbbreviations[fullName as keyof typeof bookAbbreviations]
+      ] = fullName;
+    }
+  }
+
+  const bookName = abbrToFullName[bookAbbr.toUpperCase()];
+
+  if (!bookName) {
+    console.error(`Full book name not found for abbreviation: ${bookAbbr}`);
+    return { error: `Invalid book abbreviation: ${bookAbbr}`, data: null };
+  }
+
+  try {
+    console.log(
+      `[generate_verse_range] Generating verse range for book: ${bookName} (abbr: ${bookAbbr}), chapter: ${chapter}`
+    );
+    const response = await fetch(
+      `http://127.0.0.1:8000/generate-verse-ranges?book_name=${encodeURIComponent(
+        bookName
+      )}&book_chapter=${chapter}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error response from server:", errorText);
+      return {
+        error: `Server error: ${response.status} ${response.statusText}`,
+        data: null,
+      };
+    }
+
+    const result = await response.json();
+    console.log("[generate_verse_range] Server response:", result);
+
+    return { error: null, data: result };
+  } catch (error) {
+    console.error("Error generating verse range:", error);
+    let errorMessage = "Failed to generate verse range.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return { error: errorMessage, data: null };
+  }
+}
+
 export default function BookCard({ book, viewMode }: BookCardProps) {
   const [showChapters, setShowChapters] = useState(false);
   const [verseRanges, setVerseRanges] = useState<Record<string, string[]>>({});
@@ -69,6 +130,12 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
     new Set()
   );
   const [expandedChapter, setExpandedChapter] = useState<number | null>(null);
+  const [generatingChapters, setGeneratingChapters] = useState<Set<number>>(
+    new Set()
+  );
+  const [generateErrors, setGenerateErrors] = useState<Record<string, string>>(
+    {}
+  );
   const bookAbbr =
     bookAbbreviations[book.name as keyof typeof bookAbbreviations] || "";
 
@@ -110,6 +177,47 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
       await fetchVerseRanges(chapter);
     }
   };
+
+  const handleGenerateVerseRange = async (
+    bookAbbr: string,
+    chapter: string
+  ) => {
+    // Clear any previous errors for this chapter
+    setGenerateErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors[chapter.toString()];
+      return newErrors;
+    });
+
+    setGeneratingChapters((prev) => new Set(prev).add(parseInt(chapter, 10)));
+
+    try {
+      const result = await generate_verse_range(bookAbbr, chapter.toString());
+
+      if (result.error) {
+        setGenerateErrors((prev) => ({
+          ...prev,
+          [chapter.toString()]: result.error,
+        }));
+      } else {
+        // After successful generation, fetch the updated verse ranges
+        await fetchVerseRanges(parseInt(chapter, 10));
+      }
+    } catch (error) {
+      console.error("Error generating verse range:", error);
+      setGenerateErrors((prev) => ({
+        ...prev,
+        [chapter.toString()]: "Failed to generate verse range",
+      }));
+    } finally {
+      setGeneratingChapters((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(parseInt(chapter, 10));
+        return newSet;
+      });
+    }
+  };
+
   if (viewMode === "list") {
     return (
       <div className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-slate-200">
@@ -169,8 +277,24 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
                             )
                           ) : (
                             <div className="p-2 text-xs text-slate-500">
-                              <button className="px-3 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-600 hover:scale-105 transform transition-all duration-200 ease-in-out shadow-sm hover:shadow-md">
-                                Generate Verse Range
+                              {generateErrors[chapter.toString()] ? (
+                                <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-md text-red-700">
+                                  Error: {generateErrors[chapter.toString()]}
+                                </div>
+                              ) : null}{" "}
+                              <button
+                                className="px-3 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-600 hover:scale-105 transform transition-all duration-200 ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                onClick={() =>
+                                  handleGenerateVerseRange(
+                                    book.name,
+                                    chapter.toString()
+                                  )
+                                }
+                                disabled={generatingChapters.has(chapter)}
+                              >
+                                {generatingChapters.has(chapter)
+                                  ? "Generating..."
+                                  : "Generate Verse Range"}
                               </button>
                             </div>
                           )}
@@ -242,7 +366,25 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
                             )
                           ) : (
                             <div className="p-2 text-xs text-slate-500">
-                              No verse ranges available for this chapter.
+                              {generateErrors[chapter.toString()] ? (
+                                <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-md text-red-700">
+                                  Error: {generateErrors[chapter.toString()]}
+                                </div>
+                              ) : null}{" "}
+                              <button
+                                className="px-3 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-600 hover:scale-105 transform transition-all duration-200 ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                onClick={() =>
+                                  handleGenerateVerseRange(
+                                    book.name,
+                                    chapter.toString()
+                                  )
+                                }
+                                disabled={generatingChapters.has(chapter)}
+                              >
+                                {generatingChapters.has(chapter)
+                                  ? "Generating..."
+                                  : "Generate Verse Range"}
+                              </button>
                             </div>
                           )}
                         </div>
