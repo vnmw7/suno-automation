@@ -1,31 +1,25 @@
 // app/components/SidebarFilters.tsx
-import TestamentFilter from "./TestamentFilter";
 import BookFilter from "./BookFilter"; // Changed from GenreFilter
 import { FilterIcon } from "./ui/icon";
-import type { BibleBook } from "~/routes/main"; // Ensure this path is correct
 
 interface FilterData {
-  testaments: ("Old Testament" | "New Testament")[];
+  // testaments: ("Old Testament" | "New Testament")[]; // Removed
   bookNames: string[]; // Changed from genres
 }
 
 export interface ActiveFilters {
   // Exporting for use in other components if needed
-  testament: BibleBook["testament"] | null; // Use the type from BibleBook
   bookName: string | null; // Changed from genre
-  chapterRange: [number, number];
 }
 
 interface SidebarFiltersProps {
   filters: FilterData;
-  maxChapters: number;
   activeFilters: ActiveFilters;
   onFilterChange: (newFilter: Partial<ActiveFilters>) => void;
 }
 
 export default function SidebarFilters({
   filters,
-  maxChapters,
   activeFilters,
   onFilterChange,
 }: SidebarFiltersProps) {
@@ -35,7 +29,7 @@ export default function SidebarFilters({
         <FilterIcon className="w-5 h-5 mr-2 text-sky-600" />
         Filter Books
       </h2>
-      <TestamentFilter
+      {/* <TestamentFilter // Removed TestamentFilter
         testaments={filters.testaments}
         selectedTestament={activeFilters.testament}
         onSelectTestament={(testament: "Old Testament" | "New Testament") =>
@@ -43,7 +37,7 @@ export default function SidebarFilters({
             testament: activeFilters.testament === testament ? null : testament,
           })
         }
-      />
+      /> */}
       <BookFilter
         bookNames={filters.bookNames}
         selectedBookName={activeFilters.bookName}
@@ -56,9 +50,7 @@ export default function SidebarFilters({
       <button
         onClick={() =>
           onFilterChange({
-            testament: null,
             bookName: null,
-            chapterRange: [0, maxChapters],
           })
         }
         className="w-full mt-4 px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-100 text-sm"

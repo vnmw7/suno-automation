@@ -1,112 +1,260 @@
 // app/components/BookCard.tsx
 import { useState } from "react";
 import type { BibleBook } from "~/routes/main";
-import { BookOpenIcon, ChevronDownIcon, ChevronUpIcon } from "./ui/icon";
+import { BookOpenIcon } from "./ui/icon";
+import bookAbbreviations from "../../_constants/book-abrv.json";
+import { supabase } from "~/lib/supabase";
 
 interface BookCardProps {
   book: BibleBook;
-  onViewDetails: () => void;
   viewMode: "grid" | "list";
 }
 
-export default function BookCard({
-  book,
-  onViewDetails,
-  viewMode,
-}: BookCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export async function get_verse_range(bookAbbr: string, chapter: string) {
+  if (!bookAbbr) {
+    return { error: "Book abbreviation is required", data: null };
+  }
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      setIsExpanded(!isExpanded);
+  // Create a reverse mapping from abbreviation to full book name
+  const abbrToFullName: { [key: string]: string } = {};
+  for (const fullName in bookAbbreviations) {
+    if (Object.prototype.hasOwnProperty.call(bookAbbreviations, fullName)) {
+      abbrToFullName[
+        bookAbbreviations[fullName as keyof typeof bookAbbreviations]
+      ] = fullName;
+    }
+  }
+
+  const bookName = abbrToFullName[bookAbbr.toUpperCase()];
+
+  if (!bookName) {
+    console.error(`Full book name not found for abbreviation: ${bookAbbr}`);
+    return { error: `Invalid book abbreviation: ${bookAbbr}`, data: null };
+  }
+  try {
+    console.log(
+      `[get_verse_range] Fetching verse range for book: ${bookName} (abbr: ${bookAbbr}), chapter: ${chapter}`
+    );
+    const { data, error } = await supabase
+      .from("song_structure_tbl")
+      .select("verse_range")
+      .eq("book_name", bookName)
+      .eq("chapter", chapter);
+
+    console.log("[get_verse_range] Supabase query result:", data);
+
+    if (error) {
+      console.error("Error fetching verse range:", error);
+      return { error: error.message, data: null };
+    }
+
+    // Extract unique verse_range values from the data array
+    const verseRanges = data?.map((item) => item.verse_range) || [];
+    const uniqueVerseRanges = [...new Set(verseRanges)];
+    return { error: null, data: uniqueVerseRanges };
+  } catch (error) {
+    console.error("Unexpected error fetching verse range:", error);
+    let errorMessage = "An unexpected error occurred.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return { error: errorMessage, data: null };
+  }
+}
+
+export default function BookCard({ book, viewMode }: BookCardProps) {
+  const [showChapters, setShowChapters] = useState(false);
+  const [verseRanges, setVerseRanges] = useState<Record<string, string[]>>({});
+  const [loadingChapters, setLoadingChapters] = useState<Set<number>>(
+    new Set()
+  );
+  const [expandedChapter, setExpandedChapter] = useState<number | null>(null);
+  const bookAbbr =
+    bookAbbreviations[book.name as keyof typeof bookAbbreviations] || "";
+
+  const generateChapters = (maxChapter: number) => {
+    return Array.from({ length: maxChapter }, (_, i) => i + 1);
+  };
+  const fetchVerseRanges = async (chapter: number) => {
+    if (verseRanges[chapter.toString()]) {
+      return;
+    }
+
+    setLoadingChapters((prev) => new Set(prev).add(chapter));
+    try {
+      const result = await get_verse_range(book.name, chapter.toString());
+      if (result.error) {
+        console.error("Error fetching verse ranges:", result.error);
+      } else {
+        setVerseRanges((prev) => ({
+          ...prev,
+          [chapter.toString()]: result.data || [],
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching verse ranges:", error);
+    } finally {
+      setLoadingChapters((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(chapter);
+        return newSet;
+      });
     }
   };
 
+  const toggleChapterExpansion = async (chapter: number) => {
+    if (expandedChapter === chapter) {
+      setExpandedChapter(null);
+    } else {
+      setExpandedChapter(chapter);
+      await fetchVerseRanges(chapter);
+    }
+  };
   if (viewMode === "list") {
     return (
       <div className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-slate-200">
         <div className="flex items-center justify-between">
-          <div
-            className="flex-grow cursor-pointer"
-            onClick={() => setIsExpanded(!isExpanded)}
-            onKeyDown={handleKeyDown}
-            role="button"
-            tabIndex={0}
-          >
-            {" "}
-            <h3 className="text-lg font-semibold text-sky-700">{book.name}</h3>
-            <p className="text-sm text-slate-500">{book.testament}</p>
-            <p className="text-sm text-slate-600 mt-1">
-              Chapters: {book.chapters}
-            </p>
-          </div>
+          <div className="flex-grow">
+            <h3 className="text-lg font-semibold text-sky-700">
+              {book.name} {bookAbbr && `(${bookAbbr})`}
+            </h3>{" "}
+          </div>{" "}
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            aria-expanded={isExpanded}
-            aria-controls={`book-details-${book.id}`}
+            onClick={() => setShowChapters(!showChapters)}
             className="ml-4 px-4 py-2 bg-sky-500 text-white text-sm rounded-md hover:bg-sky-600 transition-colors flex items-center"
           >
-            {isExpanded ? (
-              <ChevronUpIcon className="w-4 h-4 mr-2" />
-            ) : (
-              <ChevronDownIcon className="w-4 h-4 mr-2" />
-            )}
-            {isExpanded ? "Hide" : "Show"} Details
+            <BookOpenIcon className="w-4 h-4 mr-2" />
+            View Progress
           </button>
-        </div>
-        {isExpanded && (
-          <div
-            id={`book-details-${book.id}`}
-            className="mt-4 pt-4 border-t border-slate-200"
-          >
-            <h4 className="font-semibold text-slate-700 mb-1">Summary:</h4>
-            <p className="text-slate-600 leading-relaxed text-sm sm:text-base mb-2">
-              {book.summary}
-            </p>
-            {book.author && (
-              <div className="mb-2">
-                <h4 className="font-semibold text-slate-700 mb-0.5">Author:</h4>
-                <p className="text-slate-600 text-sm sm:text-base">
-                  {book.author}
-                </p>
-              </div>
-            )}
-            {book.writtenDate && (
-              <div>
-                <h4 className="font-semibold text-slate-700 mb-0.5">
-                  Approx. Written Date:
-                </h4>
-                <p className="text-slate-600 text-sm sm:text-base">
-                  {book.writtenDate}
-                </p>
-              </div>
-            )}
+        </div>{" "}
+        {showChapters && (
+          <div className="mt-4 max-h-60 overflow-y-auto border border-slate-200 rounded-md p-3 bg-slate-50">
+            <div className="grid grid-cols-1 gap-2">
+              {generateChapters(book.maxChapter).map((chapter) => (
+                <div
+                  key={chapter}
+                  className="bg-white border border-slate-300 rounded-lg shadow-sm"
+                >
+                  <button
+                    onClick={() => toggleChapterExpansion(chapter)}
+                    className="w-full p-3 hover:bg-sky-50 hover:border-sky-300 transition-colors cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 rounded-lg"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm font-medium text-sky-700">
+                        Chapter {chapter}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {expandedChapter === chapter ? "▼" : "▶"}
+                      </div>{" "}
+                    </div>
+                  </button>
+                  {expandedChapter === chapter && (
+                    <div className="px-3 pb-3 pt-2">
+                      {loadingChapters.has(chapter) ? (
+                        <div className="text-center py-4 text-slate-500 text-xs">
+                          Loading verse ranges...
+                        </div>
+                      ) : verseRanges[chapter.toString()] ? (
+                        <div className="space-y-2">
+                          {verseRanges[chapter.toString()].length > 0 ? (
+                            verseRanges[chapter.toString()].map(
+                              (range, index) => (
+                                <div
+                                  key={index}
+                                  className="p-2 bg-sky-50 border border-sky-200 rounded-md text-xs text-slate-700 shadow-sm"
+                                >
+                                  Verses: {range}
+                                </div>
+                              )
+                            )
+                          ) : (
+                            <div className="p-2 text-xs text-slate-500">
+                              <button className="px-3 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-600 hover:scale-105 transform transition-all duration-200 ease-in-out shadow-sm hover:shadow-md">
+                                Generate Verse Range
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}{" "}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
     );
   }
-
-  // Grid View - remains the same, uses onViewDetails for modal
   return (
     <div className="bg-white p-5 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-slate-200 flex flex-col h-full">
-      <h3 className="text-xl font-semibold text-sky-700 mb-2">{book.name}</h3>{" "}
-      <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
-        {book.testament}
-      </p>
-      <p className="text-sm text-slate-600 mb-3 flex-grow line-clamp-3">
-        {book.summary}
-      </p>
-      <div className="text-sm text-slate-500 mb-4">
-        <span className="font-medium">Chapters:</span> {book.chapters}
+      <h3 className="text-xl font-semibold text-sky-700 mb-2">
+        {book.name} {bookAbbr && `(${bookAbbr})`}
+      </h3>{" "}
+      <div className="mt-auto">
+        {" "}
+        <button
+          onClick={() => setShowChapters(!showChapters)}
+          className="w-full px-4 py-2 bg-sky-500 text-white text-sm rounded-md hover:bg-sky-600 transition-colors flex items-center justify-center mb-2"
+        >
+          <BookOpenIcon className="w-4 h-4 mr-2" />
+          View Progress
+        </button>{" "}
+        {showChapters && (
+          <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-md p-2 bg-slate-50">
+            <div className="grid grid-cols-1 gap-2">
+              {generateChapters(book.maxChapter).map((chapter) => (
+                <div
+                  key={chapter}
+                  className="bg-white border border-slate-300 rounded-lg shadow-sm"
+                >
+                  <button
+                    onClick={() => toggleChapterExpansion(chapter)}
+                    className="w-full p-3 hover:bg-sky-50 hover:border-sky-300 transition-colors cursor-pointer text-center focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 rounded-lg"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm font-medium text-sky-700">
+                        Chapter {chapter}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {expandedChapter === chapter ? "▼" : "▶"}
+                      </div>
+                    </div>
+                  </button>
+                  {expandedChapter === chapter && (
+                    <div className="px-3 pb-3 pt-2">
+                      {loadingChapters.has(chapter) ? (
+                        <div className="text-center py-4 text-slate-500 text-xs">
+                          Loading verse ranges...
+                        </div>
+                      ) : verseRanges[chapter.toString()] ? (
+                        <div className="space-y-2">
+                          {verseRanges[chapter.toString()].length > 0 ? (
+                            verseRanges[chapter.toString()].map(
+                              (range, index) => (
+                                <div
+                                  key={index}
+                                  className="p-2 bg-sky-50 border border-sky-200 rounded-md text-xs text-slate-700 shadow-sm"
+                                >
+                                  Verses: {range}
+                                </div>
+                              )
+                            )
+                          ) : (
+                            <div className="p-2 text-xs text-slate-500">
+                              No verse ranges available for this chapter.
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-      <button
-        onClick={onViewDetails} // This will trigger the modal in grid view
-        className="mt-auto w-full px-4 py-2 bg-sky-500 text-white text-sm rounded-md hover:bg-sky-600 transition-colors flex items-center justify-center"
-      >
-        <BookOpenIcon className="w-4 h-4 mr-2" />
-        View Details
-      </button>
     </div>
   );
 }

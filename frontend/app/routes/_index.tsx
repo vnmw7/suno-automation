@@ -37,21 +37,45 @@ export default function Index() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const responseData = await response.json();
-      console.log("Login successful:", responseData);
+      console.log("Login response received:", responseData);
+      console.log("Response type:", typeof responseData);
+      console.log("Is array:", Array.isArray(responseData));
+
+      // Check for various successful response formats
+      let loginSuccessful = false;
 
       if (
         Array.isArray(responseData) &&
         responseData.length > 0 &&
         responseData[0] === true
       ) {
+        loginSuccessful = true;
+      } else if (responseData === true) {
+        loginSuccessful = true;
+      } else if (responseData && responseData.success === true) {
+        loginSuccessful = true;
+      } else if (responseData && responseData.status === "success") {
+        loginSuccessful = true;
+      }
+
+      if (loginSuccessful) {
+        console.log("Login successful, navigating to /main");
         navigate("/main");
       } else {
-        alert("Login failed. Someting happened in the backend.");
+        console.log("Login failed, unexpected response format:", responseData);
+        alert(
+          `Login failed. Unexpected response from backend: ${JSON.stringify(
+            responseData
+          )}`
+        );
       }
     } catch (error) {
       console.error("Login failed:", error);
-      alert("Login failed. Please try again.");
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      alert(`Login failed. Error: ${errorMessage}`);
     } finally {
+      console.log("Setting loading to false");
       setIsLoading(false);
     }
   };
