@@ -7,6 +7,10 @@ import BookCard from "../components/BookCard";
 import BookDetailsView from "../components/BookDetailsView";
 import { ListIcon, ViewGridIcon, BookOpenIcon } from "../components/ui/icon";
 import { supabase } from "~/lib/supabase";
+import {
+  isCanonicalBook,
+  getFullBookName,
+} from "../../_constants/canonical-books";
 
 export interface BibleBook {
   id: string;
@@ -41,9 +45,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const { data: uniqueBooksData, error: rpcError } = await supabase.rpc(
       "get_unique_book_names_from_verses"
     );
-
     console.log(
-      "[main.tsx] Supabase RPC call completed, processing results..."
+      "[main.tsx] Supabase RPC call completed, processing results and filtering for 66 canonical books..."
     );
     console.log(uniqueBooksData);
     if (rpcError) {
@@ -70,21 +73,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
         viewMode: viewModeFromUrl,
       };
     }
-
     const databaseBooks: BibleBook[] = [];
     const bookNamesArray: string[] = [];
     for (const item of uniqueBooksData) {
-      if (item && item.book_name) {
+      console.log("[main.tsx] Processing item from RPC:", item);
+      if (item && item.book_name && isCanonicalBook(item.book_name)) {
+        const fullBookName = getFullBookName(item.book_name);
         databaseBooks.push({
-          id: item.book_name,
-          name: item.book_name,
+          id: item.book_name, // Keep the abbreviated ID for database consistency
+          name: fullBookName, // Use the full name for display
           maxChapter: item.max_chapter_number || 1,
         });
-        bookNamesArray.push(item.book_name);
+        bookNamesArray.push(fullBookName);
       }
     }
 
-    console.log("Processed unique books from RPC:", databaseBooks.length);
+    console.log("Processed canonical books from RPC:", databaseBooks.length);
+    console.log("Canonical books found:", bookNamesArray);
     const filterData: FilterData = {
       bookNames: bookNamesArray,
     };

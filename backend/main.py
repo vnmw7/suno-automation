@@ -20,9 +20,11 @@ def read_root():
 
 
 @app.get("/login")
-def login():
-    is_successful = login_suno()
-    return {is_successful}
+async def login():
+    from utils.suno_functions import login_suno
+
+    is_successful = await login_suno()
+    return {"success": is_successful}
 
 
 @app.post("/generate-verse-ranges")
@@ -32,6 +34,17 @@ def generate_verse_ranges(book_name: str, book_chapter: int):
     try:
         generate_verse_ranges(book_name, book_chapter)
         return {"message": "Verse ranges generated successfully."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/generate-song")
+async def generate_song():
+    from utils.suno_functions import generate_song
+
+    try:
+        result = await generate_song()
+        return {"success": result, "message": "Song generation completed"}
     except Exception as e:
         return {"error": str(e)}
 

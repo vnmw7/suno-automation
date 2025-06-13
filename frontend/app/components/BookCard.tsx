@@ -15,7 +15,6 @@ export async function get_verse_range(bookAbbr: string, chapter: string) {
     return { error: "Book abbreviation is required", data: null };
   }
 
-  // Create a reverse mapping from abbreviation to full book name
   const abbrToFullName: { [key: string]: string } = {};
   for (const fullName in bookAbbreviations) {
     if (Object.prototype.hasOwnProperty.call(bookAbbreviations, fullName)) {
@@ -67,7 +66,6 @@ export async function generate_verse_range(bookAbbr: string, chapter: string) {
     return { error: "Book abbreviation is required", data: null };
   }
 
-  // Create a reverse mapping from abbreviation to full book name
   const abbrToFullName: { [key: string]: string } = {};
   for (const fullName in bookAbbreviations) {
     if (Object.prototype.hasOwnProperty.call(bookAbbreviations, fullName)) {
@@ -143,13 +141,14 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
     return Array.from({ length: maxChapter }, (_, i) => i + 1);
   };
   const fetchVerseRanges = async (chapter: number) => {
-    if (verseRanges[chapter.toString()]) {
+    console.log("[BookCard.tsx] Fetching verse ranges for chapter:", chapter);
+    if (verseRanges[chapter.toString()]?.length > 0) {
       return;
     }
 
     setLoadingChapters((prev) => new Set(prev).add(chapter));
     try {
-      const result = await get_verse_range(book.name, chapter.toString());
+      const result = await get_verse_range(bookAbbr, chapter.toString());
       if (result.error) {
         console.error("Error fetching verse ranges:", result.error);
       } else {
@@ -182,7 +181,6 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
     bookAbbr: string,
     chapter: string
   ) => {
-    // Clear any previous errors for this chapter
     setGenerateErrors((prev) => {
       const newErrors = { ...prev };
       delete newErrors[chapter.toString()];
@@ -200,7 +198,6 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
           [chapter.toString()]: result.error,
         }));
       } else {
-        // After successful generation, fetch the updated verse ranges
         await fetchVerseRanges(parseInt(chapter, 10));
       }
     } catch (error) {
@@ -271,7 +268,19 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
                                   key={index}
                                   className="p-2 bg-sky-50 border border-sky-200 rounded-md text-xs text-slate-700 shadow-sm"
                                 >
-                                  Verses: {range}
+                                  <div className="flex justify-between items-center">
+                                    <span>Verses: {range}</span>
+                                    <button
+                                      className="ml-2 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors"
+                                      onClick={() => {
+                                        console.log(
+                                          `Generate song for ${book.name} Chapter ${chapter}, Verses: ${range}`
+                                        );
+                                      }}
+                                    >
+                                      Generate Song
+                                    </button>
+                                  </div>
                                 </div>
                               )
                             )
@@ -286,7 +295,7 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
                                 className="px-3 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-600 hover:scale-105 transform transition-all duration-200 ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                                 onClick={() =>
                                   handleGenerateVerseRange(
-                                    book.name,
+                                    bookAbbr,
                                     chapter.toString()
                                   )
                                 }
@@ -360,7 +369,20 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
                                   key={index}
                                   className="p-2 bg-sky-50 border border-sky-200 rounded-md text-xs text-slate-700 shadow-sm"
                                 >
-                                  Verses: {range}
+                                  <div className="flex justify-between items-center">
+                                    <span>Verses: {range}</span>
+                                    <button
+                                      className="ml-2 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors"
+                                      onClick={() => {
+                                        // TODO: Implement song generation logic
+                                        console.log(
+                                          `Generate song for ${book.name} Chapter ${chapter}, Verses: ${range}`
+                                        );
+                                      }}
+                                    >
+                                      Generate Song
+                                    </button>
+                                  </div>
                                 </div>
                               )
                             )
@@ -375,7 +397,7 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
                                 className="px-3 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-600 hover:scale-105 transform transition-all duration-200 ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                                 onClick={() =>
                                   handleGenerateVerseRange(
-                                    book.name,
+                                    bookAbbr,
                                     chapter.toString()
                                   )
                                 }
