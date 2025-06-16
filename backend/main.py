@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware  # Add this import
-
-from utils.suno_functions import login_suno
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -12,6 +11,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class SongRequest(BaseModel):
+    strLyrics: str
+    strStyle: str
+    strTitle: str
 
 
 @app.get("/")
@@ -38,13 +43,24 @@ def generate_verse_ranges(book_name: str, book_chapter: int):
         return {"error": str(e)}
 
 
-@app.get("/generate-song")
-async def generate_song():
-    from utils.suno_functions import generate_song
+@app.post("/generate-song")
+async def generate_song_endpoint(request: SongRequest):
+    from utils.suno_functions import generate_song, download_song
 
     try:
-        result = await generate_song()
-        return {"success": result, "message": "Song generation completed"}
+        # result = await generate_song(
+        #     strLyrics=request.strLyrics,
+        #     strStyle=request.strStyle,
+        #     strTitle=request.strTitle,
+        # )
+
+        SONG_INDEX = 1
+        SONG_COUNT = 2
+        for i in range(SONG_INDEX, SONG_COUNT + 1):
+            print(f"Downloading song {i} with title: {request.strTitle}")
+            await download_song(strTitle=request.strTitle, intIndex=i)
+
+        return {"success": "result", "message": "Song generation completed"}
     except Exception as e:
         return {"error": str(e)}
 

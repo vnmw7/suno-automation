@@ -81,7 +81,7 @@ async def login_suno():
     return False
 
 
-async def generate_song(lyrics="test", tags="test, song, lyrics", title="test title"):
+async def generate_song(strLyrics, strStyle, strTitle):
     try:
         async with AsyncCamoufox(
             headless=False,
@@ -94,97 +94,161 @@ async def generate_song(lyrics="test", tags="test, song, lyrics", title="test ti
         ) as browser:
             page = await browser.new_page()
             print("Navigating to suno.com...")
-            await page.goto("https://suno.com")
+            await page.goto("https://suno.com/create")
             print("Waiting for page to load...")
             await page.wait_for_timeout(2000)
             await page.wait_for_load_state("networkidle")
             print("Page loaded.")
-
-            sign_in_button_selector = 'button:has(span:has-text("Sign in"))'
-            if await page.locator(sign_in_button_selector).is_visible():
-                print("Sign-in button found. Attempting login process...")
-                await page.wait_for_selector(
-                    sign_in_button_selector, state="visible", timeout=60000
-                )
-                await page.wait_for_selector(
-                    sign_in_button_selector, state="enabled", timeout=60000
-                )
-
-                count = await page.locator(sign_in_button_selector).count()
-                print(f"Number of elements with 'Sign in': {count}")
-                await page.click(sign_in_button_selector)
-                await page.wait_for_timeout(2000)
-                await page.click('button:has(img[alt="Sign in with Google"])')
-                await page.wait_for_timeout(2000)
-                print("Typing email...")
-                await page.type('input[type="email"]', "pbNJ1sznC2Gr@gmail.com")
-                await page.keyboard.press("Enter")
-                await page.wait_for_timeout(2000)
-                await page.wait_for_load_state("load")
-                await page.wait_for_timeout(2000)
-                print("Typing password...")
-                await page.type('input[type="password"]', "&!8G26tlbsgO")
-                await page.keyboard.press("Enter")
-                await page.wait_for_timeout(2000)
-                await page.wait_for_load_state("load")
-                await page.wait_for_timeout(2000)
-                print("Login completed.")
-            else:
-                print("Already logged in or login not required.")
-
-            # Navigate to create page and generate song
             print("Clicking Custom button...")
-            custom_button = page.locator('button:has(span:has-text("Custom"))')
-            await custom_button.wait_for(state="visible", timeout=5000)
-            await custom_button.click()
-            await page.wait_for_timeout(2000)
 
-            # Fill in lyrics
+            print(f"Current URL before Custom button: {page.url}")
+
+            try:
+                custom_button = page.locator('button:has(span:has-text("Custom"))')
+                await custom_button.wait_for(state="visible", timeout=10000)
+                print("Custom button found and visible")
+                await custom_button.click()
+                await page.wait_for_timeout(2000)
+                print("Custom button clicked successfully")
+            except Exception as e:
+                print(f"Error clicking Custom button: {e}")
+
+                try:
+                    alt_custom_button = page.locator('button:has-text("Custom")')
+                    await alt_custom_button.wait_for(state="visible", timeout=5000)
+                    await alt_custom_button.click()
+                    await page.wait_for_timeout(2000)
+                    print("Used alternative Custom button selector")
+                except Exception as e2:
+                    print(f"Alternative Custom button also failed: {e2}")
+                    raise Exception("Could not find or click Custom button")
+
             print("Filling lyrics...")
-            lyrics_textarea = page.locator(
-                'textarea[data-testid="lyrics-input-textarea"]'
-            )
-            await lyrics_textarea.wait_for(state="visible", timeout=2000)
-            await lyrics_textarea.type(lyrics)
-            await page.wait_for_timeout(2000)
+            try:
+                lyrics_textarea = page.locator(
+                    'textarea[data-testid="lyrics-input-textarea"]'
+                )
+                await lyrics_textarea.wait_for(state="visible", timeout=10000)
+                await lyrics_textarea.clear()
+                await lyrics_textarea.type(strLyrics)
+                await page.wait_for_timeout(2000)
+                print(f"Lyrics filled successfully: {len(strLyrics)} characters")
+            except Exception as e:
+                print(f"Error filling lyrics: {e}")
+                raise Exception("Could not fill lyrics textarea")
 
-            # Fill in tags
             print("Filling tags...")
-            await page.type('textarea[data-testid="tag-input-textarea"]', tags)
-            await page.wait_for_timeout(2000)
+            try:
+                tags_textarea = page.locator(
+                    'textarea[data-testid="tag-input-textarea"]'
+                )
+                await tags_textarea.wait_for(state="visible", timeout=10000)
+                await tags_textarea.clear()
+                await tags_textarea.type(strStyle)
+                await page.wait_for_timeout(2000)
+                print(f"Tags filled successfully: {strStyle}")
+            except Exception as e:
+                print(f"Error filling tags: {e}")
+                raise Exception("Could not fill tags textarea")
 
-            # Fill in title
             print("Filling title...")
-            await page.type('input[placeholder="Enter song title"]', title)
-            await page.wait_for_timeout(2000)
+            try:
+                title_input = page.locator('input[placeholder="Enter song title"]')
+                await title_input.wait_for(state="visible", timeout=10000)
+                await title_input.clear()
+                await title_input.type(strTitle)
+                await page.wait_for_timeout(2000)
+                print(f"Title filled successfully: {strTitle}")
+            except Exception as e:
+                print(f"Error filling title: {e}")
+                raise Exception("Could not fill title input")
 
-            # Create the song
             print("Creating song...")
-            await page.click('button:has(span:has-text("Create"))')
-            await page.wait_for_timeout(2000)
+            try:
+                create_button = page.locator('button:has(span:has-text("Create"))')
+                await create_button.wait_for(state="visible", timeout=10000)
+                print("Create button found and visible")
+                await create_button.click()
+                await page.wait_for_timeout(3000)
+                print("Create button clicked successfully - song creation initiated")
+            except Exception as e:
+                print(f"Error clicking Create button: {e}")
 
-            # Navigate to user's songs page
+                try:
+                    alt_create_button = page.locator('button:has-text("Create")')
+                    await alt_create_button.wait_for(state="visible", timeout=5000)
+                    await alt_create_button.click()
+                    await page.wait_for_timeout(3000)
+                    print("Used alternative Create button selector")
+                except Exception as e2:
+                    print(f"Alternative Create button also failed: {e2}")
+                    raise Exception("Could not find or click Create button")
+
+            await page.wait_for_timeout(3000)
+            return True
+
+    except Exception as e:
+        print(f"An error occurred in generate_song: {e}")
+        print(traceback.format_exc())
+        return False
+
+
+async def download_song(strTitle, intIndex):
+    try:
+        async with AsyncCamoufox(
+            headless=False,
+            persistent_context=True,
+            user_data_dir="user-data-dir",
+            os=("windows"),
+            config=config,
+            humanize=True,
+            i_know_what_im_doing=True,
+        ) as browser:
+            page = await browser.new_page()
             print("Navigating to user songs page...")
-            await page.goto(
-                "https://suno.com/me", wait_until="domcontentloaded", timeout=30000
-            )
-            print(f"Navigation to /me initiated. Current URL: {page.url}")
-            await page.wait_for_url("https://suno.com/me**", timeout=20000)
+            try:
+                await page.goto(
+                    "https://suno.com/me", wait_until="domcontentloaded", timeout=30000
+                )
+                print("Waiting for page to load...")
+                print(f"Navigation to /me initiated. Current URL: {page.url}")
+                await page.wait_for_url("https://suno.com/me**", timeout=20000)
+                await page.wait_for_timeout(3000)
 
-            # Wait for the song to appear and download it
-            print(f"Looking for song with title: {title}")
-            locator = page.locator(f'span.text-foreground-primary[title="{title}"]')
+                # Try to wait for networkidle, but don't fail if it times out
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception as e:
+                    print(
+                        f"Warning: Page may still be loading (networkidle timeout): {e}"
+                    )
+
+                print("Page loaded.")
+            except Exception as e:
+                print(f"Error during page navigation: {e}")
+
+                if "suno.com/me" not in page.url:
+                    raise Exception("Failed to navigate to the user songs page")
+
+            print(f"Looking for song with title: {strTitle}")
+            locator = page.locator(f'span.text-foreground-primary[title="{strTitle}"]')
             await locator.first.wait_for(state="attached", timeout=10000)
             count = await locator.count()
-            print(f"Found {count} songs with title '{title}'")
+            print(f"Found {count} songs with title '{strTitle}'")
             await page.wait_for_timeout(2000)
 
-            # Right-click on the song (using the 3rd instance, index 2)
-            print("Right-clicking on song...")
-            await locator.nth(2).click(button="right")
+            # Validate index
+            if intIndex < 1 or intIndex > count:
+                raise Exception(
+                    f"Invalid song index {intIndex}. Found {count} songs with title '{strTitle}'. Index should be between 1 and {count}."
+                )
+
+            print(
+                f"Right-clicking on song index {intIndex} (0-based: {intIndex - 1})..."
+            )
+            await locator.nth(intIndex - 1).click(button="right")
             await page.wait_for_timeout(2000)
 
-            # Handle download menu
             print("Opening download menu...")
             context_menu_content = page.locator(
                 "div[data-radix-menu-content][data-state='open']"
@@ -216,24 +280,11 @@ async def generate_song(lyrics="test", tags="test, song, lyrics", title="test ti
             await mp3_audio_item.click()
             await page.wait_for_timeout(2000)
 
-            # Handle download
-            print("Starting download...")
-            download_bttn = page.locator('button:has(span:has-text("Download Anyway"))')
-
-            # Use page.expect_download() to handle the download
-            async with page.expect_download(timeout=30000) as download_info:
-                await download_bttn.click()
-            download = await download_info.value
-
-            download_path = f"./{download.suggested_filename}"
-            await download.save_as(download_path)
-            print(f"Download completed and saved to: {download_path}")
-
-            await page.wait_for_timeout(3000)
+            print("Song download initiated successfully!")
             return True
 
     except Exception as e:
-        print(f"An error occurred in generate_song: {e}")
+        print(f"An error occurred in download_song: {e}")
         print(traceback.format_exc())
         return False
 
@@ -241,24 +292,22 @@ async def generate_song(lyrics="test", tags="test, song, lyrics", title="test ti
 if __name__ == "__main__":
 
     async def main():
-        # You can customize these parameters
         sample_lyrics = """[Verse 1]:
-In the beginning God created the heavens and the earth;
-Now the earth was formless and empty,
-darkness was over the surface of the deep,
-and the Spirit of God was hovering over the waters;
+            In the beginning God created the heavens and the earth;
+            Now the earth was formless and empty,
+            darkness was over the surface of the deep,
+            and the Spirit of God was hovering over the waters;
 
-[Chorus]:
-And God said, "Let there be light," and there was light;
-God saw that the light was good,
-and he separated the light from the darkness;
-God called the light "day," and the darkness he called "night;"
-And there was evening, and there was morning—the first day;"""
+            [Chorus]:
+            And God said, "Let there be light," and there was light;
+            God saw that the light was good,
+            and he separated the light from the darkness;
+            God called the light "day," and the darkness he called "night;"            And there was evening, and there was morning—the first day;"""
 
         await generate_song(
-            lyrics=sample_lyrics,
-            tags="biblical, creation, inspirational",
-            title="Genesis Creation Song",
+            strLyrics=sample_lyrics,
+            strStyle="biblical, creation, inspirational",
+            strTitle="Genesis Creation Song",
         )
         print("generate_song() completed.")
 
