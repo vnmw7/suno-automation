@@ -1,3 +1,8 @@
+"""
+suno_functions.py
+This file sets up the functions that will be used when automating Suno interactions.
+"""
+
 from camoufox.async_api import AsyncCamoufox
 import traceback
 import asyncio

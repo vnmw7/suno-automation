@@ -1,3 +1,8 @@
+"""
+main.py
+This file sets up the FastAPI application.
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
