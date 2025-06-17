@@ -60,7 +60,7 @@ async def generate_song_endpoint(request: SongRequest):
             user_data_dir="user-data-dir",
             os=("windows"),
             config=config,
-            humanize=True,
+            humanize=False,
             i_know_what_im_doing=True,
         ) as browser:
             page = await browser.new_page()
