@@ -50,7 +50,31 @@ def generate_verse_ranges(book_name: str, book_chapter: int):
 
 
 @app.post("/generate-song")
-async def generate_song_endpoint(request: SongRequest):
+async def generate_song_endpoint(SongRequest: SongRequest):
+    from utils.suno_functions import generate_song
+
+    try:
+        result = await generate_song(
+            strLyrics=SongRequest.strLyrics,
+            strStyle=SongRequest.strStyle,
+            strTitle=SongRequest.strTitle,
+        )
+        return {
+            "success": True,
+            "message": "Song generated successfully.",
+            "result": result,
+        }
+    except Exception as e:
+        print(f"A critical error occurred in generate_song_endpoint: {e}")
+        print(traceback.format_exc())
+        return {
+            "error": str(e),
+            "message": "A critical error occurred during the song generation.",
+        }
+
+
+@app.post("/download-song")
+async def download_song_endpoint(request: SongRequest):
     try:
         from utils.suno_functions import download_song_with_page, AsyncCamoufox, config
 

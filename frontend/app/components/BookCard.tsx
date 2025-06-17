@@ -4,6 +4,7 @@ import type { BibleBook } from "~/routes/main";
 import { BookOpenIcon } from "./ui/icon";
 import bookAbbreviations from "../../_constants/book-abrv.json";
 import { supabase } from "~/lib/supabase";
+import ChapterCard from "./CardChapter";
 
 interface BookCardProps {
   book: BibleBook;
@@ -177,6 +178,16 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
     }
   };
 
+  const handleGenerateSong = (
+    bookName: string,
+    chapter: number,
+    range: string
+  ) => {
+    console.log(
+      `Generate song for ${bookName} Chapter ${chapter}, Verses: ${range}`
+    );
+  };
+
   const handleGenerateVerseRange = async (
     bookAbbr: string,
     chapter: string
@@ -234,84 +245,23 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
         </div>{" "}
         {showChapters && (
           <div className="mt-4 max-h-60 overflow-y-auto border border-slate-200 rounded-md p-3 bg-slate-50">
+            {" "}
             <div className="grid grid-cols-1 gap-2">
               {generateChapters(book.maxChapter).map((chapter) => (
-                <div
+                <ChapterCard
                   key={chapter}
-                  className="bg-white border border-slate-300 rounded-lg shadow-sm"
-                >
-                  <button
-                    onClick={() => toggleChapterExpansion(chapter)}
-                    className="w-full p-3 hover:bg-sky-50 hover:border-sky-300 transition-colors cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 rounded-lg"
-                  >
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm font-medium text-sky-700">
-                        Chapter {chapter}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {expandedChapter === chapter ? "▼" : "▶"}
-                      </div>{" "}
-                    </div>
-                  </button>
-                  {expandedChapter === chapter && (
-                    <div className="px-3 pb-3 pt-2">
-                      {loadingChapters.has(chapter) ? (
-                        <div className="text-center py-4 text-slate-500 text-xs">
-                          Loading verse ranges...
-                        </div>
-                      ) : verseRanges[chapter.toString()] ? (
-                        <div className="space-y-2">
-                          {verseRanges[chapter.toString()].length > 0 ? (
-                            verseRanges[chapter.toString()].map(
-                              (range, index) => (
-                                <div
-                                  key={index}
-                                  className="p-2 bg-sky-50 border border-sky-200 rounded-md text-xs text-slate-700 shadow-sm"
-                                >
-                                  <div className="flex justify-between items-center">
-                                    <span>Verses: {range}</span>
-                                    <button
-                                      className="ml-2 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors"
-                                      onClick={() => {
-                                        console.log(
-                                          `Generate song for ${book.name} Chapter ${chapter}, Verses: ${range}`
-                                        );
-                                      }}
-                                    >
-                                      Generate Song
-                                    </button>
-                                  </div>
-                                </div>
-                              )
-                            )
-                          ) : (
-                            <div className="p-2 text-xs text-slate-500">
-                              {generateErrors[chapter.toString()] ? (
-                                <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-md text-red-700">
-                                  Error: {generateErrors[chapter.toString()]}
-                                </div>
-                              ) : null}{" "}
-                              <button
-                                className="px-3 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-600 hover:scale-105 transform transition-all duration-200 ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                                onClick={() =>
-                                  handleGenerateVerseRange(
-                                    bookAbbr,
-                                    chapter.toString()
-                                  )
-                                }
-                                disabled={generatingChapters.has(chapter)}
-                              >
-                                {generatingChapters.has(chapter)
-                                  ? "Generating..."
-                                  : "Generate Verse Range"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}{" "}
-                </div>
+                  chapter={chapter}
+                  bookName={book.name}
+                  bookAbbr={bookAbbr}
+                  isExpanded={expandedChapter === chapter}
+                  isLoading={loadingChapters.has(chapter)}
+                  verseRanges={verseRanges[chapter.toString()] || []}
+                  isGenerating={generatingChapters.has(chapter)}
+                  generateError={generateErrors[chapter.toString()]}
+                  onToggleExpansion={toggleChapterExpansion}
+                  onGenerateVerseRange={handleGenerateVerseRange}
+                  onGenerateSong={handleGenerateSong}
+                />
               ))}
             </div>
           </div>
@@ -335,85 +285,23 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
         </button>{" "}
         {showChapters && (
           <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-md p-2 bg-slate-50">
+            {" "}
             <div className="grid grid-cols-1 gap-2">
               {generateChapters(book.maxChapter).map((chapter) => (
-                <div
+                <ChapterCard
                   key={chapter}
-                  className="bg-white border border-slate-300 rounded-lg shadow-sm"
-                >
-                  <button
-                    onClick={() => toggleChapterExpansion(chapter)}
-                    className="w-full p-3 hover:bg-sky-50 hover:border-sky-300 transition-colors cursor-pointer text-center focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 rounded-lg"
-                  >
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm font-medium text-sky-700">
-                        Chapter {chapter}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {expandedChapter === chapter ? "▼" : "▶"}
-                      </div>
-                    </div>
-                  </button>
-                  {expandedChapter === chapter && (
-                    <div className="px-3 pb-3 pt-2">
-                      {loadingChapters.has(chapter) ? (
-                        <div className="text-center py-4 text-slate-500 text-xs">
-                          Loading verse ranges...
-                        </div>
-                      ) : verseRanges[chapter.toString()] ? (
-                        <div className="space-y-2">
-                          {verseRanges[chapter.toString()].length > 0 ? (
-                            verseRanges[chapter.toString()].map(
-                              (range, index) => (
-                                <div
-                                  key={index}
-                                  className="p-2 bg-sky-50 border border-sky-200 rounded-md text-xs text-slate-700 shadow-sm"
-                                >
-                                  <div className="flex justify-between items-center">
-                                    <span>Verses: {range}</span>
-                                    <button
-                                      className="ml-2 px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition-colors"
-                                      onClick={() => {
-                                        // TODO: Implement song generation logic
-                                        console.log(
-                                          `Generate song for ${book.name} Chapter ${chapter}, Verses: ${range}`
-                                        );
-                                      }}
-                                    >
-                                      Generate Song
-                                    </button>
-                                  </div>
-                                </div>
-                              )
-                            )
-                          ) : (
-                            <div className="p-2 text-xs text-slate-500">
-                              {generateErrors[chapter.toString()] ? (
-                                <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-md text-red-700">
-                                  Error: {generateErrors[chapter.toString()]}
-                                </div>
-                              ) : null}{" "}
-                              <button
-                                className="px-3 py-2 bg-sky-500 text-white rounded-md hover:bg-sky-600 hover:scale-105 transform transition-all duration-200 ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                                onClick={() =>
-                                  handleGenerateVerseRange(
-                                    bookAbbr,
-                                    chapter.toString()
-                                  )
-                                }
-                                disabled={generatingChapters.has(chapter)}
-                              >
-                                {generatingChapters.has(chapter)
-                                  ? "Generating..."
-                                  : "Generate Verse Range"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
+                  chapter={chapter}
+                  bookName={book.name}
+                  bookAbbr={bookAbbr}
+                  isExpanded={expandedChapter === chapter}
+                  isLoading={loadingChapters.has(chapter)}
+                  verseRanges={verseRanges[chapter.toString()] || []}
+                  isGenerating={generatingChapters.has(chapter)}
+                  generateError={generateErrors[chapter.toString()]}
+                  onToggleExpansion={toggleChapterExpansion}
+                  onGenerateVerseRange={handleGenerateVerseRange}
+                  onGenerateSong={handleGenerateSong}
+                />
               ))}
             </div>
           </div>
