@@ -298,6 +298,12 @@ async def download_song_with_page(page, strTitle, intIndex):
         print(
             f"Inside download_song_with_page for title: '{strTitle}', index: {intIndex}"
         )
+
+        # Check if page is already closed before starting
+        if page.is_closed():
+            print(f"Page was closed before starting download for song index {intIndex}. Cannot proceed.")
+            return False
+
         print("Navigating to user songs page (https://suno.com/me)...")
         await page.goto(
             "https://suno.com/me", wait_until="domcontentloaded", timeout=45000
@@ -309,6 +315,8 @@ async def download_song_with_page(page, strTitle, intIndex):
             print("Successfully landed on /me page.")
         except Exception as e:
             print(f"Failed to confirm navigation to /me page URL: {e}")
+            if page.is_closed():
+                print("Page closed during URL wait.")
             return False
 
         print("Waiting for page content to settle (networkidle)...")
@@ -316,6 +324,8 @@ async def download_song_with_page(page, strTitle, intIndex):
             await page.wait_for_load_state("networkidle", timeout=30000)
         except Exception as e:
             print(f"Warning: Networkidle timeout on /me page: {e}")
+            if page.is_closed():
+                print("Page closed during networkidle wait.")
 
         await page.wait_for_timeout(2000)
 
@@ -348,7 +358,45 @@ async def download_song_with_page(page, strTitle, intIndex):
         print(f"Targeting song at 0-based index {intIndex - 1}.")
 
         print("Scrolling target song into view if needed...")
-        await target_song_element.scroll_into_view_if_needed(timeout=10000)
+        try:
+            await target_song_element.scroll_into_view_if_needed(
+                timeout=20000
+            )  # Increased timeout
+            print(
+                "Successfully scrolled using Playwright's scroll_into_view_if_needed."
+            )
+        except Exception as scroll_err_playwright:
+            print(
+                f"Playwright scroll_into_view_if_needed failed: {scroll_err_playwright}. Attempting JavaScript scroll."
+            )
+            try:
+                await target_song_element.wait_for(state="attached", timeout=5000)
+                is_vis_before_js_scroll = await target_song_element.is_visible()
+                if is_vis_before_js_scroll:
+                    print(
+                        "Element reported as visible before JS scroll attempt; Playwright scroll might have had stability issues."
+                    )
+                else:
+                    print("Element not visible, proceeding with JS scroll.")
+
+                await target_song_element.evaluate(
+                    "element => element.scrollIntoView({ block: 'center', inline: 'nearest' })"
+                )
+                await page.wait_for_timeout(1500)
+                print("JavaScript scrollIntoView attempt executed.")
+
+                if not await target_song_element.is_visible(timeout=7000):
+                    print(
+                        "Warning: Element still not visible after JavaScript scroll and wait."
+                    )
+                    raise scroll_err_playwright
+                else:
+                    print("Element confirmed visible after JavaScript scroll attempt.")
+            except Exception as scroll_err_js_combined:
+                print(
+                    f"JavaScript scroll/visibility check also failed: {scroll_err_js_combined}"
+                )
+                raise scroll_err_playwright
 
         print(
             "Waiting for target song element to be visible and stable before right-click..."
@@ -395,45 +443,82 @@ async def download_song_with_page(page, strTitle, intIndex):
             download_submenu_panel_locator_str = "div[data-radix-menu-content][data-state='open'][role='menu']"  # Fallback
 
         download_submenu_panel = page.locator(download_submenu_panel_locator_str).last
-
         await download_submenu_panel.wait_for(state="visible", timeout=10000)
         print("Download submenu panel is visible.")
 
-        print("Locating and clicking 'MP3 Audio' option...")
+        print("Locating 'MP3 Audio' option...")
         mp3_audio_item = download_submenu_panel.locator(
             "div[role='menuitem']:has-text('MP3 Audio')"
         )
-        await mp3_audio_item.wait_for(state="visible", timeout=5000)
-        await mp3_audio_item.click(timeout=10000)
-        print("'MP3 Audio' option clicked.")
+        await mp3_audio_item.wait_for(state="visible", timeout=10000)  # Increased timeout
+        print("'MP3 Audio' option located and ready.")
 
-        page.wait_for_timeout(2000)
+        # CRITICAL FIX: Start expect_download *before* the click that triggers it
+        print("Expecting download to start...")
+        try:
+            async with page.expect_download(timeout=60000) as download_info_manager:
+                print("Attempting to click 'MP3 Audio' option to initiate download...")
+                # Add small delay for stability
+                await page.wait_for_timeout(500)
+                await mp3_audio_item.click(timeout=15000)  # Increased click timeout
+                print("'MP3 Audio' option clicked.")
 
-        print("Locating 'Download Anyway' button...")
-        download_bttn = page.locator('button:has(span:has-text("Download Anyway"))')
-        await download_bttn.wait_for(state="visible", timeout=10000)
-        print("'Download Anyway' button is visible.")
+                # Handle "Download Anyway" button if it appears AFTER 'MP3 Audio' click
+                # This must also be INSIDE the `async with page.expect_download` block
+                print("Checking for 'Download Anyway' button...")
+                download_anyway_button = page.locator(
+                    'button:has(span:has-text("Download Anyway"))'
+                )
+                try:
+                    await download_anyway_button.wait_for(
+                        state="visible", timeout=15000  # Increased timeout
+                    )
+                    print("'Download Anyway' button is visible. Clicking it...")
+                    await download_anyway_button.click(timeout=10000)
+                    print("'Download Anyway' button clicked.")
+                except Exception:
+                    print(
+                        "'Download Anyway' button not found/visible when expected. Assuming direct download."
+                    )
 
-        with page.expect_download(timeout=30000) as download_info:
-            download_bttn.click()
-        download = download_info.value
+            print("Download expectation block finished.")
+            download = await download_info_manager.value
 
-        download_path = f"./{download.suggested_filename}"
-        download.save_as(download_path)
-        print(f"Clicked 'MP3 Audio'. Download started and saved to: {download_path}")
+            if not download:
+                print(
+                    f"Error: Download was expected but not received for '{strTitle}' index {intIndex}."
+                )
+                return False
 
-        await page.wait_for_timeout(5000)
+            download_path = f"./{download.suggested_filename}"
+            await download.save_as(download_path)
+            print(f"Download for '{strTitle}' (index {intIndex}) saved to: {download_path}")
+
+        except Exception as download_expect_err:
+            print(f"Error during download expectation or saving: {download_expect_err}")
+            print(traceback.format_exc())
+            return False
+
+        await page.wait_for_timeout(3000)  # Brief pause after saving
 
         print(
-            f"Song download for '{strTitle}' (index {intIndex}) initiated successfully!"
+            f"Song download for '{strTitle}' (index {intIndex}) process completed successfully!"
         )
         return True
 
     except Exception as e:
         print(
-            f"An error occurred in download_song_with_page for index {intIndex}, title '{strTitle}': {e}"
+            f"A critical error occurred in download_song_with_page for index {intIndex}, title '{strTitle}': {e}"
         )
         print(traceback.format_exc())
+        
+        # Check if page is still available for debugging
+        if page and not page.is_closed():
+            print("Page is still available after error.")
+            # Screenshot could be taken here if needed for debugging
+        elif page and page.is_closed():
+            print("Page was closed when the critical error was caught.")
+        
         return False
 
 
