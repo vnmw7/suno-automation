@@ -178,16 +178,6 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
     }
   };
 
-  const handleGenerateSong = (
-    bookName: string,
-    chapter: number,
-    range: string
-  ) => {
-    console.log(
-      `Generate song for ${bookName} Chapter ${chapter}, Verses: ${range}`
-    );
-  };
-
   const handleGenerateVerseRange = async (
     bookAbbr: string,
     chapter: string
@@ -260,7 +250,6 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
                   generateError={generateErrors[chapter.toString()]}
                   onToggleExpansion={toggleChapterExpansion}
                   onGenerateVerseRange={handleGenerateVerseRange}
-                  onGenerateSong={handleGenerateSong}
                 />
               ))}
             </div>
@@ -300,7 +289,6 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
                   generateError={generateErrors[chapter.toString()]}
                   onToggleExpansion={toggleChapterExpansion}
                   onGenerateVerseRange={handleGenerateVerseRange}
-                  onGenerateSong={handleGenerateSong}
                 />
               ))}
             </div>

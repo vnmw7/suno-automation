@@ -6,6 +6,22 @@ This file sets up the functions that will be used when automating Suno interacti
 from camoufox.async_api import AsyncCamoufox
 import traceback
 import asyncio
+import json
+import re
+
+# Import supabase from backend lib
+import importlib
+import importlib.util
+import os
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "lib"))
+supabase_utils_path = os.path.join(lib_path, "supabase.py")
+
+spec = importlib.util.spec_from_file_location("supabase_utils", supabase_utils_path)
+supabase_utils = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(supabase_utils)
+
+supabase = supabase_utils.supabase
 
 
 config = {
@@ -87,7 +103,42 @@ async def login_suno():
         return False
 
 
-async def generate_song(strLyrics, strStyle, strTitle):
+async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, strTitle):
+    from utils.converter import song_strcture_to_lyrics
+
+    song_structure_dict = (
+        supabase.table("song_structure_tbl")
+        .select("song_structure")
+        .eq("book_name", strBookName)
+        .eq("chapter", intBookChapter)
+        .eq("verse_range", strVerseRange)
+        .execute()
+    )
+
+    song_structure_json_string = song_structure_dict.data[0]["song_structure"]
+    parsed_song_structure = json.loads(song_structure_json_string)
+
+    song_structure_verses = song_strcture_to_lyrics(
+        parsed_song_structure, strBookName, intBookChapter
+    )
+    print(f"Converted song structure verses: {song_structure_verses}")
+
+    strLyrics_parts = []
+    for section_title, verses_dict in song_structure_verses.items():
+        strLyrics_parts.append(f"[{section_title}]:")
+        for verse_num, verse_text in verses_dict.items():
+            processed_text = verse_text.strip()
+            processed_text = re.sub(r"\s*([.;])\s*", r"\1\n\n", processed_text)
+            processed_text = re.sub(
+                r"^\s+(?=\S)", "", processed_text, flags=re.MULTILINE
+            )
+            strLyrics_parts.append(processed_text)
+
+    intermediate_strLyrics = "\n".join(strLyrics_parts)
+    strLyrics = re.sub(r"\n{3,}", "\n", intermediate_strLyrics)
+    strLyrics = re.sub(r"\n", "\n\n", strLyrics)
+    strLyrics = re.sub(r"(\[.*?\]:)\n+", r"\1\n", strLyrics)
+
     try:
         async with AsyncCamoufox(
             headless=False,
@@ -129,19 +180,19 @@ async def generate_song(strLyrics, strStyle, strTitle):
                     print(f"Alternative Custom button also failed: {e2}")
                     raise Exception("Could not find or click Custom button")
 
-            print("Filling lyrics...")
+            print("Filling strLyrics...")
             try:
-                lyrics_textarea = page.locator(
-                    'textarea[data-testid="lyrics-input-textarea"]'
+                strLyrics_textarea = page.locator(
+                    'textarea[data-testid="strLyrics-input-textarea"]'
                 )
-                await lyrics_textarea.wait_for(state="visible", timeout=10000)
-                await lyrics_textarea.clear()
-                await lyrics_textarea.type(strLyrics)
+                await strLyrics_textarea.wait_for(state="visible", timeout=10000)
+                await strLyrics_textarea.clear()
+                await strLyrics_textarea.type(strLyrics)
                 await page.wait_for_timeout(2000)
-                print(f"Lyrics filled successfully: {len(strLyrics)} characters")
+                print(f"strLyrics filled successfully: {len(strLyrics)} characters")
             except Exception as e:
-                print(f"Error filling lyrics: {e}")
-                raise Exception("Could not fill lyrics textarea")
+                print(f"Error filling strLyrics: {e}")
+                raise Exception("Could not fill strLyrics textarea")
 
             print("Filling tags...")
             try:
@@ -301,7 +352,9 @@ async def download_song_with_page(page, strTitle, intIndex):
 
         # Check if page is already closed before starting
         if page.is_closed():
-            print(f"Page was closed before starting download for song index {intIndex}. Cannot proceed.")
+            print(
+                f"Page was closed before starting download for song index {intIndex}. Cannot proceed."
+            )
             return False
 
         print("Navigating to user songs page (https://suno.com/me)...")
@@ -450,7 +503,9 @@ async def download_song_with_page(page, strTitle, intIndex):
         mp3_audio_item = download_submenu_panel.locator(
             "div[role='menuitem']:has-text('MP3 Audio')"
         )
-        await mp3_audio_item.wait_for(state="visible", timeout=10000)  # Increased timeout
+        await mp3_audio_item.wait_for(
+            state="visible", timeout=10000
+        )  # Increased timeout
         print("'MP3 Audio' option located and ready.")
 
         # CRITICAL FIX: Start expect_download *before* the click that triggers it
@@ -492,7 +547,9 @@ async def download_song_with_page(page, strTitle, intIndex):
 
             download_path = f"./{download.suggested_filename}"
             await download.save_as(download_path)
-            print(f"Download for '{strTitle}' (index {intIndex}) saved to: {download_path}")
+            print(
+                f"Download for '{strTitle}' (index {intIndex}) saved to: {download_path}"
+            )
 
         except Exception as download_expect_err:
             print(f"Error during download expectation or saving: {download_expect_err}")
@@ -511,34 +568,23 @@ async def download_song_with_page(page, strTitle, intIndex):
             f"A critical error occurred in download_song_with_page for index {intIndex}, title '{strTitle}': {e}"
         )
         print(traceback.format_exc())
-        
+
         # Check if page is still available for debugging
         if page and not page.is_closed():
             print("Page is still available after error.")
             # Screenshot could be taken here if needed for debugging
         elif page and page.is_closed():
             print("Page was closed when the critical error was caught.")
-        
+
         return False
 
 
 if __name__ == "__main__":
 
     async def main():
-        sample_lyrics = """[Verse 1]:
-            In the beginning God created the heavens and the earth;
-            Now the earth was formless and empty,
-            darkness was over the surface of the deep,
-            and the Spirit of God was hovering over the waters;
-
-            [Chorus]:
-            And God said, "Let there be light," and there was light;
-            God saw that the light was good,
-            and he separated the light from the darkness;
-            God called the light "day," and the darkness he called "night;"            And there was evening, and there was morning—the first day;"""
-
         await generate_song(
-            strLyrics=sample_lyrics,
+            strBookName="Genesis",
+            intBookChapter=1,
             strStyle="biblical, creation, inspirational",
             strTitle="Genesis Creation Song",
         )

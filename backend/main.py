@@ -20,7 +20,9 @@ app.add_middleware(
 
 
 class SongRequest(BaseModel):
-    strLyrics: str
+    strBookName: str
+    intBookChapter: int
+    strVerseRange: str
     strStyle: str
     strTitle: str
 
@@ -55,7 +57,9 @@ async def generate_song_endpoint(SongRequest: SongRequest):
 
     try:
         result = await generate_song(
-            strLyrics=SongRequest.strLyrics,
+            strBookName=SongRequest.strBookName,
+            intBookChapter=SongRequest.intBookChapter,
+            strVerseRange=SongRequest.strVerseRange,
             strStyle=SongRequest.strStyle,
             strTitle=SongRequest.strTitle,
         )

@@ -103,9 +103,7 @@ def bookname_to_abrv(bookname: str) -> str:
     return mapping.get(bookname, bookname)
 
 
-def song_structure_to_lyrics_structure(
-    input_dict, book_name: str, book_chapter: int
-) -> dict:
+def song_strcture_to_lyrics(input_dict, book_name: str, book_chapter: int) -> dict:
     output_dict = {}
     current_book_abrv = bookname_to_abrv(book_name)
 

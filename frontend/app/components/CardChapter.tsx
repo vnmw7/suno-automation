@@ -11,7 +11,6 @@ interface ChapterCardProps {
   generateError?: string;
   onToggleExpansion: (chapter: number) => void;
   onGenerateVerseRange: (bookAbbr: string, chapter: string) => void;
-  onGenerateSong: (bookName: string, chapter: number, range: string) => void;
 }
 
 const ChapterCard = ({
@@ -25,7 +24,6 @@ const ChapterCard = ({
   generateError,
   onToggleExpansion,
   onGenerateVerseRange,
-  onGenerateSong,
 }: ChapterCardProps) => {
   return (
     <div className="bg-white border border-slate-300 rounded-lg shadow-sm">
@@ -55,7 +53,6 @@ const ChapterCard = ({
                     range={range}
                     bookName={bookName}
                     chapter={chapter}
-                    onGenerateSong={onGenerateSong}
                   />
                 ))
               ) : (
