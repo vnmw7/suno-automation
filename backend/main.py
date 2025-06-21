@@ -27,6 +27,12 @@ class SongRequest(BaseModel):
     strTitle: str
 
 
+class SongStructureRequest(BaseModel):
+    strBookName: str
+    intBookChapter: int
+    strVerseRange: str
+
+
 @app.get("/")
 def read_root():
     return {"message": "server working"}
@@ -41,14 +47,57 @@ async def login_endpoint():
 
 
 @app.post("/generate-verse-ranges")
-def generate_verse_ranges(book_name: str, book_chapter: int):
+def generate_verse_ranges_endpoint(book_name: str, book_chapter: int):
     from utils.ai_functions import generate_verse_ranges
 
     try:
-        generate_verse_ranges(book_name, book_chapter)
-        return {"message": "Verse ranges generated successfully."}
+        verse_ranges = generate_verse_ranges(book_name, book_chapter)
+        return {
+            "success": True,
+            "message": "Verse ranges generated successfully.",
+            "verse_ranges": verse_ranges,
+        }
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.get("/get-verse-ranges")
+def get_verse_ranges_endpoint(book_name: str, book_chapter: int):
+    from utils.ai_functions import get_verse_ranges
+
+    try:
+        verse_ranges = get_verse_ranges(book_name, book_chapter)
+        return {
+            "success": True,
+            "message": "Verse ranges retrieved successfully.",
+            "verse_ranges": verse_ranges,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/generate-song-structure")
+async def generate_song_structure_endpoint(request: SongStructureRequest):
+    from utils.ai_functions import generate_song_structure
+
+    try:
+        result = generate_song_structure(
+            strBookName=request.strBookName,
+            intBookChapter=request.intBookChapter,
+            strVerseRange=request.strVerseRange,
+        )
+        return {
+            "success": True,
+            "message": "Song structure generated successfully.",
+            "result": result,
+        }
+    except Exception as e:
+        print(f"A critical error occurred in generate_song_structure_endpoint: {e}")
+        print(traceback.format_exc())
+        return {
+            "error": str(e),
+            "message": "A critical error occurred during the song structure generation.",
+        }
 
 
 @app.post("/generate-song")
