@@ -117,12 +117,20 @@ async def generate_song_endpoint(SongRequest: SongRequest):
             "message": "Song generated successfully.",
             "result": result,
         }
+    except ValueError as ve:
+        print(f"ValueError in generate_song_endpoint: {ve}")
+        return {
+            "error": str(ve),
+            "message": "Missing or invalid song structure data.",
+            "success": False,
+        }
     except Exception as e:
         print(f"A critical error occurred in generate_song_endpoint: {e}")
         print(traceback.format_exc())
         return {
             "error": str(e),
             "message": "A critical error occurred during the song generation.",
+            "success": False,
         }
 
 
@@ -194,6 +202,22 @@ async def download_song_endpoint(request: SongRequest):
             "error": str(e),
             "message": "A critical error occurred during the song operation.",
         }
+
+
+@app.get("/debug/song-structures")
+def debug_song_structures_endpoint():
+    """Debug endpoint to see what song structures are available in the database"""
+    try:
+        from lib.supabase import supabase
+
+        result = supabase.table("song_structure_tbl").select("*").execute()
+        return {
+            "success": True,
+            "message": f"Found {len(result.data)} song structures",
+            "data": result.data,
+        }
+    except Exception as e:
+        return {"error": str(e), "message": "Failed to retrieve song structures"}
 
 
 if __name__ == "__main__":

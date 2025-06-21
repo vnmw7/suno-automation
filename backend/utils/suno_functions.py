@@ -115,8 +115,34 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
         .execute()
     )
 
+    print(f"Database query result for {strBookName} {intBookChapter}:{strVerseRange}:")
+    print(
+        f"  Data count: {len(song_structure_dict.data) if song_structure_dict.data else 0}"
+    )
+    print(f"  Data: {song_structure_dict.data}")
+
+    # Check if data exists
+    if not song_structure_dict.data or len(song_structure_dict.data) == 0:
+        raise ValueError(
+            f"No song structure found for {strBookName} {intBookChapter}:{strVerseRange}"
+        )
+
     song_structure_json_string = song_structure_dict.data[0]["song_structure"]
-    parsed_song_structure = json.loads(song_structure_json_string)
+    print(f"  song_structure field value: {song_structure_json_string}")
+    print(f"  song_structure type: {type(song_structure_json_string)}")
+
+    # Check if song_structure field is not None
+    if song_structure_json_string is None:
+        raise ValueError(
+            f"Song structure is None for {strBookName} {intBookChapter}:{strVerseRange}"
+        )
+
+    try:
+        parsed_song_structure = json.loads(song_structure_json_string)
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"Invalid JSON in song structure for {strBookName} {intBookChapter}:{strVerseRange}: {e}"
+        )
 
     song_structure_verses = song_strcture_to_lyrics(
         parsed_song_structure, strBookName, intBookChapter
@@ -183,7 +209,7 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
             print("Filling strLyrics...")
             try:
                 strLyrics_textarea = page.locator(
-                    'textarea[data-testid="strLyrics-input-textarea"]'
+                    'textarea[data-testid="lyrics-input-textarea"]'
                 )
                 await strLyrics_textarea.wait_for(state="visible", timeout=10000)
                 await strLyrics_textarea.clear()
@@ -192,7 +218,7 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
                 print(f"strLyrics filled successfully: {len(strLyrics)} characters")
             except Exception as e:
                 print(f"Error filling strLyrics: {e}")
-                raise Exception("Could not fill strLyrics textarea")
+                raise Exception("Could not fill lyrics textarea")
 
             print("Filling tags...")
             try:
