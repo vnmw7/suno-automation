@@ -99,7 +99,9 @@ const ModalSongs = ({
       const result = await callGenerateSongAPI(requestPayload);
 
       if (result.success) {
-        setMessage(`Song with style '${selectedStyle}' generated successfully!`);
+        setMessage(
+          `Song with style '${selectedStyle}' generated successfully!`
+        );
         console.log("Song generation result:", result.result);
       } else {
         setError(result.error || result.message || "Failed to generate song");
