@@ -136,6 +136,7 @@ async def generate_song_endpoint(SongRequest: SongRequest):
 
 @app.post("/download-song")
 async def download_song_endpoint(request: SongRequest):
+
     try:
         from utils.suno_functions import download_song_with_page, AsyncCamoufox, config
 
@@ -160,7 +161,7 @@ async def download_song_endpoint(request: SongRequest):
                     f"Attempting to download song {i} of {SONG_COUNT} with title: {request.strTitle}"
                 )
                 success = await download_song_with_page(
-                    page, strTitle=request.strTitle, intIndex=i + 2
+                    page, strTitle=request.strTitle, intIndex=-i
                 )
                 download_results.append(
                     {

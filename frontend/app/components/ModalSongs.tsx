@@ -4,9 +4,13 @@ import {
   generateSongStructure as callGenerateSongStructureAPI,
   fetchSongStructures,
   fetchStyles,
+  calldownloadSongAPI,
+  fetchSongFilesFromPublic,
   type SongStructure,
   type Style,
 } from "../lib/api";
+
+const SONG_DIRECTORY = "/songs";
 
 interface ModalSongsProps {
   isOpen: boolean;
@@ -30,54 +34,87 @@ const ModalSongs = ({
   const [error, setError] = useState<string | null>(null);
   const [structureError, setStructureError] = useState<string | null>(null);
 
-  // New state for fetched data
   const [songStructures, setSongStructures] = useState<SongStructure[]>([]);
   const [styles, setStyles] = useState<Style[]>([]);
-  const [isFetching, setIsFetching] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isFetchingStructuresStyles, setIsFetchingStructuresStyles] = useState(false);
+  const [fetchStructuresStylesError, setFetchStructuresStylesError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "generate" | "structures" | "styles"
+    "generate" | "structures" | "styles" | "qa_songs" | "songs"
   >("generate");
   const [generatingStyle, setGeneratingStyle] = useState<string | null>(null);
+  const [songFiles, setSongFiles] = useState<string[]>([]);
+  const [isFetchingSongFiles, setIsFetchingSongFiles] = useState(false);
+  const [fetchSongFilesError, setFetchSongFilesError] = useState<string | null>(null);
 
-  // Fetch data when modal opens
   useEffect(() => {
+    const loadInitialData = async () => {
+      // Fetch structures and styles
+      setIsFetchingStructuresStyles(true);
+      setFetchStructuresStylesError(null);
+      try {
+        const [structuresResponse, stylesResponse] = await Promise.all([
+          fetchSongStructures(range),
+          fetchStyles(range),
+        ]);
+
+        if (structuresResponse.success && structuresResponse.result) {
+          setSongStructures(structuresResponse.result);
+        } else {
+          console.error(
+            "Failed to fetch song structures:",
+            structuresResponse.error
+          );
+          setFetchStructuresStylesError(structuresResponse.error || "Error fetching structures");
+        }
+
+        if (stylesResponse.success && stylesResponse.result) {
+          setStyles(stylesResponse.result);
+        } else {
+          console.error("Failed to fetch styles:", stylesResponse.error);
+          setFetchStructuresStylesError(fetchStructuresStylesError + (stylesResponse.error || " Error fetching styles"));
+        }
+      } catch (err) {
+        setFetchStructuresStylesError("An unexpected error occurred while fetching structures/styles.");
+        console.error("Error fetching structures/styles data:", err);
+      } finally {
+        setIsFetchingStructuresStyles(false);
+      }
+
+      // Fetch song files from the public directory
+      setIsFetchingSongFiles(true);
+      setFetchSongFilesError(null);
+      try {
+        const songFilesResponse = await fetchSongFilesFromPublic(bookName, chapter, range);
+        if (songFilesResponse.success && songFilesResponse.result) {
+          setSongFiles(songFilesResponse.result);
+        } else {
+          setFetchSongFilesError(songFilesResponse.error || "Failed to load song files.");
+          console.error("Failed to load song files from public:", songFilesResponse.error);
+        }
+      } catch (err) {
+        setFetchSongFilesError("An unexpected error occurred while fetching song files.");
+        console.error("Error fetching song files from public:", err);
+      } finally {
+        setIsFetchingSongFiles(false);
+      }
+    };
+
     if (isOpen) {
-      fetchData();
+      loadInitialData();
+    } else {
+      // Clear data on close
+      setSongStructures([]);
+      setStyles([]);
+      setSongFiles([]); // Clear song files
+      setMessage(null);
+      setError(null);
+      setStructureMessage(null);
+      setStructureError(null);
+      setFetchStructuresStylesError(null);
+      setFetchSongFilesError(null); // Clear song files error
+      setActiveTab("generate"); // Reset to default tab
     }
-  }, [isOpen]);
-
-  const fetchData = async () => {
-    setIsFetching(true);
-    setFetchError(null);
-
-    try {
-      const [structuresResponse, stylesResponse] = await Promise.all([
-        fetchSongStructures(),
-        fetchStyles(),
-      ]);
-
-      if (structuresResponse.success && structuresResponse.result) {
-        setSongStructures(structuresResponse.result);
-      } else {
-        console.error(
-          "Failed to fetch song structures:",
-          structuresResponse.error
-        );
-      }
-
-      if (stylesResponse.success && stylesResponse.result) {
-        setStyles(stylesResponse.result);
-      } else {
-        console.error("Failed to fetch styles:", stylesResponse.error);
-      }
-    } catch (err) {
-      setFetchError("Failed to fetch data");
-      console.error("Error fetching data:", err);
-    } finally {
-      setIsFetching(false);
-    }
-  };
+  }, [isOpen, range, bookName, chapter]); // Added bookName, chapter as dependencies
 
   const handleGenerateSong = async (selectedStyle: string) => {
     setIsLoading(true);
@@ -105,6 +142,21 @@ const ModalSongs = ({
         console.log("Song generation result:", result.result);
       } else {
         setError(result.error || result.message || "Failed to generate song");
+      }
+
+      console.log("Downloading songs:", requestPayload);
+
+      await new Promise((resolve) => setTimeout(resolve, 3 * 60 * 1000));
+
+      const downloadResult = await calldownloadSongAPI(requestPayload);
+
+      if (downloadResult.success) {
+        setMessage(
+          `Song with style '${selectedStyle}' generated successfully!`
+        );
+        console.log("Song generation result:", downloadResult.result);
+      } else {
+        setError(downloadResult.error || downloadResult.message || "Failed to generate song");
       }
     } catch (err) {
       setError("An unexpected error occurred");
@@ -163,7 +215,6 @@ const ModalSongs = ({
           </button>
         </div>
 
-        {/* Tab Navigation */}
         <div className="flex space-x-1 mb-4 border-b">
           <button
             className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
@@ -195,11 +246,19 @@ const ModalSongs = ({
           >
             Styles ({styles.length})
           </button>
+          <button
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
+              activeTab === "songs"
+                ? "bg-blue-500 text-white border-blue-500"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab("songs")}
+          >
+            Songs ({songFiles.length})
+          </button>
         </div>
 
-        {/* Tab Content */}
         <div className="space-y-4">
-          {/* Generate Tab */}
           {activeTab === "generate" && (
             <>
               <div className="flex gap-2">
@@ -230,16 +289,15 @@ const ModalSongs = ({
             </>
           )}
 
-          {/* Song Structures Tab */}
           {activeTab === "structures" && (
             <div>
-              {isFetching ? (
+              {isFetchingStructuresStyles ? (
                 <div className="text-center py-4">
                   Loading song structures...
                 </div>
-              ) : fetchError ? (
+              ) : fetchStructuresStylesError ? (
                 <div className="p-3 bg-red-100 border border-red-300 rounded text-red-700">
-                  {fetchError}
+                  {fetchStructuresStylesError}
                 </div>
               ) : songStructures.length === 0 ? (
                 <div className="text-center py-4 text-gray-500">
@@ -279,7 +337,6 @@ const ModalSongs = ({
             </div>
           )}
 
-          {/* Styles Tab */}
           {activeTab === "styles" && (
             <div>
               {message && (
@@ -293,11 +350,11 @@ const ModalSongs = ({
                   {error}
                 </div>
               )}
-              {isFetching ? (
+              {isFetchingStructuresStyles ? (
                 <div className="text-center py-4">Loading styles...</div>
-              ) : fetchError ? (
+              ) : fetchStructuresStylesError ? (
                 <div className="p-3 bg-red-100 border border-red-300 rounded text-red-700">
-                  {fetchError}
+                  {fetchStructuresStylesError}
                 </div>
               ) : styles.length === 0 ? (
                 <div className="text-center py-4 text-gray-500">
@@ -342,6 +399,45 @@ const ModalSongs = ({
                           {style.description}
                         </p>
                       )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "songs" && (
+            <div>
+              {isFetchingSongFiles ? (
+                <div className="text-center py-4">Loading QA songs...</div>
+              ) : fetchSongFilesError ? (
+                <div className="p-3 bg-red-100 border border-red-300 rounded text-red-700">
+                  {fetchSongFilesError}
+                </div>
+              ) : songFiles.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">
+                  No songs found in {SONG_DIRECTORY}.
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {songFiles.map((fileName) => (
+                    <div key={fileName} className="p-3 bg-gray-50 border rounded">
+                      <p className="font-medium text-sm mb-2 break-all">{fileName}</p>
+                      <audio
+                        controls
+                        src={`${SONG_DIRECTORY}/${encodeURIComponent(fileName)}`}
+                        className="w-full mb-2"
+                      >
+                        <track kind="captions" srcLang="en" label="English captions" />
+                        Your browser does not support the audio element.
+                      </audio>
+                      <a
+                        href={`${SONG_DIRECTORY}/${encodeURIComponent(fileName)}`}
+                        download={fileName}
+                        className="text-blue-500 hover:text-blue-700 text-sm hover:underline"
+                      >
+                        Download MP3
+                      </a>
                     </div>
                   ))}
                 </div>

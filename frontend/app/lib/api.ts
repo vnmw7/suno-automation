@@ -146,53 +146,67 @@ export interface FetchStylesResponse {
   error?: string;
 }
 
-export const fetchSongStructures =
-  async (): Promise<FetchSongStructuresResponse> => {
-    try {
-      console.log("Fetching song structures from Supabase...");
+export const fetchSongStructures = async (
+  verseRange?: string
+): Promise<FetchSongStructuresResponse> => {
+  try {
+    console.log("Fetching song structures from Supabase...");
 
-      const { data, error } = await supabase
-        .from("song_structure_tbl")
-        .select("*")
-        .not("song_structure", "is", null)
-        .not("song_structure", "eq", "")
-        .order("id", { ascending: false });
+    let query = supabase
+      .from("song_structure_tbl")
+      .select("*")
+      .not("song_structure", "is", null)
+      .not("song_structure", "eq", "")
+      .order("id", { ascending: false });
 
-      if (error) {
-        console.error("Supabase error fetching song structures:", error);
-        return {
-          success: false,
-          message: "Failed to fetch song structures from database",
-          error: error.message,
-        };
-      }
+    if (verseRange) {
+      query = query.eq("verse_range", verseRange);
+    }
 
-      console.log("Supabase song structures data:", data);
+    const { data, error } = await query;
 
-      return {
-        success: true,
-        message: "Song structures fetched successfully",
-        result: data || [],
-      };
-    } catch (error) {
-      console.error("Error fetching song structures:", error);
+    if (error) {
+      console.error("Supabase error fetching song structures:", error);
       return {
         success: false,
-        message: "Failed to fetch song structures",
-        error: error instanceof Error ? error.message : "Unknown error",
+        message: "Failed to fetch song structures from database",
+        error: error.message,
       };
     }
-  };
 
-export const fetchStyles = async (): Promise<FetchStylesResponse> => {
+    console.log("Supabase song structures data:", data);
+
+    return {
+      success: true,
+      message: "Song structures fetched successfully",
+      result: data || [],
+    };
+  } catch (error) {
+    console.error("Error fetching song structures:", error);
+    return {
+      success: false,
+      message: "Failed to fetch song structures",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+};
+
+export const fetchStyles = async (
+  verseRange?: string
+): Promise<FetchStylesResponse> => {
   try {
     console.log("Fetching styles from Supabase song_structure_tbl...");
 
-    // Fetch all unique styles from the song_structure_tbl
-    const { data, error } = await supabase
+    let query = supabase
       .from("song_structure_tbl")
-      .select("*") // Use select('*') to avoid the malformed array literal error
+      .select("styles")
       .not("styles", "is", null);
+
+    if (verseRange) {
+      query = query.eq("verse_range", verseRange);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Supabase error fetching styles:", error);
@@ -201,32 +215,23 @@ export const fetchStyles = async (): Promise<FetchStylesResponse> => {
         message: "Failed to fetch styles from database",
         error: error.message,
       };
-    } // Extract unique styles from the results
+    }
+
+    // Extract unique styles from the results
     const uniqueStyles = new Set<string>();
     data?.forEach((row) => {
       if (row.styles && Array.isArray(row.styles)) {
-        row.styles.forEach((style: string) => {
-          if (style && typeof style === "string") {
-            uniqueStyles.add(style.trim());
-          }
-        });
+        row.styles.forEach((style: string) => uniqueStyles.add(style));
       }
     });
-
-    // Convert to the expected format
-    const styleResults: Style[] = Array.from(uniqueStyles).map(
-      (styleName, index) => ({
-        id: index + 1,
-        name: styleName,
-      })
-    );
-
-    console.log("Extracted unique styles:", styleResults);
 
     return {
       success: true,
       message: "Styles fetched successfully",
-      result: styleResults,
+      result: Array.from(uniqueStyles).map((style, index) => ({
+        id: index + 1, // Generate a unique ID for each style
+        name: style,
+      })),
     };
   } catch (error) {
     console.error("Error fetching styles:", error);
@@ -235,5 +240,65 @@ export const fetchStyles = async (): Promise<FetchStylesResponse> => {
       message: "Failed to fetch styles",
       error: error instanceof Error ? error.message : "Unknown error",
     };
+  }
+};
+
+export const calldownloadSongAPI = async (
+  request: SongRequest
+): Promise<SongResponse> => {
+  try {
+    console.log("API request payload for download-song:", request);
+
+    const response = await fetch(`${API_BASE_URL}/download-song`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    console.log("Download-song response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error response from download-song:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log("Download-song API response data:", data);
+    return data;
+  } catch (error) {
+    console.error("Error downloading song:", error);
+    return {
+      success: false,
+      message: "Failed to download song",
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+};
+
+export const fetchSongFilesFromPublic = async (
+  bookName: string,
+  chapter: number,
+  verseRange: string
+): Promise<{ success: boolean; result?: string[]; error?: string }> => {
+  try {
+    const queryParams = new URLSearchParams({
+      bookName,
+      chapter: chapter.toString(),
+      range: verseRange,
+    });
+
+    const response = await fetch(`/api/list-songs?${queryParams.toString()}`);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Network response was not ok" }));
+      return { success: false, error: errorData.error || `HTTP error! status: ${response.statusText} (${response.status})` };
+    }
+    const data = await response.json();
+    return { success: true, result: data.files };
+  } catch (error) {
+    console.error("Failed to fetch song files from public:", error);
+    return { success: false, error: error instanceof Error ? error.message : "An unknown error occurred" };
   }
 };

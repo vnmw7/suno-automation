@@ -6,14 +6,12 @@ interface VerseRangeCardProps {
   bookName: string;
   chapter: number;
   lyrics?: string;
-  style?: string;
 }
 
 const VerseRangeCard = ({
   range,
   bookName,
   chapter,
-  style = "Contemporary Christian",
 }: VerseRangeCardProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -42,7 +40,7 @@ const VerseRangeCard = ({
         range={range}
         bookName={bookName}
         chapter={chapter}
-        style={style}
+
       />
     </>
   );

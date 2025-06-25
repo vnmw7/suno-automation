@@ -9,13 +9,13 @@
 // - modify it via the UI (e.g. via about:config in the browser); or
 // - set it within a user.js file in your profile.
 
-user_pref("app.update.lastUpdateTime.addon-background-update-timer", 1750486344);
-user_pref("app.update.lastUpdateTime.browser-cleanup-thumbnails", 1750493002);
+user_pref("app.update.lastUpdateTime.addon-background-update-timer", 1750775551);
+user_pref("app.update.lastUpdateTime.browser-cleanup-thumbnails", 1750841932);
 user_pref("app.update.lastUpdateTime.region-update-timer", 1750399204);
-user_pref("app.update.lastUpdateTime.services-settings-poll-changes", 1750486344);
+user_pref("app.update.lastUpdateTime.services-settings-poll-changes", 1750775551);
 user_pref("app.update.lastUpdateTime.telemetry_modules_ping", 1748714449);
 user_pref("app.update.lastUpdateTime.telemetry_untrustedmodules_ping", 0);
-user_pref("app.update.lastUpdateTime.xpi-signature-verification", 1750486344);
+user_pref("app.update.lastUpdateTime.xpi-signature-verification", 1750775551);
 user_pref("browser.bookmarks.restore_default_bookmarks", false);
 user_pref("browser.contentblocking.category", "standard");
 user_pref("browser.download.viewableInternally.typeWasRegistered.avif", true);
@@ -33,7 +33,7 @@ user_pref("browser.privacySegmentation.createdShortcut", true);
 user_pref("browser.proton.toolbar.version", 3);
 user_pref("browser.sessionstore.upgradeBackup.latestBuildID", "20250315105711");
 user_pref("browser.startup.couldRestoreSession.count", 2);
-user_pref("browser.startup.lastColdStartupCheck", 1750492966);
+user_pref("browser.startup.lastColdStartupCheck", 1750845202);
 user_pref("browser.theme.content-theme", 0);
 user_pref("browser.theme.toolbar-theme", 0);
 user_pref("browser.uiCustomization.state", "{\"placements\":{\"widget-overflow-fixed-list\":[],\"unified-extensions-area\":[],\"nav-bar\":[\"back-button\",\"forward-button\",\"stop-reload-button\",\"customizableui-special-spring1\",\"vertical-spacer\",\"urlbar-container\",\"customizableui-special-spring2\",\"save-to-pocket-button\",\"downloads-button\",\"fxa-toolbar-menu-button\",\"unified-extensions-button\",\"ublock0_raymondhill_net-browser-action\"],\"toolbar-menubar\":[\"menubar-items\"],\"TabsToolbar\":[\"tabbrowser-tabs\",\"new-tab-button\",\"alltabs-button\"],\"vertical-tabs\":[],\"PersonalToolbar\":[\"personal-bookmarks\"]},\"seen\":[\"developer-button\",\"ublock0_raymondhill_net-browser-action\"],\"dirtyAreaCache\":[\"nav-bar\",\"vertical-tabs\",\"toolbar-menubar\",\"TabsToolbar\",\"PersonalToolbar\"],\"currentVersion\":21,\"newElementCount\":2}");
@@ -63,8 +63,8 @@ user_pref("intl.accept_languages", "en-US");
 user_pref("media.getdisplaymedia.screencapturekit.enabled", false);
 user_pref("media.getdisplaymedia.screencapturekit.picker.enabled", false);
 user_pref("media.gmp-manager.buildID", "20250315105711");
-user_pref("media.gmp-manager.lastCheck", 1750471623);
-user_pref("media.gmp-manager.lastEmptyCheck", 1750471623);
+user_pref("media.gmp-manager.lastCheck", 1750776270);
+user_pref("media.gmp-manager.lastEmptyCheck", 1750776270);
 user_pref("media.gmp.storage.version.observed", 1);
 user_pref("media.hardware-video-decoding.failed", false);
 user_pref("pdfjs.enabledCache.state", true);
@@ -80,7 +80,7 @@ user_pref("security.sandbox.warn_unprivileged_namespaces", false);
 user_pref("security.webauthn.show_ms_settings_link", true);
 user_pref("sidebar.backupState", "{\"width\":\"\",\"command\":\"\",\"expanded\":false,\"hidden\":true}");
 user_pref("signon.management.page.os-auth.optout", "MDIEEPgAAAAAAAAAAAAAAAAAAAEwFAYIKoZIhvcNAwcECHwPLtce+nwgBAj6XBFl4Yh9uw==");
-user_pref("toolkit.startup.last_success", 1750492956);
+user_pref("toolkit.startup.last_success", 1750845198);
 user_pref("toolkit.telemetry.cachedClientID", "c0ffeec0-ffee-c0ff-eec0-ffeec0ffeec0");
 user_pref("toolkit.telemetry.cachedProfileGroupID", "decafdec-afde-cafd-ecaf-decafdecafde");
 user_pref("toolkit.telemetry.previousBuildID", "20250315105711");

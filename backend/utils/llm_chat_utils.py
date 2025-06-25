@@ -56,7 +56,7 @@ def send_api_request(
                 "X-Title": os.getenv("OPENROUTER_SITE_NAME", "<YOUR_SITE_NAME>"),
             },
             extra_body={},
-            model="meta-llama/llama-3.3-8b-instruct:free",
+            model="deepseek/deepseek-r1-0528-qwen3-8b:free",
             messages=messages,
         )
         print(

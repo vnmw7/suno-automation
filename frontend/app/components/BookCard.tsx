@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { BibleBook } from "~/routes/main";
 import { BookOpenIcon } from "./ui/icon";
 import bookAbbreviations from "../../_constants/book-abrv.json";
-import { supabase } from "~/lib/supabase";
+import { supabase } from "../lib/supabase";
 import ChapterCard from "./CardChapter";
 
 interface BookCardProps {
@@ -31,6 +31,7 @@ export async function get_verse_range(bookAbbr: string, chapter: string) {
     console.error(`Full book name not found for abbreviation: ${bookAbbr}`);
     return { error: `Invalid book abbreviation: ${bookAbbr}`, data: null };
   }
+
   try {
     console.log(
       `[get_verse_range] Fetching verse range for book: ${bookName} (abbr: ${bookAbbr}), chapter: ${chapter}`
@@ -49,8 +50,8 @@ export async function get_verse_range(bookAbbr: string, chapter: string) {
     }
 
     // Extract unique verse_range values from the data array
-    const verseRanges = data?.map((item) => item.verse_range) || [];
-    const uniqueVerseRanges = [...new Set(verseRanges)];
+    const verseRanges = data?.map((item: { verse_range: string }) => item.verse_range) || [];
+    const uniqueVerseRanges = Array.isArray(verseRanges) ? [...new Set(verseRanges)] : [];
     return { error: null, data: uniqueVerseRanges };
   } catch (error) {
     console.error("Unexpected error fetching verse range:", error);
@@ -79,7 +80,8 @@ export async function generate_verse_range(bookAbbr: string, chapter: string) {
   const bookName = abbrToFullName[bookAbbr.toUpperCase()];
 
   if (!bookName) {
-    console.error(`Full book name not found for abbreviation: ${bookAbbr}`);
+    const errorMessage = `Full book name not found for abbreviation: ${bookAbbr}`;
+    console.error(`[generate_verse_range] ${errorMessage}`);
     return { error: `Invalid book abbreviation: ${bookAbbr}`, data: null };
   }
 
@@ -101,9 +103,28 @@ export async function generate_verse_range(bookAbbr: string, chapter: string) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Error response from server:", errorText);
+      console.error(
+        `[generate_verse_range] Backend error. Status: ${response.status}. Body: ${errorText}`
+      );
+
+      let detailedError = `Server error: ${response.status} ${response.statusText}`;
+      if (errorText) {
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.detail) {
+            detailedError =
+              typeof errorJson.detail === "string"
+                ? errorJson.detail
+                : JSON.stringify(errorJson.detail);
+          } else {
+            detailedError = errorText;
+          }
+        } catch (e) {
+          detailedError = errorText;
+        }
+      }
       return {
-        error: `Server error: ${response.status} ${response.statusText}`,
+        error: detailedError,
         data: null,
       };
     }
@@ -113,9 +134,12 @@ export async function generate_verse_range(bookAbbr: string, chapter: string) {
 
     return { error: null, data: result };
   } catch (error) {
-    console.error("Error generating verse range:", error);
+    console.error("[generate_verse_range] Fetch failed:", error);
     let errorMessage = "Failed to generate verse range.";
-    if (error instanceof Error) {
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+      errorMessage =
+        "Cannot connect to backend. Please ensure the server is running and accessible.";
+    } else if (error instanceof Error) {
       errorMessage = error.message;
     }
     return { error: errorMessage, data: null };
@@ -143,10 +167,7 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
   };
   const fetchVerseRanges = async (chapter: number) => {
     console.log("[BookCard.tsx] Fetching verse ranges for chapter:", chapter);
-    if (verseRanges[chapter.toString()]?.length > 0) {
-      return;
-    }
-
+    
     setLoadingChapters((prev) => new Set(prev).add(chapter));
     try {
       const result = await get_verse_range(bookAbbr, chapter.toString());
@@ -182,37 +203,54 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
     bookAbbr: string,
     chapter: string
   ) => {
+    const chapterNum = parseInt(chapter, 10);
+    console.log(
+      `[handleGenerateVerseRange] Starting generation for ${bookAbbr} chapter ${chapter}`
+    );
     setGenerateErrors((prev) => {
       const newErrors = { ...prev };
       delete newErrors[chapter.toString()];
       return newErrors;
     });
 
-    setGeneratingChapters((prev) => new Set(prev).add(parseInt(chapter, 10)));
+    setGeneratingChapters((prev) => new Set(prev).add(chapterNum));
 
     try {
       const result = await generate_verse_range(bookAbbr, chapter.toString());
 
       if (result.error) {
+        console.error(
+          `[handleGenerateVerseRange] Error generating for ${bookAbbr} chapter ${chapter}:`,
+          result.error
+        );
         setGenerateErrors((prev) => ({
           ...prev,
           [chapter.toString()]: result.error,
         }));
       } else {
-        await fetchVerseRanges(parseInt(chapter, 10));
+        console.log(
+          `[handleGenerateVerseRange] Generation successful for ${bookAbbr} chapter ${chapter}. Refreshing verse ranges.`
+        );
+        await fetchVerseRanges(chapterNum);
       }
     } catch (error) {
-      console.error("Error generating verse range:", error);
+      console.error(
+        `[handleGenerateVerseRange] Unexpected client-side error for ${bookAbbr} chapter ${chapter}:`,
+        error
+      );
       setGenerateErrors((prev) => ({
         ...prev,
-        [chapter.toString()]: "Failed to generate verse range",
+        [chapter.toString()]: "An unexpected client-side error occurred.",
       }));
     } finally {
       setGeneratingChapters((prev) => {
         const newSet = new Set(prev);
-        newSet.delete(parseInt(chapter, 10));
+        newSet.delete(chapterNum);
         return newSet;
       });
+      console.log(
+        `[handleGenerateVerseRange] Finished generation process for ${bookAbbr} chapter ${chapter}`
+      );
     }
   };
 

@@ -27,7 +27,7 @@ def send_api_request(
 
     try:
         completion = client.chat.completions.create(
-            model="gpt-4o",  # Changed to gpt-4o
+            model="google/gemma-2-27b-it",  # Changed to gpt-4o
             messages=messages,
         )
         print(
@@ -78,9 +78,6 @@ def aimlapi_general_query(
 
 
 if __name__ == "__main__":
-    # Moved get_rate_limits() call to main execution block
-    # get_rate_limits()
-    # Example test query
     print("\nTesting llm_general_query:")
     test_prompt = "Tell me a short joke."
     test_response = aimlapi_general_query(test_prompt)

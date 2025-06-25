@@ -276,107 +276,12 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
         return False
 
 
-async def download_song(strTitle, intIndex):
-    try:
-        async with AsyncCamoufox(
-            headless=False,
-            persistent_context=True,
-            user_data_dir="user-data-dir",
-            os=("windows"),
-            config=config,
-            humanize=True,
-            i_know_what_im_doing=True,
-        ) as browser:
-            page = await browser.new_page()
-            print("Navigating to user songs page...")
-            try:
-                await page.goto(
-                    "https://suno.com/me", wait_until="domcontentloaded", timeout=30000
-                )
-                print("Waiting for page to load...")
-                print(f"Navigation to /me initiated. Current URL: {page.url}")
-                await page.wait_for_url("https://suno.com/me**", timeout=20000)
-                await page.wait_for_timeout(3000)
-
-                # Try to wait for networkidle, but don't fail if it times out
-                try:
-                    await page.wait_for_load_state("networkidle", timeout=15000)
-                except Exception as e:
-                    print(
-                        f"Warning: Page may still be loading (networkidle timeout): {e}"
-                    )
-
-                print("Page loaded.")
-            except Exception as e:
-                print(f"Error during page navigation: {e}")
-
-                if "suno.com/me" not in page.url:
-                    raise Exception("Failed to navigate to the user songs page")
-
-            print(f"Looking for song with title: {strTitle}")
-            locator = page.locator(f'span.text-foreground-primary[title="{strTitle}"]')
-            await locator.first.wait_for(state="attached", timeout=10000)
-            count = await locator.count()
-            print(f"Found {count} songs with title '{strTitle}'")
-            await page.wait_for_timeout(2000)
-
-            # Validate index
-            if intIndex < 1 or intIndex > count:
-                raise Exception(
-                    f"Invalid song index {intIndex}. Found {count} songs with title '{strTitle}'. Index should be between 1 and {count}."
-                )
-
-            print(f"Right-clicking on song index {intIndex} (0-based: {intIndex})...")
-            await locator.nth(intIndex - 1).click(button="right")
-            await page.wait_for_timeout(2000)
-
-            print("Opening download menu...")
-            context_menu_content = page.locator(
-                "div[data-radix-menu-content][data-state='open']"
-            )
-            await context_menu_content.wait_for(state="visible", timeout=15000)
-            await page.wait_for_timeout(500)
-
-            download_submenu_trigger = context_menu_content.locator(
-                '[data-testid="download-sub-trigger"]'
-            )
-            await download_submenu_trigger.wait_for(state="visible", timeout=5000)
-            await download_submenu_trigger.hover()
-
-            download_trigger_id = await download_submenu_trigger.get_attribute("id")
-            if not download_trigger_id:
-                raise Exception(
-                    "Download trigger item does not have an ID. Cannot reliably locate submenu."
-                )
-
-            download_submenu_panel = page.locator(
-                f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
-            )
-            await download_submenu_panel.wait_for(state="visible", timeout=10000)
-
-            mp3_audio_item = download_submenu_panel.locator(
-                "div[role='menuitem']:has-text('MP3 Audio')"
-            )
-            await mp3_audio_item.wait_for(state="visible", timeout=5000)
-            await mp3_audio_item.click()
-            await page.wait_for_timeout(2000)
-
-            print("Song download initiated successfully!")
-            return True
-
-    except Exception as e:
-        print(f"An error occurred in download_song: {e}")
-        print(traceback.format_exc())
-        return False
-
-
 async def download_song_with_page(page, strTitle, intIndex):
     try:
         print(
             f"Inside download_song_with_page for title: '{strTitle}', index: {intIndex}"
         )
 
-        # Check if page is already closed before starting
         if page.is_closed():
             print(
                 f"Page was closed before starting download for song index {intIndex}. Cannot proceed."
@@ -409,11 +314,15 @@ async def download_song_with_page(page, strTitle, intIndex):
         await page.wait_for_timeout(2000)
 
         print(f"Looking for song elements with title: '{strTitle}'")
-        song_title_locator_str = f'span.text-foreground-primary[title="{strTitle}"]'
+        song_title_locator_str = (
+            f'span[title="{strTitle}"]'  # More resilient selector
+        )
         song_elements = page.locator(song_title_locator_str)
 
         try:
-            await song_elements.first.wait_for(state="attached", timeout=30000)
+            await song_elements.first.wait_for(
+                state="attached", timeout=60000
+            )  # Increased timeout
             print("First song element with matching title is attached.")
         except Exception as e:
             print(
@@ -427,14 +336,25 @@ async def download_song_with_page(page, strTitle, intIndex):
         if count == 0:
             print(f"No songs found with title '{strTitle}'. Cannot download.")
             return False
-        if not (1 <= intIndex <= count):
-            print(
-                f"Invalid song index {intIndex}. Found {count} songs. Index must be between 1 and {count}."
-            )
-            return False
 
-        target_song_element = song_elements.nth(intIndex - 1)
-        print(f"Targeting song at 0-based index {intIndex - 1}.")
+        target_0_based_index = 0
+        if intIndex > 0:
+            if not (1 <= intIndex <= count):
+                print(
+                    f"Invalid song index {intIndex}. Found {count} songs. Index must be between 1 and {count}."
+                )
+                return False
+            target_0_based_index = intIndex - 1
+        else:  # Handle negative indices from the end of the list
+            if not (-count <= intIndex <= -1):
+                print(
+                    f"Invalid negative song index {intIndex}. Found {count} songs. Index must be between {-count} and -1."
+                )
+                return False
+            target_0_based_index = count + intIndex
+
+        target_song_element = song_elements.nth(target_0_based_index)
+        print(f"Targeting song at 0-based index {target_0_based_index}.")
 
         print("Scrolling target song into view if needed...")
         try:
@@ -529,30 +449,25 @@ async def download_song_with_page(page, strTitle, intIndex):
         mp3_audio_item = download_submenu_panel.locator(
             "div[role='menuitem']:has-text('MP3 Audio')"
         )
-        await mp3_audio_item.wait_for(
-            state="visible", timeout=10000
-        )  # Increased timeout
+        await mp3_audio_item.wait_for(state="visible", timeout=10000)
         print("'MP3 Audio' option located and ready.")
 
-        # CRITICAL FIX: Start expect_download *before* the click that triggers it
         print("Expecting download to start...")
         try:
             async with page.expect_download(timeout=60000) as download_info_manager:
                 print("Attempting to click 'MP3 Audio' option to initiate download...")
-                # Add small delay for stability
+
                 await page.wait_for_timeout(500)
-                await mp3_audio_item.click(timeout=15000)  # Increased click timeout
+                await mp3_audio_item.click(timeout=15000)
                 print("'MP3 Audio' option clicked.")
 
-                # Handle "Download Anyway" button if it appears AFTER 'MP3 Audio' click
-                # This must also be INSIDE the `async with page.expect_download` block
                 print("Checking for 'Download Anyway' button...")
                 download_anyway_button = page.locator(
                     'button:has(span:has-text("Download Anyway"))'
                 )
                 try:
                     await download_anyway_button.wait_for(
-                        state="visible", timeout=15000  # Increased timeout
+                        state="visible", timeout=15000
                     )
                     print("'Download Anyway' button is visible. Clicking it...")
                     await download_anyway_button.click(timeout=10000)
@@ -571,7 +486,10 @@ async def download_song_with_page(page, strTitle, intIndex):
                 )
                 return False
 
-            download_path = f"./{download.suggested_filename}"
+            sanitized_title = strTitle.replace(":", "-")
+            download_path = (
+                f"./for_song_qa/{sanitized_title.replace(' ', '_')}_index_{intIndex}.mp3"
+            )
             await download.save_as(download_path)
             print(
                 f"Download for '{strTitle}' (index {intIndex}) saved to: {download_path}"
@@ -582,7 +500,7 @@ async def download_song_with_page(page, strTitle, intIndex):
             print(traceback.format_exc())
             return False
 
-        await page.wait_for_timeout(3000)  # Brief pause after saving
+        await page.wait_for_timeout(3000)
 
         print(
             f"Song download for '{strTitle}' (index {intIndex}) process completed successfully!"
@@ -595,10 +513,9 @@ async def download_song_with_page(page, strTitle, intIndex):
         )
         print(traceback.format_exc())
 
-        # Check if page is still available for debugging
         if page and not page.is_closed():
             print("Page is still available after error.")
-            # Screenshot could be taken here if needed for debugging
+
         elif page and page.is_closed():
             print("Page was closed when the critical error was caught.")
 

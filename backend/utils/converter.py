@@ -113,6 +113,10 @@ def song_strcture_to_lyrics(input_dict, book_name: str, book_chapter: int) -> di
 
         cleaned_verse_range_str = verse_range_str.strip()
 
+        # Extract verse range by removing book name and chapter
+        if cleaned_verse_range_str.startswith(f"{book_name} {book_chapter}:"):
+            cleaned_verse_range_str = cleaned_verse_range_str[len(f"{book_name} {book_chapter}:") :]
+
         if "-" in cleaned_verse_range_str:
             parts = cleaned_verse_range_str.split("-")
             if len(parts) == 2:
