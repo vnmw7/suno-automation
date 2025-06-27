@@ -1,0 +1,20 @@
+2025-06-27 21:58:52,964 - INFO - Navigating to accounts.google.com to determine login state...
+2025-06-27 21:58:57,829 - INFO - Not redirected. Current URL is https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Faccounts.google.com%2F&followup=https%3A%2F%2Faccounts.google.com%2F&ifkv=AdBytiNosi5Ea3mAkVAreslOIOsHYdDN-zfFbgNIRn78P-mmgRdf2pqNh8gpLbRTpvyXY0OUGvie&passive=1209600&flowName=GlifWebSignIn&flowEntry=ServiceLogin. Proceeding with login flow.
+2025-06-27 21:58:57,915 - INFO - Filled input field for selector 'input[type="email"]'
+2025-06-27 21:58:59,837 - INFO - Clicked button with selector 'button:has-text("Next")'
+2025-06-27 21:58:59,838 - INFO - Entered email: pbNJ1sznC2Gr@gmail.com and clicked Next.
+2025-06-27 21:59:09,862 - ERROR - Error waiting for selector 'input[type="password"]': Page.wait_for_selector: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator("input[type=\"password\"]") to be visible
+    6 × locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+
+2025-06-27 21:59:09,863 - ERROR - Failed to find and fill the password input field.
+2025-06-27 21:59:29,342 - INFO - Navigating to accounts.google.com to determine login state...
+2025-06-27 21:59:34,465 - INFO - Not redirected. Current URL is https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Faccounts.google.com%2F&followup=https%3A%2F%2Faccounts.google.com%2F&ifkv=AdBytiPB8MEYkAlJ6L7ll25n64Snh9GCKzvf4aaKTY9KmTYVP65OTypuLHOAIomvjrQ2mFnpTU-8&passive=1209600&flowName=GlifWebSignIn&flowEntry=ServiceLogin. Proceeding with login flow.
+2025-06-27 21:59:34,569 - INFO - Filled input field for selector 'input[type="email"]'
+2025-06-27 21:59:36,342 - INFO - Clicked button with selector 'button:has-text("Next")'
+2025-06-27 21:59:36,343 - INFO - Entered email: pbNJ1sznC2Gr@gmail.com and clicked Next.
+2025-06-27 21:59:38,376 - INFO - Filled input field for selector 'input[type="password"]'
+2025-06-27 21:59:39,513 - INFO - Clicked button with selector 'button:has-text("Next")'
+2025-06-27 21:59:39,514 - INFO - Password submitted. Waiting for successful login redirection...
+2025-06-27 21:59:44,824 - INFO - Successfully redirected to: https://myaccount.google.com/?pli=1. Login confirmed.
