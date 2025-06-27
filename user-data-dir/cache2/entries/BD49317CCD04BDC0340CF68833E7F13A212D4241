@@ -2,8 +2,8 @@
 #
 # For more information about this list, see: https://pgl.yoyo.org/adservers/
 # ----
-# last updated:   Wed, 11 Jun 2025 22:30:44 GMT
-# entries:        3430
+# last updated:   Thu, 26 Jun 2025 13:06:55 GMT
+# entries:        3422
 # format:         hosts (hosts -- in hosts file format)
 # credits:        Peter Lowe - pgl@yoyo.org - https://pgl.yoyo.org/ - https://twitter.com/pgl
 # this URL:       https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=1&mimetype=plaintext
@@ -35,7 +35,6 @@
 127.0.0.1 4d5.net
 127.0.0.1 4info.com
 127.0.0.1 4jnzhl0d0.com
-127.0.0.1 50websads.com
 127.0.0.1 518ad.com
 127.0.0.1 6sc.co
 127.0.0.1 777partner.com
@@ -1032,7 +1031,6 @@
 127.0.0.1 banners.babylon-x.com
 127.0.0.1 banners.bol.com.br
 127.0.0.1 banners.cams.com
-127.0.0.1 banners.clubseventeen.com
 127.0.0.1 banners.czi.cz
 127.0.0.1 banners.dine.com
 127.0.0.1 banners.direction-x.com
@@ -1190,7 +1188,6 @@
 127.0.0.1 cashfiesta.com
 127.0.0.1 cashpartner.com
 127.0.0.1 cashstaging.me
-127.0.0.1 casinopays.com
 127.0.0.1 casinorewards.com
 127.0.0.1 casinotraffic.com
 127.0.0.1 cattlecommittee.com
@@ -1258,6 +1255,7 @@
 127.0.0.1 click.email.sonos.com
 127.0.0.1 click.email.strawberry.no
 127.0.0.1 click.emails.argos.co.uk
+127.0.0.1 click.emails.tuclothing.sainsburys.co.uk
 127.0.0.1 click.fool.com
 127.0.0.1 click.hookupinyourcity.com
 127.0.0.1 click.hooligapps.com
@@ -1438,6 +1436,7 @@
 127.0.0.1 dakic-ia-300.com
 127.0.0.1 damageddistance.com
 127.0.0.1 damdoor.com
+127.0.0.1 dancemistake.com
 127.0.0.1 dapper.net
 127.0.0.1 data.namesakeoscilloscopemarquis.com
 127.0.0.1 datenow.link
@@ -1449,6 +1448,7 @@
 127.0.0.1 decisivebase.com
 127.0.0.1 decisivedrawer.com
 127.0.0.1 decknetwork.net
+127.0.0.1 decoycreation.com
 127.0.0.1 deepintent.com
 127.0.0.1 delicatecascade.com
 127.0.0.1 deloo.de
@@ -1465,7 +1465,6 @@
 127.0.0.1 didtheyreadit.com
 127.0.0.1 digestiondrawer.com
 127.0.0.1 digital-ads.s3.amazonaws.com
-127.0.0.1 digitalmerkat.com
 127.0.0.1 direct-events-collector.spot.im
 127.0.0.1 direct-re2.pl
 127.0.0.1 directaclick.com
@@ -1543,6 +1542,7 @@
 127.0.0.1 emerse.com
 127.0.0.1 emetriq.de
 127.0.0.1 emjcd.com
+127.0.0.1 eml.blackduck.com
 127.0.0.1 emltrk.com
 127.0.0.1 emodoinc.com
 127.0.0.1 emptyescort.com
@@ -1650,7 +1650,6 @@
 127.0.0.1 flairadscpc.com
 127.0.0.1 flakyfeast.com
 127.0.0.1 flashtalking.com
-127.0.0.1 fleshlightcash.com
 127.0.0.1 flexbanner.com
 127.0.0.1 flimsycircle.com
 127.0.0.1 flimsythought.com
@@ -1730,7 +1729,6 @@
 127.0.0.1 go-link.network
 127.0.0.1 go-mpulse.net
 127.0.0.1 go-rank.de
-127.0.0.1 go-redirect.pl
 127.0.0.1 go.dhs.gov
 127.0.0.1 go.eu.sparkpostmail1.com
 127.0.0.1 go.first.org
@@ -2049,7 +2047,6 @@
 127.0.0.1 liveadexchanger.com
 127.0.0.1 liveintent.com
 127.0.0.1 livelylaugh.com
-127.0.0.1 livelyreward.com
 127.0.0.1 liverail.com
 127.0.0.1 livingsleet.com
 127.0.0.1 lizardslaugh.com
@@ -2155,6 +2152,7 @@
 127.0.0.1 mediavoice.com
 127.0.0.1 mediax.angloinfo.com
 127.0.0.1 mediaz.angloinfo.com
+127.0.0.1 mediumshort.com
 127.0.0.1 medleyads.com
 127.0.0.1 medyanetads.com
 127.0.0.1 meetrics.net
@@ -2235,7 +2233,6 @@
 127.0.0.1 mtree.com
 127.0.0.1 munchkin.marketo.net
 127.0.0.1 mundanenail.com
-127.0.0.1 mundanepollution.com
 127.0.0.1 musiccounter.ru
 127.0.0.1 muteknife.com
 127.0.0.1 muwmedia.com
@@ -2345,7 +2342,6 @@
 127.0.0.1 omniture.com
 127.0.0.1 omtrdc.net
 127.0.0.1 onaudience.com
-127.0.0.1 onclasrv.com
 127.0.0.1 onclickads.net
 127.0.0.1 oneandonlynetwork.com
 127.0.0.1 onestat.com
@@ -2528,7 +2524,6 @@
 127.0.0.1 promos.bwin.it
 127.0.0.1 promos.fling.com
 127.0.0.1 promote.pair.com
-127.0.0.1 promotions-884485.c.cdn77.org
 127.0.0.1 pronetadvertising.com
 127.0.0.1 propellerads.com
 127.0.0.1 propellerclick.com
@@ -2611,8 +2606,6 @@
 127.0.0.1 rankchamp.de
 127.0.0.1 ranking-charts.de
 127.0.0.1 ranking-hits.de
-127.0.0.1 ranking-links.de
-127.0.0.1 ranking-liste.de
 127.0.0.1 rankingchart.de
 127.0.0.1 rankingscout.com
 127.0.0.1 rankyou.com
@@ -2623,7 +2616,6 @@
 127.0.0.1 rayjump.com
 127.0.0.1 rcadserver.com
 127.0.0.1 re-direct.pl
-127.0.0.1 re-direct1.com
 127.0.0.1 reachjunction.com
 127.0.0.1 reactx.com
 127.0.0.1 readingguilt.com
@@ -2657,6 +2649,7 @@
 127.0.0.1 reklamcsere.hu
 127.0.0.1 reklamdsp.com
 127.0.0.1 relmaxtop.com
+127.0.0.1 reloadphoto.com
 127.0.0.1 rememberdiscussion.com
 127.0.0.1 remox.com
 127.0.0.1 report-1.appmetrica.webvisor.com
@@ -2980,7 +2973,6 @@
 127.0.0.1 supertop100.com
 127.0.0.1 supply.colossusssp.com
 127.0.0.1 supportwaves.com
-127.0.0.1 surfmusik-adserver.de
 127.0.0.1 surveygizmobeacon.s3.amazonaws.com
 127.0.0.1 sw88.espn.com
 127.0.0.1 swan-swan-goose.com
@@ -3442,21 +3434,22 @@
 127.0.0.1 zqtk.net
 127.0.0.1 zy16eoat1w.com
 127.0.0.1 zzhc.vnet.cn
-÷‘ä˙)           hJ‘©HJ8hJ‚∑   e    ~FETCH,:https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=1&mimetype=plaintext strongly-framed 1 security-info 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 request-method GET request-Accept-Encoding gzip, deflate, br, zstd response-head HTTP/2 200 
+
+(∑      h^o’h^o÷HWœ%h^}Â   e    ~FETCH,:https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=1&mimetype=plaintext strongly-framed 1 security-info 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 request-method GET request-Accept-Encoding gzip, deflate, br, zstd response-head HTTP/2 200 
 server: nginx/1.24.0 (Ubuntu)
-date: Thu, 12 Jun 2025 13:22:51 GMT
+date: Fri, 27 Jun 2025 10:17:58 GMT
 content-type: text/plain;charset=UTF-8
 cache-control: max-age=3600
 vary: Accept-Encoding
-last-modified: Wed, 11 Jun 2025 22:30:44 GMT
+last-modified: Thu, 26 Jun 2025 13:06:55 GMT
 x-cache-status: HIT
 X-Firefox-Spdy: h2
  original-response-headers server: nginx/1.24.0 (Ubuntu)
-date: Thu, 12 Jun 2025 13:22:51 GMT
+date: Fri, 27 Jun 2025 10:17:58 GMT
 content-type: text/plain;charset=UTF-8
 cache-control: max-age=3600
 vary: Accept-Encoding
-last-modified: Wed, 11 Jun 2025 22:30:44 GMT
+last-modified: Thu, 26 Jun 2025 13:06:55 GMT
 x-cache-status: HIT
 X-Firefox-Spdy: h2
- ctid 1 uncompressed-len 0 net-response-time-onstart 1352 net-response-time-onstop 1631  fá
+ ctid 1 uncompressed-len 0 net-response-time-onstart 1294 net-response-time-onstop 1554  e≤
