@@ -7,9 +7,11 @@ This file contains the login functionality for the application.
 import sys
 import os
 import logging
+import time
 import traceback
 from camoufox.async_api import AsyncCamoufox
 from dotenv import load_dotenv
+import re
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from configs.browser_config import config
@@ -114,8 +116,6 @@ async def login_google():
         ) as browser:
             page = await browser.new_page()
 
-            # IMPORTANT: This selector must use "starts with" (aria-label^=) to match
-            # variations like "Google Account" and "Google Account settings".
             logged_in_selector = 'div.GiKO7c:has-text("Home")'
             email_input_selector = 'input[type="email"]'
 
@@ -123,11 +123,10 @@ async def login_google():
             logger.info("Navigating to accounts.google.com to determine login state...")
             await page.goto("https://accounts.google.com/", wait_until="networkidle")
 
-            # Check if we were redirected to the main account page. This is the clearest
-            # sign that we are already logged in.
+            # Check if we were redirected to the main account page.
             if "myaccount.google.com" in page.url:
                 logger.info(f"Already logged in. Redirected to: {page.url}")
-                # As a final sanity check, we can look for the account icon on this page.
+
                 if await check_logged_in_state(page, logged_in_selector, timeout=5000):
                     logger.info("Confirmed logged-in state on myaccount.google.com.")
                 else:
@@ -149,27 +148,23 @@ async def login_google():
                 if not await fill_input(page, password_input_selector, GOOGLE_PASSWORD):
                     logger.error("Failed to find and fill the password input field.")
                     return False
-                # This click triggers the final login and redirection.
                 await click_button(page, 'button:has-text("Next")')
                 logger.info("Password submitted. Waiting for successful login redirection...")
 
                 # --- Step 3: Verify Login by waiting for the URL to change ---
-                # This is the most reliable way to confirm a successful login.
                 await page.wait_for_url("**/myaccount.google.com/**", timeout=LOGIN_CONFIRMATION_TIMEOUT)
                 logger.info(f"Successfully redirected to: {page.url}. Login confirmed.")
                 return True
 
             except Exception as e:
-                # This block catches errors during the email/password entry phase.
                 logger.error(f"An error occurred during the login form interaction: {str(e)}")
-                # For debugging, let's see where we ended up.
+
                 page_title = await page.title()
                 logger.debug(f"Page title at time of error: '{page_title}'")
                 logger.error(traceback.format_exc())
                 return False
 
     except Exception as e:
-        # This is a catch-all for broader issues like browser launch failures.
         logger.error(f"A major error occurred in login_google: {str(e)}")
         logger.error(traceback.format_exc())
         return False
@@ -197,12 +192,26 @@ async def suno_login_microsoft():
             logger.info("Page loaded for login check.")
 
             sign_in_selector = 'button:has(span:has-text("Sign in"))'
-            logged_in_selector = 'button[aria-label="Profile"]'  # Adjust based on actual logged-in indicator
 
             # Check if already logged in
-            if await check_logged_in_state(page, logged_in_selector, timeout=5000):
-                logger.info("Suno login not required. Already logged in.")
+            await page.goto("https://suno.com/create")
+            await page.wait_for_timeout(5000)
+
+            # Check if we were redirected to the main account page.
+            if "https://suno.com/create" in page.url:
+                logger.info(f"Already logged in. Redirected to: {page.url}")
+
+                logged_in_selector = 'button:has(span:has-text("Create"))'
+                if await check_logged_in_state(page, logged_in_selector, timeout=5000):
+                    logger.info("Confirmed logged-in state on suno.com.")
+                else:
+                    logger.warning("Redirected to suno.com but couldn't find profile icon. Assuming login is OK based on URL.")
                 return True
+            else:
+                logger.info("Navigating to Suno to log in using Microsoft...")
+                await page.goto("https://suno.com")
+                await page.wait_for_load_state("load", timeout=DEFAULT_TIMEOUT)
+                logger.info("Page loaded for login check.")
 
             if await wait_for_selector(page, sign_in_selector):
                 logger.info("Sign-in button found. Attempting login process...")
@@ -215,49 +224,84 @@ async def suno_login_microsoft():
                 await page.keyboard.press("Enter")
                 await page.wait_for_load_state("load", timeout=DEFAULT_TIMEOUT)
                 logger.info("Entered Microsoft email and submitted.")
+                
 
                 # Send code to email
                 send_code_selector = 'button:has-text("Send code")'
                 if await click_button(page, send_code_selector):
                     logger.info("Sending authentication code to email...")
+                    await page.wait_for_timeout(60000)
 
-                    # Open a new browser tab for Gmail
                     new_tab = await browser.new_page()
                     logger.info("New browser tab opened for Gmail.")
-                    await new_tab.goto("https://mail.google.com/")
+                    await new_tab.goto("https://mail.google.com/",  wait_until="networkidle")
                     await new_tab.wait_for_load_state("load", timeout=DEFAULT_TIMEOUT)
                     logger.info("Page loaded for mail.google.com.")
+                    
+                    logger.info("Searching for the Microsoft verification email...")
+                    email_row_selector = 'tr:has(span[email="account-security-noreply@accountprotection.microsoft.com"])'
+                    await new_tab.wait_for_selector(email_row_selector, timeout=DEFAULT_TIMEOUT)
+                    
+                    email_row_locator = new_tab.locator(email_row_selector).first
+                    full_preview_text = await email_row_locator.inner_text()
+                    logger.info(f"Email row content found: {full_preview_text.replace(chr(10), ' ')}")
 
-                    # Handle Gmail login if necessary (assuming it might be needed)
-                    gmail_email_selector = 'input[type="email"]'
-                    if await wait_for_selector(new_tab, gmail_email_selector, timeout=5000):
-                        await fill_input(new_tab, gmail_email_selector, GOOGLE_EMAIL)
-                        await click_button(new_tab, 'button:has-text("Next")')
-                        gmail_password_selector = 'input[type="password"]'
-                        await fill_input(new_tab, gmail_password_selector, GOOGLE_PASSWORD)
-                        await click_button(new_tab, 'button:has-text("Next")')
-                        logger.info("Logged into Gmail to retrieve verification code.")
+                    match = re.search(r"Your single-use code is: (\d{6})", full_preview_text)
 
-                    # Placeholder for retrieving code from Gmail (implement based on actual email content)
-                    logger.warning("Code retrieval from Gmail not implemented. Manual intervention required.")
-                    # Close the Gmail tab to free resources
+                    if not match:
+                        logger.error("Could not find the verification code in the email preview.")
+                        await new_tab.close()
+                        return False
+
+                    verification_code = match.group(1)
+                    logger.info(f"Successfully extracted verification code: {verification_code}")
+
                     await new_tab.close()
                     logger.info("Gmail tab closed after use.")
 
-                    # Placeholder for entering verification code
-                    verification_selector = 'input[placeholder="Verification code"]'  # Adjust based on actual selector
-                    if await wait_for_selector(page, verification_selector, timeout=LOGIN_CONFIRMATION_TIMEOUT):
-                        logger.warning("Verification code input found. Please enter the code manually.")
-                        # Implement code entry logic here if automated retrieval is added
-                        return False  # Temporary until code retrieval is implemented
-                    else:
-                        logger.error("Verification code input not found.")
-                        return False
+                    verification_input_selector_base = 'input[id="codeEntry-{}"]'
+                    for i in range(6):
+                        verification_input_selector = verification_input_selector_base.format(i)
+                        await page.wait_for_selector(verification_input_selector, timeout=DEFAULT_TIMEOUT)
+                        await page.fill(verification_input_selector, verification_code[i])
+
+
+                    await page.keyboard.press("Enter")
+                    logger.info("Verification code entered. Waiting for login confirmation...")
+
+                    stay_signed_in_selector = 'button:has-text("yes")'
+                    await page.wait_for_selector(stay_signed_in_selector, timeout=DEFAULT_TIMEOUT)
+                    await click_button(page, stay_signed_in_selector)
+                    await page.wait_for_timeout(2000)
+
+                    # Check if we were redirected to the main account page.
+                    if "https://suno.com/create?*" in page.url:
+                        logger.info(f"Already logged in. Redirected to: {page.url}")
+
+                        logged_in_selector = 'button:has(span:has-text("Create"))'
+                        if await check_logged_in_state(page, logged_in_selector, timeout=5000):
+                            logger.info("Confirmed logged-in state on suno.com.")
+                        else:
+                            logger.warning("Redirected to suno.com but couldn't find profile icon. Assuming login is OK based on URL.")
+                        return True
                 else:
                     logger.error("Failed to send verification code.")
                     return False
             else:
-                logger.info("Sign-in button not visible. Assuming already signed in.")
+                await page.goto("https://suno.com/create", wait_until="networkidle")
+
+                # Check if we were redirected to the main account page.
+                if "https://suno.com/create?*" in page.url:
+                    logger.info(f"Already logged in. Redirected to: {page.url}")
+
+                    logged_in_selector = 'button:has(span:has-text("Create"))'
+                    if await check_logged_in_state(page, logged_in_selector, timeout=5000):
+                        logger.info("Confirmed logged-in state on suno.com.")
+                    else:
+                        logger.warning("Redirected to suno.com but couldn't find profile icon. Assuming login is OK based on URL.")
+                    return True
+
+                logger.info("Something wrong. Please debug the login process.")
                 return True
 
     except Exception as e:
@@ -274,5 +318,5 @@ async def suno_login_microsoft():
 if __name__ == "__main__":
     import asyncio
 
-    asyncio.run(login_google())
-    # asyncio.run(suno_login_microsoft())
+    # asyncio.run(login_google())
+    asyncio.run(suno_login_microsoft())

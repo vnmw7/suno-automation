@@ -46,6 +46,14 @@ async def login_endpoint():
     return {"success": is_successful}
 
 
+@app.get("/login/microsoft")
+async def login_with_microsoft_endpoint():
+    from lib.login import login_google, suno_login_microsoft
+
+    await login_google()
+    is_successful = await suno_login_microsoft()
+    return {"success": is_successful}
+
 @app.post("/generate-verse-ranges")
 def generate_verse_ranges_endpoint(book_name: str, book_chapter: int):
     from utils.ai_functions import generate_verse_ranges
