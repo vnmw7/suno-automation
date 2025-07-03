@@ -2,6 +2,10 @@ import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import fs from "node:fs/promises"; // Using Node.js file system module
 import path from "node:path";
 
+function isErrorWithCode(err: unknown): err is { code: string } {
+  return typeof err === "object" && err !== null && "code" in err;
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const bookName = url.searchParams.get("bookName");
@@ -32,12 +36,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     return json({ success: true, files: mp3Files });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Error listing song files from ${songsPublicDir}:`, error);
-    if (error.code === "ENOENT") {
+    if (isErrorWithCode(error) && error.code === "ENOENT") {
       // Directory not found
       return json(
-        { success: false, error: `Song directory not found on server at ${songsPublicDir}` },
+        {
+          success: false,
+          error: `Song directory not found on server at ${songsPublicDir}`,
+        },
         { status: 404 }
       );
     }

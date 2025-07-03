@@ -18,14 +18,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 class SongRequest(BaseModel):
     strBookName: str
     intBookChapter: int
     strVerseRange: str
     strStyle: str
     strTitle: str
-
 
 class SongStructureRequest(BaseModel):
     strBookName: str
@@ -151,7 +149,7 @@ async def download_song_endpoint(request: SongRequest):
         async with AsyncCamoufox(
             headless=False,
             persistent_context=True,
-            user_data_dir="user-data-dir",
+            user_data_dir="backend/camoufox_session_data",
             os=("windows"),
             config=config,
             humanize=False,

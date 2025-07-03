@@ -9,3 +9,5 @@ supabase
 pandas
 camoufox[geoip] 
 fastapi[standard]
+ruff
+black

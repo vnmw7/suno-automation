@@ -2,15 +2,15 @@
 import { useState } from "react";
 import { useLoaderData, MetaFunction } from "@remix-run/react";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import SidebarFilters from "~/components/SidebarFilters";
+import SidebarFilters from "../components/SidebarFilters";
 import BookCard from "../components/BookCard";
 import BookDetailsView from "../components/BookDetailsView";
 import { ListIcon, ViewGridIcon, BookOpenIcon } from "../components/ui/icon";
-import { supabase } from "~/lib/supabase";
+import { supabase } from "../lib/supabase";
 import {
   isCanonicalBook,
   getFullBookName,
-} from "../../_constants/canonical-books";
+} from "../constants/canonical-books";
 
 export interface BibleBook {
   id: string;

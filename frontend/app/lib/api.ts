@@ -1,5 +1,5 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
-import { supabase } from "./supabase";
+import { supabase } from "../lib/supabase";
 
 export interface SongRequest {
   strBookName: string;

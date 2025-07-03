@@ -1,13 +1,11 @@
 """
 login.py
-
 This file contains the login functionality for the application.
 """
 
 import sys
 import os
 import logging
-import time
 import traceback
 from camoufox.async_api import AsyncCamoufox
 from dotenv import load_dotenv
@@ -108,7 +106,7 @@ async def login_google():
         async with AsyncCamoufox(
             headless=False,
             persistent_context=True,
-            user_data_dir="user-data-dir",
+            user_data_dir="backend/camoufox_session_data",
             os=("windows"),
             config=config,
             humanize=True,
@@ -179,7 +177,7 @@ async def suno_login_microsoft():
         async with AsyncCamoufox(
             headless=False,
             persistent_context=True,
-            user_data_dir="user-data-dir",
+            user_data_dir="backend/camoufox_session_data",
             os=("windows"),
             config=config,
             humanize=True,
@@ -234,13 +232,13 @@ async def suno_login_microsoft():
 
                     new_tab = await browser.new_page()
                     logger.info("New browser tab opened for Gmail.")
-                    await new_tab.goto("https://mail.google.com/",  wait_until="networkidle")
-                    await new_tab.wait_for_load_state("load", timeout=DEFAULT_TIMEOUT)
-                    logger.info("Page loaded for mail.google.com.")
+                    await new_tab.goto("https://mail.google.com/", wait_until="domcontentloaded", timeout=60000)
+                    await page.wait_for_timeout(60000)
+                    logger.info("Gmail page loaded, searching for email...")
                     
                     logger.info("Searching for the Microsoft verification email...")
-                    email_row_selector = 'tr:has(span[email="account-security-noreply@accountprotection.microsoft.com"])'
-                    await new_tab.wait_for_selector(email_row_selector, timeout=DEFAULT_TIMEOUT)
+                    email_row_selector = 'div:has(span[email="account-security-noreply@accountprotection.microsoft.com"]):has-text("Your single-use code")'
+                    await new_tab.wait_for_selector(email_row_selector, timeout=30000)
                     
                     email_row_locator = new_tab.locator(email_row_selector).first
                     full_preview_text = await email_row_locator.inner_text()
@@ -255,6 +253,9 @@ async def suno_login_microsoft():
 
                     verification_code = match.group(1)
                     logger.info(f"Successfully extracted verification code: {verification_code}")
+
+                    email_row_locator = new_tab.locator(email_row_selector).nth(1)
+                    await email_row_locator.click()
 
                     await new_tab.close()
                     logger.info("Gmail tab closed after use.")

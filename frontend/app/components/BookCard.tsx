@@ -2,7 +2,7 @@
 import { useState } from "react";
 import type { BibleBook } from "~/routes/main";
 import { BookOpenIcon } from "./ui/icon";
-import bookAbbreviations from "../../_constants/book-abrv.json";
+import bookAbbreviations from "../constants/book-abrv.json";
 import { supabase } from "../lib/supabase";
 import ChapterCard from "./CardChapter";
 

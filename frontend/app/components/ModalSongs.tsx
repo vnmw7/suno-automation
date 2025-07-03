@@ -57,24 +57,31 @@ const ModalSongs = ({
           fetchStyles(range),
         ]);
 
+        const errors: string[] = [];
         if (structuresResponse.success && structuresResponse.result) {
           setSongStructures(structuresResponse.result);
         } else {
-          console.error(
-            "Failed to fetch song structures:",
-            structuresResponse.error
-          );
-          setFetchStructuresStylesError(structuresResponse.error || "Error fetching structures");
+          const error =
+            structuresResponse.error || "Error fetching structures";
+          console.error("Failed to fetch song structures:", error);
+          errors.push(error);
         }
 
         if (stylesResponse.success && stylesResponse.result) {
           setStyles(stylesResponse.result);
         } else {
-          console.error("Failed to fetch styles:", stylesResponse.error);
-          setFetchStructuresStylesError(fetchStructuresStylesError + (stylesResponse.error || " Error fetching styles"));
+          const error = stylesResponse.error || "Error fetching styles";
+          console.error("Failed to fetch styles:", error);
+          errors.push(error);
+        }
+
+        if (errors.length > 0) {
+          setFetchStructuresStylesError(errors.join(" "));
         }
       } catch (err) {
-        setFetchStructuresStylesError("An unexpected error occurred while fetching structures/styles.");
+        setFetchStructuresStylesError(
+          "An unexpected error occurred while fetching structures/styles."
+        );
         console.error("Error fetching structures/styles data:", err);
       } finally {
         setIsFetchingStructuresStyles(false);
@@ -84,15 +91,26 @@ const ModalSongs = ({
       setIsFetchingSongFiles(true);
       setFetchSongFilesError(null);
       try {
-        const songFilesResponse = await fetchSongFilesFromPublic(bookName, chapter, range);
+        const songFilesResponse = await fetchSongFilesFromPublic(
+          bookName,
+          chapter,
+          range
+        );
         if (songFilesResponse.success && songFilesResponse.result) {
           setSongFiles(songFilesResponse.result);
         } else {
-          setFetchSongFilesError(songFilesResponse.error || "Failed to load song files.");
-          console.error("Failed to load song files from public:", songFilesResponse.error);
+          setFetchSongFilesError(
+            songFilesResponse.error || "Failed to load song files."
+          );
+          console.error(
+            "Failed to load song files from public:",
+            songFilesResponse.error
+          );
         }
       } catch (err) {
-        setFetchSongFilesError("An unexpected error occurred while fetching song files.");
+        setFetchSongFilesError(
+          "An unexpected error occurred while fetching song files."
+        );
         console.error("Error fetching song files from public:", err);
       } finally {
         setIsFetchingSongFiles(false);
@@ -114,7 +132,7 @@ const ModalSongs = ({
       setFetchSongFilesError(null); // Clear song files error
       setActiveTab("generate"); // Reset to default tab
     }
-  }, [isOpen, range, bookName, chapter]); // Added bookName, chapter as dependencies
+  }, [isOpen, range, bookName, chapter]);
 
   const handleGenerateSong = async (selectedStyle: string) => {
     setIsLoading(true);
