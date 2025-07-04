@@ -132,6 +132,10 @@ export async function generate_verse_range(bookAbbr: string, chapter: string) {
     const result = await response.json();
     console.log("[generate_verse_range] Server response:", result);
 
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
     return { error: null, data: result };
   } catch (error) {
     console.error("[generate_verse_range] Fetch failed:", error);
@@ -219,13 +223,20 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
       const result = await generate_verse_range(bookAbbr, chapter.toString());
 
       if (result.error) {
+        let errorMessage = "An unexpected error occurred.";
+        if (typeof result.error === "string") {
+          errorMessage = result.error;
+        } else if (typeof result.error === "object" && result.error !== null && 'error' in result.error) {
+          errorMessage = (result.error as any).error;
+        }
+        
         console.error(
           `[handleGenerateVerseRange] Error generating for ${bookAbbr} chapter ${chapter}:`,
-          result.error
+          errorMessage
         );
         setGenerateErrors((prev) => ({
           ...prev,
-          [chapter.toString()]: result.error,
+          [chapter.toString()]: errorMessage,
         }));
       } else {
         console.log(
@@ -238,9 +249,15 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
         `[handleGenerateVerseRange] Unexpected client-side error for ${bookAbbr} chapter ${chapter}:`,
         error
       );
+      
+      let errorMessage = "An unexpected client-side error occurred.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       setGenerateErrors((prev) => ({
         ...prev,
-        [chapter.toString()]: "An unexpected client-side error occurred.",
+        [chapter.toString()]: errorMessage,
       }));
     } finally {
       setGeneratingChapters((prev) => {

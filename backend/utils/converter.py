@@ -108,14 +108,27 @@ def song_strcture_to_lyrics(input_dict, book_name: str, book_chapter: int) -> di
     current_book_abrv = bookname_to_abrv(book_name)
 
     for section_key, verse_range_str in input_dict.items():
+        # Skip non-stanza keys
+        if not section_key.lower().startswith("stanza"):
+            continue
+
         section_verses_data = {}
         verse_numbers_to_fetch = []
+
+        # Ensure verse_range_str is a string before stripping
+        if not isinstance(verse_range_str, str):
+            print(
+                f"Warning: Verse range for section '{section_key}' is not a string: {verse_range_str}. Skipping."
+            )
+            continue
 
         cleaned_verse_range_str = verse_range_str.strip()
 
         # Extract verse range by removing book name and chapter
         if cleaned_verse_range_str.startswith(f"{book_name} {book_chapter}:"):
-            cleaned_verse_range_str = cleaned_verse_range_str[len(f"{book_name} {book_chapter}:") :]
+            cleaned_verse_range_str = cleaned_verse_range_str[
+                len(f"{book_name} {book_chapter}:") :
+            ]
 
         if "-" in cleaned_verse_range_str:
             parts = cleaned_verse_range_str.split("-")

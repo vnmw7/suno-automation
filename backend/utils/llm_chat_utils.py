@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 import requests
 from dotenv import load_dotenv  # type: ignore
@@ -30,6 +31,17 @@ def get_rate_limits():
         )
 
 
+def extract_json_from_markdown(markdown_string: str):
+    """
+    Extracts a JSON object from a markdown string.
+    """
+    # Regex to find a JSON object within a markdown code block
+    json_match = re.search(r"```json\n(.*?)\n```", markdown_string, re.DOTALL)
+    if json_match:
+        return json_match.group(1)
+    return markdown_string
+
+
 def send_api_request(
     message: str,
 ):
@@ -46,7 +58,7 @@ def send_api_request(
     messages = [{"role": "user", "content": message}]
 
     print(
-        "Sending request to LLM with model: google/gemma-3-1b-it:free"
+        "Sending request to LLM with model: deepseek/deepseek-r1-0528:free"
     )  # Corrected f-string
 
     try:

@@ -1,9 +1,22 @@
 import os
+import re
+import json
 
 from dotenv import load_dotenv  # type: ignore
 from openai import APIError, OpenAI  # Import APIError
 
 load_dotenv()
+
+
+def extract_json_from_markdown(markdown_string: str):
+    """
+    Extracts a JSON object from a markdown string.
+    """
+    # Regex to find a JSON object within a markdown code block
+    json_match = re.search(r"```json\n(.*?)\n```", markdown_string, re.DOTALL)
+    if json_match:
+        return json_match.group(1)
+    return markdown_string
 
 
 def send_api_request(
@@ -23,11 +36,11 @@ def send_api_request(
     )
     messages = [{"role": "user", "content": message}]
 
-    print("Sending request to LLM with model: gpt-4o")
+    print("Sending request to LLM with model: google/gemma-3-27b-it")
 
     try:
         completion = client.chat.completions.create(
-            model="google/gemma-2-27b-it",  # Changed to gpt-4o
+            model="google/gemma-3-27b-it",
             messages=messages,
         )
         print(

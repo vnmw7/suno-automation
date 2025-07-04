@@ -51,12 +51,13 @@ async def login_with_microsoft_endpoint():
     await login_google()
     is_successful = await suno_login_microsoft()
     return {"success": is_successful}
-
+    
 @app.post("/generate-verse-ranges")
 def generate_verse_ranges_endpoint(book_name: str, book_chapter: int):
     from utils.ai_functions import generate_verse_ranges
 
     try:
+        print(f"[generate_verse_ranges_endpoint({book_name}, {book_chapter})] Generating verse ranges for {book_name} chapter {book_chapter}")
         verse_ranges = generate_verse_ranges(book_name, book_chapter)
         return {
             "success": True,
@@ -64,7 +65,12 @@ def generate_verse_ranges_endpoint(book_name: str, book_chapter: int):
             "verse_ranges": verse_ranges,
         }
     except Exception as e:
-        return {"error": str(e)}
+        print(f"A critical error occurred in generate_verse_ranges_endpoint: {e}")
+        print(traceback.format_exc())
+        return {
+            "error": str(e),
+            "message": "A critical error occurred during the verse ranges generation.",
+        }
 
 
 @app.get("/get-verse-ranges")
@@ -84,6 +90,7 @@ def get_verse_ranges_endpoint(book_name: str, book_chapter: int):
 
 @app.post("/generate-song-structure")
 async def generate_song_structure_endpoint(request: SongStructureRequest):
+    print(f"[generate_song_structure_endpoint()] Generating song structure for {request.strBookName} chapter {request.intBookChapter}")
     from utils.ai_functions import generate_song_structure
 
     try:

@@ -5,14 +5,20 @@ import json
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.bible_utils import split_chapter_into_sections
-from utils.llm_chat_utils import llm_general_query
-from utils.llm_chat_backup import aimlapi_general_query
+from utils.llm_chat_utils import llm_general_query, extract_json_from_markdown
+from utils.llm_chat_backup import (
+    aimlapi_general_query,
+    extract_json_from_markdown as extract_json_from_markdown_backup,
+)
 from utils.assign_styles import get_style_by_chapter
 from lib.supabase import supabase
 
 
 def generate_verse_ranges(book_name: str, book_chapter: int) -> list[str]:
+    print(f"[generate_verse_ranges()] Generating verse ranges for {book_name} chapter {book_chapter}")
     split_chapter = split_chapter_into_sections(book_name, str(book_chapter))
+
+    print(f"[generate_verse_ranges()] Splitting {book_name} {book_chapter} into sections: {split_chapter}")
     prompt = f"Split {book_name} {book_chapter} in Christian NIV Bible into {split_chapter} sections of similar size which stand alone. Give the range of verses separated by commas. Provide the output as numbers in oneline, nothing extra like explanations. Do not iclude the thinking and thought process to save output tokens."
     verse_ranges_str = llm_general_query(prompt)
 
@@ -57,7 +63,6 @@ def get_verse_ranges(book_name: str, book_chapter: int) -> list[str]:
     if response.data and len(response.data) > 0:
         return [item["verse_range"] for item in response.data]
     else:
-        # Generate verse ranges if they don't exist
         return generate_verse_ranges(book_name, book_chapter)
 
 
@@ -98,7 +103,9 @@ def generate_song_structure(
     prompt = f"Make a song structure using the Book of {strBookName} chapter {intBookChapter}, strictly from verses {strVerseRange} in the Bible only. The song will have 4-6 naturally segmented either verses, choruses or bridges. Strictly do not overlap nor reuse the verses in each segment. Strictly the output should be in json format: {{'stanza label': 'bible verse range number only', 'stanza label': 'bible verse range number only'}}. Do not provide any explanation only the json output."
 
     song_structure_response = llm_general_query(prompt)
-    if not song_structure_response:
+    primary_llm_failed = not song_structure_response
+
+    if primary_llm_failed:
         print("Primary LLM failed, trying backup LLM...")
         song_structure_response = aimlapi_general_query(prompt)
 
@@ -107,10 +114,17 @@ def generate_song_structure(
     # Parse the song structure
     try:
         if song_structure_response:
+            # Extract JSON from markdown
+            if primary_llm_failed:
+                json_string = extract_json_from_markdown_backup(
+                    song_structure_response
+                )
+            else:
+                json_string = extract_json_from_markdown(song_structure_response)
             song_structure = (
-                json.loads(song_structure_response)
-                if isinstance(song_structure_response, str)
-                else song_structure_response
+                json.loads(json_string)
+                if isinstance(json_string, str)
+                else json_string
             )
         else:
             print("Error: Failed to get song structure from LLM")
