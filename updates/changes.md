@@ -1,2 +1,3 @@
 - Fixed "Error: Invalid JSON response from LLM"
 - Fixed problem when spliting verses from books with numbers ex. "1 Samuel" and "2 Kings" by converting it into SAMUEL_1 and KINGS_1
+- Generated lyrics are empty

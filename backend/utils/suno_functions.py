@@ -199,19 +199,30 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
 
     strLyrics_parts = []
     for section_title, verses_dict in song_structure_verses.items():
-        strLyrics_parts.append(f"[{section_title}]:")
+        # Ensure section_title is a string and verses_dict is a dictionary
+        if not isinstance(section_title, str) or not isinstance(verses_dict, dict):
+            print(f"Skipping invalid section: {section_title}")
+            continue
+
+        strLyrics_parts.append(f"[{section_title}]")
         for verse_num, verse_text in verses_dict.items():
+            # Ensure verse_text is a string
+            if not isinstance(verse_text, str):
+                print(f"Skipping invalid verse text for verse {verse_num}")
+                continue
+            
             processed_text = verse_text.strip()
-            processed_text = re.sub(r"\s*([.;])\s*", r"\1\n\n", processed_text)
-            processed_text = re.sub(
-                r"^\s+(?=\S)", "", processed_text, flags=re.MULTILINE
-            )
+            # Add a space before punctuation for better readability and to avoid issues with splitting
+            processed_text = re.sub(r'\s*([,;.!?])\s*', r' \1 ', processed_text)
+            # Remove extra spaces
+            processed_text = re.sub(r'\s+', ' ', processed_text).strip()
             strLyrics_parts.append(processed_text)
 
-    intermediate_strLyrics = "\n".join(strLyrics_parts)
-    strLyrics = re.sub(r"\n{3,}", "\n", intermediate_strLyrics)
-    strLyrics = re.sub(r"\n", "\n\n", strLyrics)
-    strLyrics = re.sub(r"(\[.*?\]:)\n+", r"\1\n", strLyrics)
+    strLyrics = "\n".join(strLyrics_parts)
+
+    # Final check to ensure lyrics are not empty
+    if not strLyrics.strip():
+        raise ValueError("Generated lyrics are empty. Cannot proceed.")
 
     try:
         async with AsyncCamoufox(
