@@ -193,7 +193,7 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
         )
 
     song_structure_verses = song_strcture_to_lyrics(
-        parsed_song_structure, strBookName, intBookChapter
+        parsed_song_structure, strBookName, intBookChapter, strStyle
     )
     print(f"Converted song structure verses: {song_structure_verses}")
 
