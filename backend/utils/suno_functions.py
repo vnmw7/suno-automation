@@ -238,8 +238,6 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
             print("Navigating to suno.com...")
             await page.goto("https://suno.com/create")
             print("Waiting for page to load...")
-            await page.wait_for_timeout(2000)
-            await page.wait_for_load_state("networkidle")
             print("Page loaded.")
             print("Clicking Custom button...")
 
@@ -307,8 +305,25 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
 
             print("Creating song...")
             try:
-                create_button = page.locator('button:has-text("Create")').nth(1)
-                await create_button.wait_for(state="visible", timeout=10000)
+                create_selectors = [
+                    '[data-testid="create-button"]',
+                    'button:has-text("Create")'
+                ]
+                create_button = None
+                for selector in create_selectors:
+                    try:
+                        button = page.locator(selector).nth(1) if "has-text" in selector else page.locator(selector)
+                        await button.wait_for(state="visible", timeout=5000)
+                        create_button = button
+                        print(f"Found create button with selector: {selector}")
+                        break
+                    except Exception:
+                        print(f"Create button not found with selector: {selector}")
+                        continue
+                
+                if not create_button:
+                    raise Exception("Could not find a visible create button.")
+
                 await create_button.click()
                 await page.wait_for_timeout(5000)
                 await page.wait_for_load_state("networkidle", timeout=180000)

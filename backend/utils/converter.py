@@ -108,8 +108,14 @@ def song_strcture_to_lyrics(input_dict, book_name: str, book_chapter: int) -> di
     current_book_abrv = bookname_to_abrv(book_name)
 
     for section_key, verse_range_str in input_dict.items():
-        # Skip non-stanza keys
-        if not section_key.lower().startswith("stanza"):
+        # More flexible check for various song section types
+        allowed_prefixes = [
+            "intro", "verse", "pre-chorus", "prechorus", "chorus", 
+            "post-chorus", "postchorus", "hook", "bridge", "solo", 
+            "interlude", "refrain", "stanza", "couplet", "outro",
+            "middle 8", "breakdown"
+        ]
+        if not any(section_key.lower().startswith(prefix) for prefix in allowed_prefixes):
             continue
 
         section_verses_data = {}

@@ -1,3 +1,6 @@
-- Fixed "Error: Invalid JSON response from LLM"
-- Fixed problem when spliting verses from books with numbers ex. "1 Samuel" and "2 Kings" by converting it into SAMUEL_1 and KINGS_1
-- Generated lyrics are empty
+- Patched "Error: Invalid JSON response from LLM"
+- Patched problem when spliting verses from books with numbers ex. "1 Samuel" and "2 Kings" by converting it into SAMUEL_1 and KINGS_1
+- Patched "Generated lyrics are empty"
+- Patched the "Create Button not found" bug
+- changed the verse generation prompt
+- added migration script for progress table

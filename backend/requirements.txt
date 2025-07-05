@@ -11,3 +11,4 @@ camoufox[geoip]
 fastapi[standard]
 ruff
 black
+psycopg2-binary
