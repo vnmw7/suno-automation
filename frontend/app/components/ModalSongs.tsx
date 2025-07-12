@@ -145,7 +145,7 @@ const ModalSongs = ({
         strBookName: bookName,
         intBookChapter: chapter,
         strVerseRange: range,
-        strStyle: selectedStyle,
+        strStyle: `${selectedStyle}`, // Ensure comma-separated string format
         strTitle: title,
       };
 
@@ -204,6 +204,14 @@ const ModalSongs = ({
       if (result.success) {
         setStructureMessage("Song structure generated successfully!");
         console.log("Song structure generation result:", result.result);
+        
+        // Refetch updated song structures
+        const newStructuresResponse = await fetchSongStructures(range);
+        if (newStructuresResponse.success && newStructuresResponse.result) {
+          setSongStructures(newStructuresResponse.result);
+        } else {
+          console.error("Failed to refetch song structures after generation");
+        }
       } else {
         setStructureError(
           result.error || result.message || "Failed to generate song structure"

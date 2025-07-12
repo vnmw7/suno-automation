@@ -1,6 +1,7 @@
 import importlib
 import importlib.util
 import os
+import json
 
 lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "lib"))
 supabase_utils_path = os.path.join(lib_path, "supabase.py")
@@ -103,19 +104,36 @@ def bookname_to_abrv(bookname: str) -> str:
     return mapping.get(bookname, bookname)
 
 
-def song_strcture_to_lyrics(input_dict, book_name: str, book_chapter: int, strStyle: str) -> dict:
+def song_strcture_to_lyrics(
+    song_struct_id: int, input_dict, book_name: str, book_chapter: int, strStyle: str
+) -> dict:
     output_dict = {}
     current_book_abrv = bookname_to_abrv(book_name)
 
     for section_key, verse_range_str in input_dict.items():
         # More flexible check for various song section types
         allowed_prefixes = [
-            "intro", "verse", "pre-chorus", "prechorus", "chorus", 
-            "post-chorus", "postchorus", "hook", "bridge", "solo", 
-            "interlude", "refrain", "stanza", "couplet", "outro",
-            "middle 8", "breakdown"
+            "intro",
+            "verse",
+            "pre-chorus",
+            "prechorus",
+            "chorus",
+            "post-chorus",
+            "postchorus",
+            "hook",
+            "bridge",
+            "solo",
+            "interlude",
+            "refrain",
+            "stanza",
+            "couplet",
+            "outro",
+            "middle 8",
+            "breakdown",
         ]
-        if not any(section_key.lower().startswith(prefix) for prefix in allowed_prefixes):
+        if not any(
+            section_key.lower().startswith(prefix) for prefix in allowed_prefixes
+        ):
             continue
 
         section_verses_data = {}
@@ -196,4 +214,38 @@ def song_strcture_to_lyrics(input_dict, book_name: str, book_chapter: int, strSt
 
         output_dict[section_key] = section_verses_data
 
+    # Save to database
+    try:
+        lyrics_json = json.dumps(output_dict)
+        data_to_insert = {
+            "pg1_song_struct_id": song_struct_id,
+            "pg1_style": strStyle,
+            "pg1_lyrics": lyrics_json,
+            "pg1_status": 0,
+            "pg1_reviews": 0,
+        }
+        supabase.table("tblprogress_v1").insert(data_to_insert).execute()
+    except Exception as e:
+        print(f"Error saving progress to database: {e}")
+
     return output_dict
+
+
+if __name__ == "__main__":
+    # Example usage
+    input_data = {
+        "intro": "Exodus 2:1-2",
+        "verse_1": "Exodus 2:3-4",
+        "chorus_1": "Exodus 2:5-6",
+        "verse_2": "Exodus 2:7-8",
+        "chorus_2": "Exodus 2:9-10",
+        "outro": "Exodus 2:11-12",
+    }
+    book_name = "Exodus"
+    book_chapter = 2
+    strStyle = "Pop"
+    song_struct_id = 1  # Example ID
+    result = song_strcture_to_lyrics(
+        song_struct_id, input_data, book_name, book_chapter, strStyle
+    )
+    print(result)

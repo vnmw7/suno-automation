@@ -193,7 +193,7 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
         )
 
     song_structure_verses = song_strcture_to_lyrics(
-        parsed_song_structure, strBookName, intBookChapter, strStyle
+        song_structure_id, parsed_song_structure, strBookName, intBookChapter, strStyle
     )
     print(f"Converted song structure verses: {song_structure_verses}")
 
@@ -338,14 +338,16 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
 
                     # Save to progress_v1_tbl
                     try:
-                        data, count = (
-                            supabase.table("progress_v1_tbl")
+                        data = (
+                            supabase.table("tblprogress_v1")
                             .insert(
                                 {
-                                    "song_structure_id": song_structure_id,
-                                    "suno_song_id": suno_song_id,
-                                    "status": 1,  # Assuming 1 means generated
-                                    "style": strStyle,
+                                    "pg1_song_struct_id": song_structure_id,
+                                    "pg1_lyrics": strLyrics,
+                                    "pg1_status": 0,
+                                    "pg1_reviews": 0,
+                                    "pg1_song_id": suno_song_id,
+                                    "pg1_style": strStyle,
                                 }
                             )
                             .execute()
