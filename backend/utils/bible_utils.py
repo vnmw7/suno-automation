@@ -32,7 +32,9 @@ def split_chapter_into_sections(book_name, book_chapter_str: str) -> int:
                            or Bible data cannot be fetched.
     """
 
-    print(f"[split_chapter_into_sections()] Calculating sections for chapter: {book_name} {book_chapter_str}")
+    print(
+        f"[split_chapter_into_sections()] Calculating sections for chapter: {book_name} {book_chapter_str}"
+    )
 
     try:
         book_chapter = int(book_chapter_str)
@@ -57,7 +59,7 @@ def split_chapter_into_sections(book_name, book_chapter_str: str) -> int:
                 normalized_book_name = normalized_book_name[2:] + "_3"
 
             print(f"Normalized book name: {normalized_book_name}")
-            
+
             book_to_use = Book[normalized_book_name]
             print(f"Using book enum: {book_to_use}")
         except KeyError:
@@ -71,17 +73,23 @@ def split_chapter_into_sections(book_name, book_chapter_str: str) -> int:
                 else:
                     # If no match is found after iterating, we keep the original string
                     # and let the bible library handle it, logging the failure.
-                    print(f"Could not find a matching book enum for '{book_name}'. Passing as is.")
+                    print(
+                        f"Could not find a matching book enum for '{book_name}'. Passing as is."
+                    )
                     book_to_use = book_name
             except Exception as e:
-                print(f"An unexpected error occurred during book normalization for '{book_name}': {e}")
+                print(
+                    f"An unexpected error occurred during book normalization for '{book_name}': {e}"
+                )
                 book_to_use = book_name
     else:
         book_to_use = book_name
 
     try:
         total_verses = bible.get_number_of_verses(book_to_use, book_chapter)
-        print(f"[split_chapter_into_sections({book_name}, {book_chapter_str})] Total verses in {book_name} {book_chapter}: {total_verses}")
+        print(
+            f"[split_chapter_into_sections({book_name}, {book_chapter_str})] Total verses in {book_name} {book_chapter}: {total_verses}"
+        )
 
         if total_verses is None or total_verses <= 0:
             raise bible.InvalidChapterError(

@@ -1,8 +1,10 @@
 TABLE_NAME = "tblprogress_v1"
 
+
 def create_table(conn):
     with conn.cursor() as cur:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             CREATE TABLE {TABLE_NAME} (
                 pg1_id bigserial primary key,
                 pg1_created_at timestamptz default now(),
@@ -14,4 +16,5 @@ def create_table(conn):
                 pg1_reviews smallint,
                 pg1_updated_at timestamptz default now()
             );
-        """)
+        """
+        )

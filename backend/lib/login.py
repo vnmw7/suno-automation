@@ -21,18 +21,23 @@ os.makedirs(log_dir, exist_ok=True)
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(os.path.join(log_dir, "login.log")),
-        logging.StreamHandler()
-    ]
+        logging.StreamHandler(),
+    ],
 )
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 # Validate environment variables at startup
-REQUIRED_ENV_VARS = ["GOOGLE_EMAIL", "GOOGLE_PASSWORD", "MICROSOFT_EMAIL", "MICROSOFT_PASSWORD"]
+REQUIRED_ENV_VARS = [
+    "GOOGLE_EMAIL",
+    "GOOGLE_PASSWORD",
+    "MICROSOFT_EMAIL",
+    "MICROSOFT_PASSWORD",
+]
 missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
 if missing_vars:
     error_msg = f"ERROR: Missing required environment variables: {', '.join(missing_vars)}. Please set them in your .env file."
@@ -89,12 +94,15 @@ async def click_button(page, selector, timeout=DEFAULT_TIMEOUT):
 async def check_logged_in_state(page, logged_in_selector, timeout=DEFAULT_TIMEOUT):
     """Helper function to check if already logged in based on a specific selector."""
     try:
-        await page.wait_for_selector(logged_in_selector, state="visible", timeout=timeout)
+        await page.wait_for_selector(
+            logged_in_selector, state="visible", timeout=timeout
+        )
         logger.info("Already logged in detected.")
         return True
     except Exception as e:
         logger.info(f"No logged-in state detected: {str(e)}")
         return False
+
 
 # Login to Google (Corrected Version - Uses URL for state detection)
 async def login_google():
@@ -128,15 +136,21 @@ async def login_google():
                 if await check_logged_in_state(page, logged_in_selector, timeout=5000):
                     logger.info("Confirmed logged-in state on myaccount.google.com.")
                 else:
-                    logger.warning("Redirected to myaccount.google.com but couldn't find profile icon. Assuming login is OK based on URL.")
+                    logger.warning(
+                        "Redirected to myaccount.google.com but couldn't find profile icon. Assuming login is OK based on URL."
+                    )
                 return True
 
             # --- If not redirected, we are on the login page ---
-            logger.info(f"Not redirected. Current URL is {page.url}. Proceeding with login flow.")
+            logger.info(
+                f"Not redirected. Current URL is {page.url}. Proceeding with login flow."
+            )
             try:
                 # --- Step 1: Enter Email ---
                 if not await fill_input(page, email_input_selector, GOOGLE_EMAIL):
-                    logger.error("Failed to find and fill the email input field on the login page.")
+                    logger.error(
+                        "Failed to find and fill the email input field on the login page."
+                    )
                     return False
                 await click_button(page, 'button:has-text("Next")')
                 logger.info(f"Entered email: {GOOGLE_EMAIL} and clicked Next.")
@@ -147,15 +161,21 @@ async def login_google():
                     logger.error("Failed to find and fill the password input field.")
                     return False
                 await click_button(page, 'button:has-text("Next")')
-                logger.info("Password submitted. Waiting for successful login redirection...")
+                logger.info(
+                    "Password submitted. Waiting for successful login redirection..."
+                )
 
                 # --- Step 3: Verify Login by waiting for the URL to change ---
-                await page.wait_for_url("**/myaccount.google.com/**", timeout=LOGIN_CONFIRMATION_TIMEOUT)
+                await page.wait_for_url(
+                    "**/myaccount.google.com/**", timeout=LOGIN_CONFIRMATION_TIMEOUT
+                )
                 logger.info(f"Successfully redirected to: {page.url}. Login confirmed.")
                 return True
 
             except Exception as e:
-                logger.error(f"An error occurred during the login form interaction: {str(e)}")
+                logger.error(
+                    f"An error occurred during the login form interaction: {str(e)}"
+                )
 
                 page_title = await page.title()
                 logger.debug(f"Page title at time of error: '{page_title}'")
@@ -166,6 +186,7 @@ async def login_google():
         logger.error(f"A major error occurred in login_google: {str(e)}")
         logger.error(traceback.format_exc())
         return False
+
 
 # Login to Suno using Microsoft Account
 async def suno_login_microsoft():
@@ -203,7 +224,9 @@ async def suno_login_microsoft():
                 if await check_logged_in_state(page, logged_in_selector, timeout=5000):
                     logger.info("Confirmed logged-in state on suno.com.")
                 else:
-                    logger.warning("Redirected to suno.com but couldn't find profile icon. Assuming login is OK based on URL.")
+                    logger.warning(
+                        "Redirected to suno.com but couldn't find profile icon. Assuming login is OK based on URL."
+                    )
                 return True
             else:
                 logger.info("Navigating to Suno to log in using Microsoft...")
@@ -214,7 +237,9 @@ async def suno_login_microsoft():
             if await wait_for_selector(page, sign_in_selector):
                 logger.info("Sign-in button found. Attempting login process...")
                 await click_button(page, sign_in_selector)
-                await click_button(page, 'button:has(img[alt="Sign in with Microsoft"])')
+                await click_button(
+                    page, 'button:has(img[alt="Sign in with Microsoft"])'
+                )
 
                 # Ensure email field is visible and ready
                 email_input_selector = 'input[type="email"]'
@@ -222,7 +247,6 @@ async def suno_login_microsoft():
                 await page.keyboard.press("Enter")
                 await page.wait_for_load_state("load", timeout=DEFAULT_TIMEOUT)
                 logger.info("Entered Microsoft email and submitted.")
-                
 
                 # Send code to email
                 send_code_selector = 'button:has-text("Send code")'
@@ -232,27 +256,39 @@ async def suno_login_microsoft():
 
                     new_tab = await browser.new_page()
                     logger.info("New browser tab opened for Gmail.")
-                    await new_tab.goto("https://mail.google.com/", wait_until="domcontentloaded", timeout=60000)
+                    await new_tab.goto(
+                        "https://mail.google.com/",
+                        wait_until="domcontentloaded",
+                        timeout=60000,
+                    )
                     await page.wait_for_timeout(60000)
                     logger.info("Gmail page loaded, searching for email...")
-                    
+
                     logger.info("Searching for the Microsoft verification email...")
                     email_row_selector = 'div:has(span[email="account-security-noreply@accountprotection.microsoft.com"]):has-text("Your single-use code")'
                     await new_tab.wait_for_selector(email_row_selector, timeout=30000)
-                    
+
                     email_row_locator = new_tab.locator(email_row_selector).first
                     full_preview_text = await email_row_locator.inner_text()
-                    logger.info(f"Email row content found: {full_preview_text.replace(chr(10), ' ')}")
+                    logger.info(
+                        f"Email row content found: {full_preview_text.replace(chr(10), ' ')}"
+                    )
 
-                    match = re.search(r"Your single-use code is: (\d{6})", full_preview_text)
+                    match = re.search(
+                        r"Your single-use code is: (\d{6})", full_preview_text
+                    )
 
                     if not match:
-                        logger.error("Could not find the verification code in the email preview.")
+                        logger.error(
+                            "Could not find the verification code in the email preview."
+                        )
                         await new_tab.close()
                         return False
 
                     verification_code = match.group(1)
-                    logger.info(f"Successfully extracted verification code: {verification_code}")
+                    logger.info(
+                        f"Successfully extracted verification code: {verification_code}"
+                    )
 
                     email_row_locator = new_tab.locator(email_row_selector).nth(1)
                     await email_row_locator.click()
@@ -262,16 +298,25 @@ async def suno_login_microsoft():
 
                     verification_input_selector_base = 'input[id="codeEntry-{}"]'
                     for i in range(6):
-                        verification_input_selector = verification_input_selector_base.format(i)
-                        await page.wait_for_selector(verification_input_selector, timeout=DEFAULT_TIMEOUT)
-                        await page.fill(verification_input_selector, verification_code[i])
-
+                        verification_input_selector = (
+                            verification_input_selector_base.format(i)
+                        )
+                        await page.wait_for_selector(
+                            verification_input_selector, timeout=DEFAULT_TIMEOUT
+                        )
+                        await page.fill(
+                            verification_input_selector, verification_code[i]
+                        )
 
                     await page.keyboard.press("Enter")
-                    logger.info("Verification code entered. Waiting for login confirmation...")
+                    logger.info(
+                        "Verification code entered. Waiting for login confirmation..."
+                    )
 
                     stay_signed_in_selector = 'button:has-text("yes")'
-                    await page.wait_for_selector(stay_signed_in_selector, timeout=DEFAULT_TIMEOUT)
+                    await page.wait_for_selector(
+                        stay_signed_in_selector, timeout=DEFAULT_TIMEOUT
+                    )
                     await click_button(page, stay_signed_in_selector)
                     await page.wait_for_timeout(2000)
 
@@ -280,10 +325,14 @@ async def suno_login_microsoft():
                         logger.info(f"Already logged in. Redirected to: {page.url}")
 
                         logged_in_selector = 'button:has(span:has-text("Create"))'
-                        if await check_logged_in_state(page, logged_in_selector, timeout=5000):
+                        if await check_logged_in_state(
+                            page, logged_in_selector, timeout=5000
+                        ):
                             logger.info("Confirmed logged-in state on suno.com.")
                         else:
-                            logger.warning("Redirected to suno.com but couldn't find profile icon. Assuming login is OK based on URL.")
+                            logger.warning(
+                                "Redirected to suno.com but couldn't find profile icon. Assuming login is OK based on URL."
+                            )
                         return True
                 else:
                     logger.error("Failed to send verification code.")
@@ -296,10 +345,14 @@ async def suno_login_microsoft():
                     logger.info(f"Already logged in. Redirected to: {page.url}")
 
                     logged_in_selector = 'button:has(span:has-text("Create"))'
-                    if await check_logged_in_state(page, logged_in_selector, timeout=5000):
+                    if await check_logged_in_state(
+                        page, logged_in_selector, timeout=5000
+                    ):
                         logger.info("Confirmed logged-in state on suno.com.")
                     else:
-                        logger.warning("Redirected to suno.com but couldn't find profile icon. Assuming login is OK based on URL.")
+                        logger.warning(
+                            "Redirected to suno.com but couldn't find profile icon. Assuming login is OK based on URL."
+                        )
                     return True
 
                 logger.info("Something wrong. Please debug the login process.")
@@ -315,6 +368,7 @@ async def suno_login_microsoft():
             logger.error("Unexpected error during Suno Microsoft login.")
         logger.error(traceback.format_exc())
         return False
+
 
 if __name__ == "__main__":
     import asyncio

@@ -22,12 +22,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class SongRequest(BaseModel):
     strBookName: str
     intBookChapter: int
     strVerseRange: str
     strStyle: str
     strTitle: str
+
 
 class SongStructureRequest(BaseModel):
     strBookName: str
@@ -55,13 +57,16 @@ async def login_with_microsoft_endpoint():
     await login_google()
     is_successful = await suno_login_microsoft()
     return {"success": is_successful}
-    
+
+
 @app.post("/generate-verse-ranges")
 def generate_verse_ranges_endpoint(book_name: str, book_chapter: int):
     from utils.ai_functions import generate_verse_ranges
 
     try:
-        print(f"[generate_verse_ranges_endpoint({book_name}, {book_chapter})] Generating verse ranges for {book_name} chapter {book_chapter}")
+        print(
+            f"[generate_verse_ranges_endpoint({book_name}, {book_chapter})] Generating verse ranges for {book_name} chapter {book_chapter}"
+        )
         verse_ranges = generate_verse_ranges(book_name, book_chapter)
         return {
             "success": True,
@@ -94,7 +99,9 @@ def get_verse_ranges_endpoint(book_name: str, book_chapter: int):
 
 @app.post("/generate-song-structure")
 async def generate_song_structure_endpoint(request: SongStructureRequest):
-    print(f"[generate_song_structure_endpoint()] Generating song structure for {request.strBookName} chapter {request.intBookChapter}")
+    print(
+        f"[generate_song_structure_endpoint()] Generating song structure for {request.strBookName} chapter {request.intBookChapter}"
+    )
     from utils.ai_functions import generate_song_structure
 
     try:
@@ -114,40 +121,6 @@ async def generate_song_structure_endpoint(request: SongStructureRequest):
         return {
             "error": str(e),
             "message": "A critical error occurred during the song structure generation.",
-        }
-
-
-@app.post("/generate-song")
-async def generate_song_endpoint(SongRequest: SongRequest):
-    from utils.suno_functions import generate_song
-
-    try:
-        result = await generate_song(
-            strBookName=SongRequest.strBookName,
-            intBookChapter=SongRequest.intBookChapter,
-            strVerseRange=SongRequest.strVerseRange,
-            strStyle=SongRequest.strStyle,
-            strTitle=SongRequest.strTitle,
-        )
-        return {
-            "success": True,
-            "message": "Song generated successfully.",
-            "result": result,
-        }
-    except ValueError as ve:
-        print(f"ValueError in generate_song_endpoint: {ve}")
-        return {
-            "error": str(ve),
-            "message": "Missing or invalid song structure data.",
-            "success": False,
-        }
-    except Exception as e:
-        print(f"A critical error occurred in generate_song_endpoint: {e}")
-        print(traceback.format_exc())
-        return {
-            "error": str(e),
-            "message": "A critical error occurred during the song generation.",
-            "success": False,
         }
 
 
@@ -220,6 +193,7 @@ async def download_song_endpoint(request: SongRequest):
             "error": str(e),
             "message": "A critical error occurred during the song operation.",
         }
+
 
 @app.get("/debug/song-structures")
 def debug_song_structures_endpoint():

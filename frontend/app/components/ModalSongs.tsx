@@ -252,8 +252,9 @@ const ModalSongs = ({
       // Mark structure step as completed
       setStepCompleted(prev => ({ ...prev, structure: true }));
       
-      // Refetch updated song structures
+      // Refetch updated song structures and styles
       await fetchAndSetSongStructures();
+      await fetchAndSetStyles();
     } catch (err) {
       setStructureError("An unexpected error occurred");
       console.error("Error in structure generation:", err);
@@ -272,6 +273,19 @@ const ModalSongs = ({
       }
     } catch (err) {
       console.error("Error fetching song structures:", err);
+    }
+  };
+
+  const fetchAndSetStyles = async () => {
+    try {
+      const stylesResponse = await fetchStyles(range);
+      if (stylesResponse.success && stylesResponse.result) {
+        setStyles(stylesResponse.result);
+      } else {
+        console.error("Failed to refresh styles:", stylesResponse.error);
+      }
+    } catch (err) {
+      console.error("Error refreshing styles:", err);
     }
   };
 

@@ -15,10 +15,14 @@ from lib.supabase import supabase
 
 
 def generate_verse_ranges(book_name: str, book_chapter: int) -> list[str]:
-    print(f"[generate_verse_ranges()] Generating verse ranges for {book_name} chapter {book_chapter}")
+    print(
+        f"[generate_verse_ranges()] Generating verse ranges for {book_name} chapter {book_chapter}"
+    )
     split_chapter = split_chapter_into_sections(book_name, str(book_chapter))
 
-    print(f"[generate_verse_ranges()] Splitting {book_name} {book_chapter} into sections: {split_chapter}")
+    print(
+        f"[generate_verse_ranges()] Splitting {book_name} {book_chapter} into sections: {split_chapter}"
+    )
     prompt = f"Split {book_name} {book_chapter} in Christian NIV Bible into {split_chapter} sections of similar size which stand alone. Give the range of verses separated by commas. Provide the output as numbers in oneline, nothing extra like explanations. Do not iclude the thinking and thought process to save output tokens."
     verse_ranges_str = llm_general_query(prompt)
 
@@ -166,15 +170,11 @@ def generate_song_structure(
         if song_structure_response:
             # Extract JSON from markdown
             if primary_llm_failed:
-                json_string = extract_json_from_markdown_backup(
-                    song_structure_response
-                )
+                json_string = extract_json_from_markdown_backup(song_structure_response)
             else:
                 json_string = extract_json_from_markdown(song_structure_response)
             song_structure = (
-                json.loads(json_string)
-                if isinstance(json_string, str)
-                else json_string
+                json.loads(json_string) if isinstance(json_string, str) else json_string
             )
         else:
             print("Error: Failed to get song structure from LLM")

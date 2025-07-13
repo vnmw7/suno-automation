@@ -5,9 +5,6 @@ This file sets up the functions that will be used when automating Suno interacti
 
 from camoufox.async_api import AsyncCamoufox
 import traceback
-import asyncio
-import json
-import re
 import importlib
 import importlib.util
 import os
@@ -26,7 +23,12 @@ supabase = supabase_utils.supabase
 load_dotenv()
 
 # Validate environment variables at startup
-REQUIRED_ENV_VARS = ["GOOGLE_EMAIL", "GOOGLE_PASSWORD", "MICROSOFT_EMAIL", "MICROSOFT_PASSWORD"]
+REQUIRED_ENV_VARS = [
+    "GOOGLE_EMAIL",
+    "GOOGLE_PASSWORD",
+    "MICROSOFT_EMAIL",
+    "MICROSOFT_PASSWORD",
+]
 missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
 if missing_vars:
     sys.exit(1)
@@ -89,7 +91,7 @@ async def login_suno():
                 email_selectors = [
                     'input[type="email"]',
                     'input[name="identifier"]',
-                    '#identifierId',
+                    "#identifierId",
                 ]
                 email_input = None
                 for selector in email_selectors:
@@ -101,7 +103,7 @@ async def login_suno():
                     except Exception:
                         print(f"Email input not found with selector: {selector}")
                         continue
-                
+
                 if not email_input or not await email_input.is_visible():
                     raise Exception("Could not find a visible email input field.")
 
@@ -150,222 +152,6 @@ async def login_suno():
             return False
 
 
-async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, strTitle):
-    from utils.converter import song_strcture_to_lyrics
-
-    song_structure_dict = (
-        supabase.table("song_structure_tbl")
-        .select("id, song_structure")
-        .eq("book_name", strBookName)
-        .eq("chapter", intBookChapter)
-        .eq("verse_range", strVerseRange)
-        .execute()
-    )
-
-    print(f"Database query result for {strBookName} {intBookChapter}:{strVerseRange}:")
-    print(
-        f"  Data count: {len(song_structure_dict.data) if song_structure_dict.data else 0}"
-    )
-    print(f"  Data: {song_structure_dict.data}")
-
-    # Check if data exists
-    if not song_structure_dict.data or len(song_structure_dict.data) == 0:
-        raise ValueError(
-            f"No song structure found for {strBookName} {intBookChapter}:{strVerseRange}"
-        )
-
-    song_structure_id = song_structure_dict.data[0]["id"]
-    song_structure_json_string = song_structure_dict.data[0]["song_structure"]
-    print(f"  song_structure field value: {song_structure_json_string}")
-    print(f"  song_structure type: {type(song_structure_json_string)}")
-
-    # Check if song_structure field is not None
-    if song_structure_json_string is None:
-        raise ValueError(
-            f"Song structure is None for {strBookName} {intBookChapter}:{strVerseRange}"
-        )
-
-    try:
-        parsed_song_structure = json.loads(song_structure_json_string)
-    except json.JSONDecodeError as e:
-        raise ValueError(
-            f"Invalid JSON in song structure for {strBookName} {intBookChapter}:{strVerseRange}: {e}"
-        )
-
-    song_structure_verses = song_strcture_to_lyrics(
-        song_structure_id, parsed_song_structure, strBookName, intBookChapter, strStyle
-    )
-    print(f"Converted song structure verses: {song_structure_verses}")
-
-    strLyrics_parts = []
-    for section_title, verses_dict in song_structure_verses.items():
-        # Ensure section_title is a string and verses_dict is a dictionary
-        if not isinstance(section_title, str) or not isinstance(verses_dict, dict):
-            print(f"Skipping invalid section: {section_title}")
-            continue
-
-        strLyrics_parts.append(f"[{section_title}]")
-        for verse_num, verse_text in verses_dict.items():
-            # Ensure verse_text is a string
-            if not isinstance(verse_text, str):
-                print(f"Skipping invalid verse text for verse {verse_num}")
-                continue
-            
-            processed_text = verse_text.strip()
-            # Add a space before punctuation for better readability and to avoid issues with splitting
-            processed_text = re.sub(r'\s*([,;.!?])\s*', r' \1 ', processed_text)
-            # Remove extra spaces
-            processed_text = re.sub(r'\s+', ' ', processed_text).strip()
-            strLyrics_parts.append(processed_text)
-
-    strLyrics = "\n".join(strLyrics_parts)
-
-    # Final check to ensure lyrics are not empty
-    if not strLyrics.strip():
-        raise ValueError("Generated lyrics are empty. Cannot proceed.")
-
-    try:
-        async with AsyncCamoufox(
-            headless=False,
-            persistent_context=True,
-            user_data_dir="backend/camoufox_session_data",
-            os=("windows"),
-            config=config,
-            humanize=True,
-            i_know_what_im_doing=True,
-        ) as browser:
-            page = await browser.new_page()
-            print("Navigating to suno.com...")
-            await page.goto("https://suno.com/create")
-            print("Waiting for page to load...")
-            print("Page loaded.")
-            print("Clicking Custom button...")
-
-            print(f"Current URL before Custom button: {page.url}")
-
-            try:
-                custom_button = page.locator('button:has(span:has-text("Custom"))')
-                await custom_button.wait_for(state="visible", timeout=10000)
-                print("Custom button found and visible")
-                await custom_button.click()
-                await page.wait_for_timeout(2000)
-                print("Custom button clicked successfully")
-            except Exception as e:
-                print(f"Error clicking Custom button: {e}")
-
-                try:
-                    alt_custom_button = page.locator('button:has-text("Custom")')
-                    await alt_custom_button.wait_for(state="visible", timeout=5000)
-                    await alt_custom_button.click()
-                    await page.wait_for_timeout(2000)
-                    print("Used alternative Custom button selector")
-                except Exception as e2:
-                    print(f"Alternative Custom button also failed: {e2}")
-                    raise Exception("Could not find or click Custom button")
-
-            print("Filling strLyrics...")
-            try:
-                strLyrics_textarea = page.locator(
-                    'textarea[data-testid="lyrics-input-textarea"]'
-                )
-                await strLyrics_textarea.wait_for(state="visible", timeout=10000)
-                await strLyrics_textarea.clear()
-                await strLyrics_textarea.type(strLyrics)
-                await page.wait_for_timeout(2000)
-                print(f"strLyrics filled successfully: {len(strLyrics)} characters")
-            except Exception as e:
-                print(f"Error filling strLyrics: {e}")
-                raise Exception("Could not fill lyrics textarea")
-
-            print("Filling tags...")
-            try:
-                tags_textarea = page.locator(
-                    'textarea[data-testid="tag-input-textarea"]'
-                )
-                await tags_textarea.wait_for(state="visible", timeout=10000)
-                await tags_textarea.clear()
-                await tags_textarea.type(strStyle)
-                await page.wait_for_timeout(2000)
-                print(f"Tags filled successfully: {strStyle}")
-            except Exception as e:
-                print(f"Error filling tags: {e}")
-                raise Exception("Could not fill tags textarea")
-
-            print("Filling title...")
-            try:
-                title_input = page.locator('input[placeholder="Enter song title"]')
-                await title_input.wait_for(state="visible", timeout=10000)
-                await title_input.clear()
-                await title_input.type(strTitle)
-                await page.wait_for_timeout(2000)
-                print(f"Title filled successfully: {strTitle}")
-            except Exception as e:
-                print(f"Error filling title: {e}")
-                raise Exception("Could not fill title input")
-
-            print("Creating song...")
-            try:
-                create_selectors = [
-                    '[data-testid="create-button"]',
-                    'button:has-text("Create")'
-                ]
-                create_button = None
-                for selector in create_selectors:
-                    try:
-                        button = page.locator(selector).nth(1) if "has-text" in selector else page.locator(selector)
-                        await button.wait_for(state="visible", timeout=5000)
-                        create_button = button
-                        print(f"Found create button with selector: {selector}")
-                        break
-                    except Exception:
-                        print(f"Create button not found with selector: {selector}")
-                        continue
-                
-                if not create_button:
-                    raise Exception("Could not find a visible create button.")
-
-                await create_button.click()
-                await page.wait_for_timeout(5000)
-                await page.wait_for_load_state("networkidle", timeout=180000)
-                print("Song creation initiated and page loaded.")
-
-                # Get the song ID from the URL
-                current_url = page.url
-                suno_song_id = None
-                if "suno.com/song/" in current_url:
-                    suno_song_id = current_url.split("suno.com/song/")[1].split("/")[0]
-                    print(f"Extracted suno_song_id: {suno_song_id}")
-
-                    # Save to progress_v1_tbl
-                    try:
-                        data = (
-                            supabase.table("tblprogress_v1")
-                            .insert(
-                                {
-                                    "pg1_song_struct_id": song_structure_id,
-                                    "pg1_lyrics": strLyrics,
-                                    "pg1_status": 0,
-                                    "pg1_reviews": 0,
-                                    "pg1_song_id": suno_song_id,
-                                    "pg1_style": strStyle,
-                                }
-                            )
-                            .execute()
-                        )
-                        print(f"Saved to progress_v1_tbl: {data}")
-                    except Exception as db_error:
-                        print(f"Error saving to Supabase: {db_error}")
-
-            except Exception as e:
-                print(f"Error clicking Create button: {e}")
-                raise Exception("Could not click Create button")
-
-    except Exception as e:
-        print(f"An error occurred in generate_song: {e}")
-        print(traceback.format_exc())
-        return False
-
-
 async def download_song_with_page(page, strTitle, intIndex):
     try:
         print(
@@ -404,9 +190,7 @@ async def download_song_with_page(page, strTitle, intIndex):
         await page.wait_for_timeout(2000)
 
         print(f"Looking for song elements with title: '{strTitle}'")
-        song_title_locator_str = (
-            f'span[title="{strTitle}"]'  # More resilient selector
-        )
+        song_title_locator_str = f'span[title="{strTitle}"]'  # More resilient selector
         song_elements = page.locator(song_title_locator_str)
 
         try:
@@ -577,9 +361,7 @@ async def download_song_with_page(page, strTitle, intIndex):
                 return False
 
             sanitized_title = strTitle.replace(":", "-")
-            download_path = (
-                f"./for_song_qa/{sanitized_title.replace(' ', '_')}_index_{intIndex}.mp3"
-            )
+            download_path = f"./for_song_qa/{sanitized_title.replace(' ', '_')}_index_{intIndex}.mp3"
             await download.save_as(download_path)
             print(
                 f"Download for '{strTitle}' (index {intIndex}) saved to: {download_path}"
@@ -610,17 +392,3 @@ async def download_song_with_page(page, strTitle, intIndex):
             print("Page was closed when the critical error was caught.")
 
         return False
-
-
-if __name__ == "__main__":
-
-    async def main():
-        await generate_song(
-            strBookName="Genesis",
-            intBookChapter=1,
-            strStyle="biblical, creation, inspirational",
-            strTitle="Genesis Creation Song",
-        )
-        print("generate_song() completed.")
-
-    asyncio.run(main())

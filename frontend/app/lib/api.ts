@@ -40,7 +40,7 @@ export const generateSong = async (
   try {
     console.log("API request payload:", request);
 
-    const response = await fetch(`${API_BASE_URL}/generate-song`, {
+    const response = await fetch(`${API_BASE_URL}/song/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

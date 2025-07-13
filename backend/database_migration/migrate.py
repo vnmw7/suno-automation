@@ -12,6 +12,7 @@ from lib.supabase import get_db_connection
 # Load environment variables from .env file
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
+
 def migrate():
     """Runs database migrations to create tables."""
     conn = get_db_connection()

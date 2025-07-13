@@ -1,6 +1,5 @@
 import os
 import re
-import json
 
 from dotenv import load_dotenv  # type: ignore
 from openai import APIError, OpenAI  # Import APIError
