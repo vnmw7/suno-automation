@@ -7,8 +7,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import traceback
+from api.song.routes import router as song_router
 
 app = FastAPI()
+
+# Include routers
+app.include_router(song_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -216,7 +220,6 @@ async def download_song_endpoint(request: SongRequest):
             "error": str(e),
             "message": "A critical error occurred during the song operation.",
         }
-
 
 @app.get("/debug/song-structures")
 def debug_song_structures_endpoint():

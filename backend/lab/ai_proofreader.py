@@ -107,7 +107,7 @@ with Camoufox(
 
     box = prompt_textarea.bounding_box()
     if box:
-        x = box["x"] + box["width"] / 2
+        x = box["x"] + box["width"] / 2                           
         y = box["y"] + box["height"] / 2
         page.mouse.click(x, y)
         print(f"Clicked at ({x}, {y}) to focus the textarea.")
