@@ -1,9 +1,16 @@
+"""Suno Automation - Song Utilities Module
+
+This module provides utility functions for generating songs using Suno's API
+and reviewing generated songs with Google AI Studio. It handles the entire
+song creation workflow from lyric generation to quality review.
+"""
+
 import os
 import json
 import re
 import traceback
 import importlib.util
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from camoufox import AsyncCamoufox
 from playwright.async_api import expect
 from configs.browser_config import config
@@ -26,18 +33,26 @@ async def generate_song_handler(
     strStyle: str,
     strTitle: str,
 ) -> Dict[str, Any]:
-    """
-    Handler function for generating songs using Suno API.
+    """Handles song generation requests by coordinating with Suno API.
+
+    This function serves as the primary handler for song generation requests.
+    It validates input parameters and delegates the song creation process to
+    the generate_song function.
 
     Args:
-        strBookName: Name of the book
-        intBookChapter: Chapter number
-        strVerseRange: Range of verses
-        strStyle: Music style for the song
-        strTitle: Title of the song
+        strBookName (str): Name of the Bible book (e.g., "Genesis", "Exodus")
+        intBookChapter (int): Chapter number within the specified book
+        strVerseRange (str): Verse range to include in the song (e.g., "1-5")
+        strStyle (str): Musical style/genre for the song (e.g., "Pop", "Rock")
+        strTitle (str): Title for the generated song
 
     Returns:
-        Dictionary containing the song generation results
+        Dict[str, Any]: Dictionary containing:
+            - 'success': Boolean indicating operation success
+            - 'song_id': ID of the generated song (if successful)
+            - 'lyrics': Lyrics used for song generation
+            - 'style': Musical style applied
+            - 'title': Song title
     """
     return await generate_song(
         strBookName=strBookName,
@@ -48,19 +63,36 @@ async def generate_song_handler(
     )
 
 
-async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, strTitle):
-    """
-    Generate a song using Suno API.
+async def generate_song(
+    strBookName: str,
+    intBookChapter: int,
+    strVerseRange: str,
+    strStyle: str,
+    strTitle: str
+) -> Union[Dict[str, Any], bool]:
+    """Generates a song using Suno's API by automating browser interactions.
+
+    This function orchestrates the entire song generation process:
+    1. Retrieves song structure from the database
+    2. Converts the structure to lyrics
+    3. Automates the Suno website to create the song
+    4. Saves generation results to the database
 
     Args:
-        strBookName: Name of the book
-        intBookChapter: Chapter number
-        strVerseRange: Range of verses
-        strStyle: Music style for the song
-        strTitle: Title of the song
+        strBookName (str): Name of the Bible book
+        intBookChapter (int): Chapter number within the book
+        strVerseRange (str): Verse range to include in the song
+        strStyle (str): Musical style/genre for the song
+        strTitle (str): Title for the generated song
 
     Returns:
-        Dictionary containing the song generation results or False on failure
+        Union[Dict[str, Any], bool]: On success, returns dictionary with:
+            - 'success': True
+            - 'song_id': Generated song ID
+            - 'lyrics': Lyrics used
+            - 'style': Applied musical style
+            - 'title': Song title
+        On failure, returns False
     """
     from utils.converter import song_strcture_to_lyrics
 
@@ -290,17 +322,27 @@ async def generate_song(strBookName, intBookChapter, strVerseRange, strStyle, st
 
 
 async def review_song_with_ai(
-    audio_file_path: str, song_structure: Dict[str, Any]
+    audio_file_path: str,
+    song_structure: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """
-    Review a song using AI Studio to check for quality issues.
+    """Reviews a generated song using Google AI Studio for quality assurance.
+
+    This function performs a two-step review process:
+    1. Asks AI to transcribe and evaluate the audio for common issues
+    2. Compares transcribed lyrics with original structure for accuracy
 
     Args:
-        audio_file_path: Path to the audio file to review
-        song_structure: Dictionary containing the song structure with lyrics
+        audio_file_path (str): Path to the generated audio file
+        song_structure (Dict[str, Any]): Original song structure with lyrics
 
     Returns:
-        Dictionary containing the review results and verdict
+        Dict[str, Any]: Review results containing:
+            - 'success': Boolean indicating review process success
+            - 'error': Error message if review failed
+            - 'first_response': AI's initial transcription and evaluation
+            - 'second_response': AI's comparison with original lyrics
+            - 'verdict': Final quality verdict ('re-roll' or 'continue')
+            - 'audio_file': Path to reviewed audio file
     """
     try:
         # Validate audio file exists
@@ -491,14 +533,18 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
 
 
 def _format_song_structure_for_prompt(song_structure: Dict[str, Any]) -> str:
-    """
-    Format song structure dictionary into readable lyrics format for the AI prompt.
+    """Formats song structure into a readable string for AI prompts.
+
+    Converts the structured song data into a plain text format suitable
+    for use in AI review prompts by organizing lyrics by section.
 
     Args:
-        song_structure: Dictionary containing song sections and lyrics
+        song_structure (Dict[str, Any]): Song structure containing:
+            - Section names as keys
+            - Dictionaries of verse numbers and lyrics as values
 
     Returns:
-        Formatted string with lyrics organized by sections
+        str: Formatted lyrics string with section headers and verses
     """
     formatted_lines = []
 
