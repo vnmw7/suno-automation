@@ -38,6 +38,9 @@ suno-automation/
 │   ├── api/               # API routes
 │   ├── configs/           # Configuration files
 │   ├── utils/             # Utility functions
+│   ├── uploads/
+│   │   ├── pending_review/
+│   │   └── approved/
 │   └── main.py            # Entry point
 ├── frontend/              # RemixJS frontend
 │   ├── app/               # Application code
