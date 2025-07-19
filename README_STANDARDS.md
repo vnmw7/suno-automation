@@ -95,6 +95,23 @@ Clearly document the technologies used to build the project. This is crucial for
 - **E2E Testing:** [Cypress](https://www.cypress.io/)
 - **Mocking:** [Mock Service Worker (MSW)](https://mswjs.io/)
 
+#### Code Quality & Linting
+
+**JavaScript/TypeScript:**
+
+- **Linting:** [ESLint](https://eslint.org/) `v8.57.0` with [TypeScript ESLint](https://typescript-eslint.io/)
+- **Code Formatting:** [Prettier](https://prettier.io/) `v3.2.5`
+- **Import Sorting:** [eslint-plugin-import](https://github.com/import-js/eslint-plugin-import)
+
+**Python:**
+
+- **Linting:** [Ruff](https://docs.astral.sh/ruff/) `v0.1.0+` (fast Python linter and code formatter)
+- **Code Formatting:** [Black](https://black.readthedocs.io/en/stable/) `v23.0.0+` (uncompromising Python code formatter)
+
+**General:**
+
+- **Pre-commit Hooks:** [Husky](https://typicode.github.io/husky/) `v9.0.11` + [lint-staged](https://github.com/okonet/lint-staged)
+
 ### 6.1. Project Structure & Architecture
 
 Document your project's directory structure and routing architecture following the official documentation and best practices of your chosen framework. This helps developers understand the codebase organization and navigate efficiently.
@@ -229,19 +246,148 @@ Explain how to execute the test scripts included in the project. This is vital f
   pnpm coverage
   ```
 
-### 10. Contributing
+### 10. Code Quality & Linting
+
+Maintain consistent code quality and formatting across the project with automated linting and formatting tools.
+
+#### Available Commands
+
+**JavaScript/TypeScript:**
+
+- **Lint all files:**
+  Check for code quality issues and potential errors.
+
+  ```sh
+  pnpm lint
+  ```
+
+- **Fix auto-fixable linting issues:**
+  Automatically resolve linting problems where possible.
+
+  ```sh
+  pnpm lint:fix
+  ```
+
+- **Format code with Prettier:**
+  Ensure consistent code formatting across the project.
+
+  ```sh
+  pnpm format
+  ```
+
+- **Check formatting without making changes:**
+  Verify if code follows formatting standards.
+
+  ```sh
+  pnpm format:check
+  ```
+
+- **Type checking:**
+  Run TypeScript compiler checks without emitting files.
+
+  ```sh
+  pnpm type-check
+  ```
+
+**Python:**
+
+- **Lint with Ruff:**
+  Check for code quality issues and potential errors.
+
+  ```sh
+  ruff check .
+  ```
+
+- **Fix auto-fixable Ruff issues:**
+  Automatically resolve linting problems where possible.
+
+  ```sh
+  ruff check --fix .
+  ```
+
+- **Format code with Black:**
+  Ensure consistent Python code formatting.
+
+  ```sh
+  black .
+  ```
+
+- **Check Black formatting without making changes:**
+  Verify if code follows Black formatting standards.
+
+  ```sh
+  black --check .
+  ```
+
+#### Pre-commit Hooks
+
+This project uses Husky and lint-staged to automatically run linting and formatting on staged files before each commit:
+
+**JavaScript/TypeScript:**
+
+- **ESLint** checks for code quality issues
+- **Prettier** formats code consistently
+- **TypeScript** validates type safety
+
+**Python:**
+
+- **Ruff** checks for code quality issues and applies auto-fixes
+- **Black** formats Python code consistently
+
+If any issues are found, the commit will be blocked until they're resolved.
+
+#### IDE Setup _(Optional but Recommended)_
+
+For the best development experience, configure your IDE with the following extensions:
+
+**VS Code:**
+
+**JavaScript/TypeScript:**
+
+- [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
+- [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+- [TypeScript Importer](https://marketplace.visualstudio.com/items?itemName=pmneo.tsimporter)
+
+**Python:**
+
+- [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
+- [Black Formatter](https://marketplace.visualstudio.com/items?itemName=ms-python.black-formatter)
+- [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
+
+**Settings (`.vscode/settings.json`):**
+
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true,
+    "source.organizeImports": true
+  },
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": true,
+      "source.organizeImports.ruff": true
+    }
+  }
+}
+```
+
+### 11. Contributing
 
 Encourage collaboration by providing clear guidelines. It's best practice to link to a more detailed `CONTRIBUTING.md` file.
 
 Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**. Please read our [Contributing Guidelines](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
-### 11. License
+### 12. License
 
 State the project's license so that users know how they are permitted to use it.
 
 This project is licensed under the MIT License - see the [LICENSE.md](./LICENSE) file for details.
 
-### 12. Authors & Acknowledgments
+### 13. Authors & Acknowledgments
 
 Give credit where it's due.
 

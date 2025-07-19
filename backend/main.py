@@ -1,6 +1,7 @@
 """
-main.py
-This file sets up the FastAPI application.
+System: Suno Automation Backend
+Module: main
+Purpose: Main FastAPI application setup, including routing, middleware, and API endpoints for song generation and related functionalities.
 """
 
 from fastapi import FastAPI
@@ -24,6 +25,17 @@ app.add_middleware(
 
 
 class SongRequest(BaseModel):
+    """
+    Represents a request to generate or download a song.
+
+    Attributes:
+        strBookName (str): The name of the book.
+        intBookChapter (int): The chapter number within the book.
+        strVerseRange (str): The range of verses to consider.
+        strStyle (str): The desired style for the song.
+        strTitle (str): The title of the song.
+    """
+
     strBookName: str
     intBookChapter: int
     strVerseRange: str
@@ -32,6 +44,15 @@ class SongRequest(BaseModel):
 
 
 class SongStructureRequest(BaseModel):
+    """
+    Represents a request to generate a song structure.
+
+    Attributes:
+        strBookName (str): The name of the book.
+        intBookChapter (int): The chapter number within the book.
+        strVerseRange (str): The range of verses to consider.
+    """
+
     strBookName: str
     intBookChapter: int
     strVerseRange: str
@@ -39,11 +60,25 @@ class SongStructureRequest(BaseModel):
 
 @app.get("/")
 def read_root():
+    """
+    Root endpoint to check if the server is running.
+
+    Returns:
+        dict: A message indicating the server is working.
+    """
     return {"message": "server working"}
 
 
 @app.get("/login")
 async def login_endpoint():
+    """
+    Initiates the Suno login process.
+
+    This endpoint calls the `login_suno` function to authenticate with Suno.
+
+    Returns:
+        dict: A dictionary indicating the success status of the login attempt.
+    """
     from utils.suno_functions import login_suno
 
     is_successful = await login_suno()
@@ -52,6 +87,15 @@ async def login_endpoint():
 
 @app.get("/login/microsoft")
 async def login_with_microsoft_endpoint():
+    """
+    Handles login using Microsoft credentials.
+
+    This endpoint first calls `login_google` and then `suno_login_microsoft`
+    to authenticate via Microsoft.
+
+    Returns:
+        dict: A dictionary indicating the success status of the Microsoft login.
+    """
     from lib.login import login_google, suno_login_microsoft
 
     await login_google()
@@ -61,6 +105,21 @@ async def login_with_microsoft_endpoint():
 
 @app.post("/generate-verse-ranges")
 def generate_verse_ranges_endpoint(book_name: str, book_chapter: int):
+    """
+    Generates verse ranges for a given book and chapter.
+
+    This endpoint takes a book name and chapter number, then uses an AI function
+    to generate corresponding verse ranges. It includes error handling for
+    unexpected issues during the generation process.
+
+    Args:
+        book_name (str): The name of the book (e.g., "Genesis").
+        book_chapter (int): The chapter number (e.g., 1).
+
+    Returns:
+        dict: A JSON response containing the success status, a message, and the
+              generated verse ranges, or an error message if an exception occurs.
+    """
     from utils.ai_functions import generate_verse_ranges
 
     try:
@@ -84,6 +143,20 @@ def generate_verse_ranges_endpoint(book_name: str, book_chapter: int):
 
 @app.get("/get-verse-ranges")
 def get_verse_ranges_endpoint(book_name: str, book_chapter: int):
+    """
+    Retrieves pre-generated verse ranges for a given book and chapter.
+
+    This endpoint fetches verse ranges from a data source using the provided
+    book name and chapter number. It handles potential errors during retrieval.
+
+    Args:
+        book_name (str): The name of the book (e.g., "Genesis").
+        book_chapter (int): The chapter number (e.g., 1).
+
+    Returns:
+        dict: A JSON response containing the success status, a message, and the
+              retrieved verse ranges, or an error message if an exception occurs.
+    """
     from utils.ai_functions import get_verse_ranges
 
     try:
@@ -99,6 +172,19 @@ def get_verse_ranges_endpoint(book_name: str, book_chapter: int):
 
 @app.post("/generate-song-structure")
 async def generate_song_structure_endpoint(request: SongStructureRequest):
+    """
+    Generates a song structure based on book, chapter, and verse range.
+
+    This endpoint takes a `SongStructureRequest` object and uses an AI function
+    to generate a song structure. It logs the process and handles potential errors.
+
+    Args:
+        request (SongStructureRequest): The request object containing book details.
+
+    Returns:
+        dict: A JSON response with the success status, a message, and the generated
+              song structure, or an error message if an exception occurs.
+    """
     print(
         f"[generate_song_structure_endpoint()] Generating song structure for {request.strBookName} chapter {request.intBookChapter}"
     )
@@ -126,6 +212,21 @@ async def generate_song_structure_endpoint(request: SongStructureRequest):
 
 @app.post("/download-song")
 async def download_song_endpoint(request: SongRequest):
+    """
+    Downloads songs based on the provided song request details.
+
+    This endpoint uses a browser automation tool (`AsyncCamoufox`) to download
+    songs. It iterates through a predefined range of song indices, attempting
+    to download each song. It returns a summary of the download results.
+
+    Args:
+        request (SongRequest): The request object containing song details like title.
+
+    Returns:
+        dict: A JSON response indicating the overall success, a message, and
+              detailed results for each song download attempt. Handles potential
+              errors during the download process.
+    """
 
     try:
         from utils.suno_functions import download_song_with_page, AsyncCamoufox, config
@@ -197,6 +298,18 @@ async def download_song_endpoint(request: SongRequest):
 
 @app.get("/debug/song-structures")
 def debug_song_structures_endpoint():
+    """
+    Debug endpoint to retrieve and display song structures from the database.
+
+    This endpoint queries the 'song_structure_tbl' table in the Supabase database
+    and returns the found records. It includes error handling for database
+    retrieval issues.
+
+    Returns:
+        dict: A JSON response with the success status, a message indicating the
+              number of song structures found, and the data itself, or an error
+              message if retrieval fails.
+    """
     """Debug endpoint to see what song structures are available in the database"""
     try:
         from lib.supabase import supabase
