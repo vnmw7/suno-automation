@@ -43,6 +43,9 @@ suno-automation/
 ├── backend/               # FastAPI backend
 │   ├── api/               # API routes
 │   ├── configs/           # Configuration files
+│   ├── services/              # <--- NEW: For business logic and external services
+│   │   ├── __init__.py
+│   │   └── supabase_service.py # <--- ALL your Supabase logic goes here
 │   ├── tests/             # Directory for all tests
 │   │   ├── conftest.py    # Shared pytest fixtures for the backend
 │   │   ├── test_api/
