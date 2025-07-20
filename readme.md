@@ -53,7 +53,7 @@ suno-automation/
 │   ├── utils/             # Utility functions
 │   ├── uploads/
 │   │   ├── pending_review/
-│   │   └── approved/
+│   │   └── final_review/
 │   └── main.py            # Entry point
 ├── frontend/              # RemixJS frontend
 │   ├── app/               # Application code
