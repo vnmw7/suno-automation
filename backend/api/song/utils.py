@@ -10,7 +10,9 @@ import json
 import re
 import traceback
 import importlib.util
+import datetime  # Added for timestamp generation
 from typing import Dict, Any, Union
+from slugify import slugify  # Added for filename sanitization
 from camoufox import AsyncCamoufox
 from playwright.async_api import expect
 from configs.browser_config import config
@@ -661,7 +663,9 @@ async def download_song_handler(
                     await last_song_locator.wait_for(state="visible", timeout=45000)
                     print("Song list appears to be loaded. Proceeding...")
                 except Exception as e:
-                    raise Exception(f"Timed out waiting for song list to become visible: {e}")
+                    raise Exception(
+                        f"Timed out waiting for song list to become visible: {e}"
+                    )
 
                 # Find song elements with enhanced error handling
                 print(f"Searching for songs with title: '{strTitle}'")
@@ -907,11 +911,14 @@ async def download_song_handler(
                     download = await download_info.value
 
                     if download:
-                        # Generate sanitized filename
-                        sanitized_title = re.sub(r'[<>:"/\\|?*]', "-", strTitle)
-                        filename = (
-                            f"{sanitized_title.replace(' ', '_')}_index_{intIndex}.mp3"
-                        )
+                        # 1. Use slugify for robust, clean title sanitization
+                        slug_title = slugify(strTitle)
+
+                        # 2. Generate a compact, numeric timestamp
+                        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+
+                        # 3. Construct the final filename with timestamp suffix
+                        filename = f"{slug_title}_index_{intIndex}_{timestamp}.mp3"
                         final_file_path = os.path.join(download_path, filename)
 
                         # Save the download
