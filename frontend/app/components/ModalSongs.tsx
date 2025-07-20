@@ -4,10 +4,13 @@ import {
   generateSongStructure as callGenerateSongStructureAPI,
   fetchSongStructures,
   fetchStyles,
-  calldownloadSongAPI,
+  downloadSongAPI,
+  reviewSongAPI,
   fetchSongFilesFromPublic,
   type SongStructure,
   type Style,
+  type SongDownloadRequest,
+  type SongReviewRequest,
 } from "../lib/api";
 
 const SONG_DIRECTORY = "/songs";
@@ -164,31 +167,89 @@ const ModalSongs = ({
 
       console.log("Sending request payload:", requestPayload);
 
+      // Step 1: Generate the song
       const result = await callGenerateSongAPI(requestPayload);
 
-      if (result.success) {
-        setMessage(
-          `Song with style '${selectedStyle}' generated successfully!`
-        );
-        console.log("Song generation result:", result.result);
-      } else {
+      if (!result.success) {
         setError(result.error || result.message || "Failed to generate song");
+        return;
       }
 
-      console.log("Downloading songs:", requestPayload);
+      setMessage(`Song with style '${selectedStyle}' generated successfully! Starting download...`);
+      console.log("Song generation result:", result.result);
 
+      // Step 2: Wait for generation to complete (3 minutes)
+      setMessage(`Song generated! Waiting for processing to complete...`);
       await new Promise((resolve) => setTimeout(resolve, 3 * 60 * 1000));
 
-      const downloadResult = await calldownloadSongAPI(requestPayload);
+      // Step 3: Download the song using the new downloadSongAPI
+      setMessage(`Downloading song...`);
+      const downloadRequest: SongDownloadRequest = {
+        strTitle: title,
+        intIndex: 1, // Default to index 1, could be made configurable
+        download_path: undefined // Let the backend use default path
+      };
 
-      if (downloadResult.success) {
-        setMessage(
-          `Song with style '${selectedStyle}' generated successfully!`
-        );
-        console.log("Song generation result:", downloadResult.result);
-      } else {
-        setError(downloadResult.error || downloadResult.message || "Failed to generate song");
+      const downloadResult = await downloadSongAPI(downloadRequest);
+
+      if (!downloadResult.success) {
+        setError(downloadResult.error || "Failed to download song");
+        return;
       }
+
+      console.log("Song download result:", downloadResult);
+      setMessage(`Song downloaded successfully! Starting review...`);
+
+      // Step 4: Review the downloaded song
+      if (downloadResult.file_path && songStructures.length > 0) {
+        const reviewRequest: SongReviewRequest = {
+          audio_file_path: downloadResult.file_path,
+          song_structure_id: songStructures[0].id
+        };
+
+        const reviewResult = await reviewSongAPI(reviewRequest);
+        
+        if (reviewResult.success) {
+          console.log("Song review result:", reviewResult);
+          
+          // Handle different review verdicts
+          switch (reviewResult.verdict) {
+            case "continue":
+              setMessage(`Song generated and reviewed successfully! Quality check passed. The song is ready for use.`);
+              break;
+            case "re-roll":
+              setMessage(`Song generated but review suggests regeneration. You may want to try generating again with different parameters.`);
+              break;
+            case "error":
+              setError(`Song review encountered an error: ${reviewResult.error || "Unknown review error"}`);
+              break;
+            default:
+              setMessage(`Song generated and downloaded successfully! Review completed with verdict: ${reviewResult.verdict}`);
+          }
+          
+          // Log review responses for debugging
+          if (reviewResult.first_response) {
+            console.log("Review first response:", reviewResult.first_response);
+          }
+          if (reviewResult.second_response) {
+            console.log("Review second response:", reviewResult.second_response);
+          }
+        } else {
+          // Review failed, but song was still downloaded successfully
+          setMessage(`Song downloaded successfully, but review failed: ${reviewResult.error || "Unknown review error"}`);
+          console.error("Review error:", reviewResult.error);
+        }
+      } else {
+        // No file path or song structures for review, but download was successful
+        setMessage(`Song downloaded successfully! Review skipped (missing file path or song structure).`);
+      }
+
+      // Refresh the song files list to show the new song
+      const songFilesResponse = await fetchSongFilesFromPublic(bookName, chapter, range);
+      if (songFilesResponse.success && songFilesResponse.result) {
+        setSongFiles(songFilesResponse.result);
+      }
+
     } catch (err) {
       setError("An unexpected error occurred");
       console.error("Error generating song:", err);
