@@ -620,7 +620,7 @@ async def download_song_handler(
             user_data_dir="backend/camoufox_session_data",
             os=("windows"),
             config=config,
-            humanize=True,
+            humanize=False,
             i_know_what_im_doing=True,
         ) as browser:
             page = await browser.new_page()
