@@ -16,6 +16,7 @@ from slugify import slugify  # Added for filename sanitization
 from camoufox import AsyncCamoufox
 from playwright.async_api import expect
 from configs.browser_config import config
+from services.supabase_service import SupabaseService
 
 # Import supabase
 lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "lib"))
@@ -324,7 +325,7 @@ async def generate_song(
 
 
 async def review_song_with_ai(
-    audio_file_path: str, song_structure: Dict[str, Any]
+    audio_file_path: str, song_structure_id: int
 ) -> Dict[str, Any]:
     """Reviews a generated song using Google AI Studio for quality assurance.
 
@@ -353,6 +354,69 @@ async def review_song_with_ai(
                 "error": f"Audio file not found at path: {audio_file_path}",
                 "verdict": "error",
             }
+
+        # Fetch song data using SupabaseService
+        service = SupabaseService()
+        try:
+            song_data = service.get_song_with_lyrics(song_structure_id)
+            if not song_data or not song_data.get('lyrics'):
+                return {
+                    "success": False,
+                    "error": f"No lyrics data found for song_structure_id: {song_structure_id}",
+                    "verdict": "error",
+                }
+            
+            # Extract original song structure from song_structure_tbl
+            original_song_structure = song_data['song_structure']
+            if not original_song_structure or not original_song_structure.get('song_structure'):
+                return {
+                    "success": False,
+                    "error": f"No song_structure found for song_structure_id: {song_structure_id}",
+                    "verdict": "error",
+                }
+            
+            # Parse the original song_structure JSON if it's a string
+            song_structure = original_song_structure['song_structure']
+            if isinstance(song_structure, str):
+                try:
+                    # Handle potential escape sequence issues in JSON
+                    cleaned_json = song_structure.replace('\\', '\\\\')
+                    song_structure = json.loads(cleaned_json)
+                except json.JSONDecodeError as e:
+                    # Try alternative parsing methods
+                    try:
+                        # Try raw string parsing
+                        song_structure = json.loads(song_structure.encode().decode('unicode_escape'))
+                    except (json.JSONDecodeError, UnicodeDecodeError) as e2:
+                        return {
+                            "success": False,
+                            "error": f"Failed to parse song_structure JSON: {e}. Alternative method also failed: {e2}",
+                            "verdict": "error",
+                        }
+            
+            # Get the most recent lyrics entry (first in the list since ordered by created_at DESC)
+            latest_lyrics = song_data['lyrics'][0]
+            pg1_lyrics = latest_lyrics.get('pg1_lyrics')
+            
+            if not pg1_lyrics:
+                return {
+                    "success": False,
+                    "error": f"No pg1_lyrics found for song_structure_id: {song_structure_id}",
+                    "verdict": "error",
+                }
+            
+            # If pg1_lyrics is a JSON string, parse it with robust error handling
+            if isinstance(pg1_lyrics, str):
+                try:
+                    # Try to parse as JSON (in case it contains structured data)
+                    parsed_lyrics = json.loads(pg1_lyrics)
+                    pg1_lyrics = parsed_lyrics
+                except json.JSONDecodeError:
+                    # If it's not JSON, treat as plain text (which is expected for lyrics)
+                    pass
+        
+        finally:
+            service.close_connection()
 
         async with AsyncCamoufox(
             headless=False,
@@ -469,14 +533,12 @@ async def review_song_with_ai(
                 )
                 await prompt_textarea.wait_for(state="visible", timeout=20000)
 
-                # Format song structure for comparison
-                formatted_lyrics = _format_song_structure_for_prompt(song_structure)
-
                 second_prompt = f"""You are our primary proofreader, and we need to confirm the AI has not made any mistakes with our lyrics while singing. Below, I will give you the intended lyrics for the song, please compare them to the lyrics you transcribed above for inaccuracies.
 
-Converted song structure verses: {song_structure}
+Original song structure: {song_structure}
 
-{formatted_lyrics}
+Actual lyrics used in generation:
+{pg1_lyrics}
 
 We are looking for things that don't match which indicates the song must be deleted and remade. Our goal is to go verse by verse and stay perfectly in order without skipping or adjusting or repeating. If the song has adlibs near the start, this is acceptable. If the song repeats a single sentence or a few words directly after that sentence or phrase has been said, this is an acceptable creative decision. If the song fully completes the lyrics, any repetition that comes after is acceptable as long as the lyrics were completely sung through at least once fully in order. Since some words may not have been recognized by you, if you notice that a word is spelled differently, but with similar phonetics, assume that the word is correct and you just misheard before. Please tell me if the song needs to be deleted and remade, or if it is safe to keep.
 
@@ -531,36 +593,6 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
             "error": f"Review process failed: {str(e)}",
             "verdict": "error",
         }
-
-
-def _format_song_structure_for_prompt(song_structure: Dict[str, Any]) -> str:
-    """Formats song structure into a readable string for AI prompts.
-
-    Converts the structured song data into a plain text format suitable
-    for use in AI review prompts by organizing lyrics by section.
-
-    Args:
-        song_structure (Dict[str, Any]): Song structure containing:
-            - Section names as keys
-            - Dictionaries of verse numbers and lyrics as values
-
-    Returns:
-        str: Formatted lyrics string with section headers and verses
-    """
-    formatted_lines = []
-
-    for section_name, verses in song_structure.items():
-        formatted_lines.append(f"[{section_name}]:")
-
-        if isinstance(verses, dict):
-            for verse_num, lyrics in verses.items():
-                formatted_lines.append(lyrics.strip())
-        elif isinstance(verses, str):
-            formatted_lines.append(verses.strip())
-
-        formatted_lines.append("")  # Add blank line between sections
-
-    return "\n".join(formatted_lines)
 
 
 async def download_song_handler(

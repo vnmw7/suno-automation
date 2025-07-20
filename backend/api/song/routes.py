@@ -18,8 +18,7 @@ class SongReviewRequest(BaseModel):
     """Request model for reviewing a song."""
 
     audio_file_path: str
-    song_structure: Dict[str, Any]
-    title: Optional[str] = None
+    song_structure_id: int
 
 
 class SongRequest(BaseModel):
@@ -209,9 +208,9 @@ async def review_song_endpoint(request: SongReviewRequest):
         if not request.audio_file_path:
             raise HTTPException(status_code=400, detail="Audio file path is required")
 
-        # Validate song structure
-        if not request.song_structure:
-            raise HTTPException(status_code=400, detail="Song structure is required")
+        # Validate song structure ID
+        if not request.song_structure_id:
+            raise HTTPException(status_code=400, detail="Song structure ID is required")
 
         # Check if audio file exists
         if not os.path.exists(request.audio_file_path):
@@ -227,7 +226,7 @@ async def review_song_endpoint(request: SongReviewRequest):
         # Perform the AI review
         review_result = await review_song_with_ai(
             audio_file_path=request.audio_file_path,
-            song_structure=request.song_structure,
+            song_structure_id=request.song_structure_id,
         )
 
         if not review_result["success"]:
