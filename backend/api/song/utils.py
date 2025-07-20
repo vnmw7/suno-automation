@@ -918,7 +918,6 @@ async def download_song_handler(
                         await download.save_as(final_file_path)
                         download_successful = True
                         print(f"Download completed successfully: {final_file_path}")
-                        raise Exception("Download object was None")
 
                 except Exception as download_error:
                     raise Exception(f"Download process failed: {download_error}")
