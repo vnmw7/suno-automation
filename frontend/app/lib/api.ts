@@ -27,6 +27,35 @@ export interface SongStructureResult {
   styles?: string[];
 }
 
+// New interfaces for download and review endpoints
+export interface SongDownloadRequest {
+  strTitle: string;
+  intIndex: number;
+  download_path?: string;
+}
+
+export interface SongDownloadResponse {
+  success: boolean;
+  file_path?: string;
+  error?: string;
+  song_title: string;
+  song_index: number;
+}
+
+export interface SongReviewRequest {
+  audio_file_path: string;
+  song_structure_id: number;
+}
+
+export interface SongReviewResponse {
+  success: boolean;
+  verdict: string;  // "continue", "re-roll", or "error"
+  first_response?: string;
+  second_response?: string;
+  error?: string;
+  audio_file?: string;
+}
+
 export interface SongResponse {
   success: boolean;
   message: string;
@@ -273,6 +302,77 @@ export const calldownloadSongAPI = async (
       success: false,
       message: "Failed to download song",
       error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+};
+
+// New API functions for download and review endpoints
+export const downloadSongAPI = async (
+  request: SongDownloadRequest
+): Promise<SongDownloadResponse> => {
+  try {
+    console.log("API request payload for /song/download:", request);
+
+    const response = await fetch(`${API_BASE_URL}/song/download/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    console.log("Download-song response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error response from /song/download:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log("Download-song API response data:", data);
+    return data;
+  } catch (error) {
+    console.error("Error downloading song:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      song_title: request.strTitle,
+      song_index: request.intIndex,
+    };
+  }
+};
+
+export const reviewSongAPI = async (
+  request: SongReviewRequest
+): Promise<SongReviewResponse> => {
+  try {
+    console.log("API request payload for /song/review:", request);
+
+    const response = await fetch(`${API_BASE_URL}/song/review/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    console.log("Review-song response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error response from /song/review:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log("Review-song API response data:", data);
+    return data;
+  } catch (error) {
+    console.error("Error reviewing song:", error);
+    return {
+      success: false,
+      verdict: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+      audio_file: request.audio_file_path,
     };
   }
 };
