@@ -6,7 +6,9 @@
         "mcp-server-git",
         "--repository",
         "C:\\projects\\suno-automation\\"
-      ]
+      ],
+      "disabled": false,
+      "alwaysAllow": []
     }
   }
 }
