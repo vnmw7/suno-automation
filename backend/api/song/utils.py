@@ -441,20 +441,6 @@ async def review_song_with_ai(
             await page.wait_for_timeout(2000)
             await page.wait_for_load_state("load")
 
-            # Login process
-            email_input = page.locator('input[type="email"]')
-            await email_input.wait_for(state="visible", timeout=10000)
-            await email_input.fill("pbNJ1sznC2Gr@gmail.com")
-            await page.keyboard.press("Enter")
-
-            password_input = page.locator('input[name="Passwd"]')
-            await password_input.wait_for(state="visible", timeout=10000)
-            await password_input.fill("&!8G26tlbsgO")
-            await page.keyboard.press("Enter")
-
-            await page.wait_for_url(
-                "https://aistudio.google.com/prompts/new_chat", timeout=20000
-            )
             await page.mouse.click(10, 10)
 
             # Wait for prompt textarea
