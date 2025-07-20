@@ -641,7 +641,7 @@ async def download_song_handler(
             humanize=False,
             i_know_what_im_doing=True,
         ) as browser:
-            page = await browser.new_page()
+            page = await browser.new_page(vanilla=True)
 
             try:
                 # Validate page is available
