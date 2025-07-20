@@ -14,7 +14,7 @@ import datetime  # Added for timestamp generation
 from typing import Dict, Any, Union
 from slugify import slugify  # Added for filename sanitization
 from camoufox import AsyncCamoufox
-from playwright.async_api import expect
+from playwright.async_api import expect, Page, Locator
 from configs.browser_config import config
 from services.supabase_service import SupabaseService
 
@@ -580,6 +580,53 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
             "verdict": "error",
         }
 
+async def teleport_click(page: Page, locator: Locator, button: str = "left", delay: int = 30):
+    """
+    Performs an instantaneous 'teleport' click by moving the mouse instantly
+    and then performing a down/up action. This avoids all visible mouse travel.
+
+    Args:
+        page (Page): The Playwright page object.
+        locator (Locator): The Playwright locator for the element to click.
+        button (str): 'left', 'right', or 'middle'. Defaults to 'left'.
+        delay (int): Milliseconds to wait between mouse down and up.
+    """
+    print(f"Performing teleport click on element.")
+    await locator.scroll_into_view_if_needed(timeout=10000)
+    box = await locator.bounding_box()
+    if not box:
+        raise Exception("Could not get bounding box for locator to perform teleport click.")
+
+    dest_x = box['x'] + box['width'] / 2
+    dest_y = box['y'] + box['height'] / 2
+
+    # 1. Move the mouse instantly to the target coordinates.
+    await page.mouse.move(dest_x, dest_y)
+    
+    # 2. Perform the click using low-level down/up events at the new location.
+    await page.mouse.down(button=button)
+    await page.wait_for_timeout(delay)  # A small delay makes the click more reliable
+    await page.mouse.up(button=button)
+    
+    print("Teleport click completed.")
+
+async def teleport_hover(page: Page, locator: Locator):
+    """
+    Performs an instantaneous 'teleport' hover by moving the mouse instantly
+    to the center of the target element.
+    """
+    print(f"Performing teleport hover on element.")
+    await locator.scroll_into_view_if_needed(timeout=10000)
+    box = await locator.bounding_box()
+    if not box:
+        raise Exception("Could not get bounding box for locator to perform teleport hover.")
+    
+    dest_x = box['x'] + box['width'] / 2
+    dest_y = box['y'] + box['height'] / 2
+
+    # Instantly move the mouse to the target coordinates.
+    await page.mouse.move(dest_x, dest_y)
+    print("Teleport hover completed.")
 
 async def download_song_handler(
     strTitle: str, intIndex: int, download_path: str
@@ -638,10 +685,10 @@ async def download_song_handler(
             user_data_dir="backend/camoufox_session_data",
             os=("windows"),
             config=config,
-            humanize=False,
+            humanize=True,
             i_know_what_im_doing=True,
         ) as browser:
-            page = await browser.new_page(vanilla=True)
+            page = await browser.new_page()
 
             try:
                 # Validate page is available
@@ -785,8 +832,7 @@ async def download_song_handler(
 
                 # Right-click to open context menu
                 print(f"Right-clicking on song at index {intIndex}...")
-                await target_song.click(button="right", timeout=20000)
-                print("Right-click completed successfully")
+                await teleport_click(page, target_song, button="right")
 
                 await page.wait_for_timeout(1000)
 
@@ -836,8 +882,7 @@ async def download_song_handler(
                 if not download_trigger:
                     raise Exception("Download option not found in context menu")
 
-                await download_trigger.hover(timeout=5000)
-                print("Hovered over download trigger")
+                await teleport_hover(page, download_trigger)
                 await page.wait_for_timeout(1000)
 
                 # Wait for download submenu panel
@@ -899,8 +944,9 @@ async def download_song_handler(
 
                 try:
                     async with page.expect_download(timeout=60000) as download_info:
-                        await mp3_option.click(timeout=15000)
-                        print("Clicked MP3 Audio option")
+                        print("Starting download with teleport click...")
+                        await teleport_click(page, mp3_option)
+                        print("Clicked MP3 Audio option with teleport click.")
 
                         # Check for "Download Anyway" button (premium content warning)
                         try:
@@ -916,8 +962,8 @@ async def download_song_handler(
                                     await anyway_btn.wait_for(
                                         state="visible", timeout=10000
                                     )
-                                    await anyway_btn.click(timeout=8000)
-                                    print("Clicked 'Download Anyway' button")
+                                    await teleport_click(page, anyway_btn)
+                                    print("Clicked 'Download Anyway' button with teleport click.")
                                     break
                                 except Exception:
                                     continue
