@@ -17,7 +17,7 @@ with Camoufox(
     main_world_eval=True,
     geoip=True,
 ) as browser:
-    page = browser.new_page(locale="en-US")
+    page = browser.new_page()
     page.goto(
         "https://aistudio.google.com/prompts/new_chat",
         wait_until="domcontentloaded",

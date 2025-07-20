@@ -429,7 +429,7 @@ async def review_song_with_ai(
             geoip=True,
             i_know_what_im_doing=True,
         ) as browser:
-            page = await browser.new_page(locale="en-US")
+            page = await browser.new_page()
 
             # Navigate to AI Studio
             await page.goto(
