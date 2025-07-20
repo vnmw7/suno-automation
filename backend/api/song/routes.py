@@ -6,7 +6,7 @@ Purpose: Defines the API routes for song-related operations, including generatio
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Optional
 import traceback
 import os
 from .utils import review_song_with_ai, generate_song_handler, download_song_handler
