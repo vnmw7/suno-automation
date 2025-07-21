@@ -12,11 +12,10 @@ import traceback
 import importlib.util
 import datetime  # Added for timestamp generation
 import aiohttp
-import asyncio
 from typing import Dict, Any, Union, Optional
 from slugify import slugify  # Added for filename sanitization
 from camoufox import AsyncCamoufox
-from playwright.async_api import expect, Page, Locator
+from playwright.async_api import Page, Locator
 from configs.browser_config import config
 from services.supabase_service import SupabaseService
 
@@ -698,7 +697,7 @@ async def teleport_click(page: Page, locator: Locator, button: str = "left", del
         button (str): 'left', 'right', or 'middle'. Defaults to 'left'.
         delay (int): Milliseconds to wait between mouse down and up.
     """
-    print(f"Performing teleport click on element.")
+    print("Performing teleport click on element.")
     await locator.scroll_into_view_if_needed(timeout=10000)
     box = await locator.bounding_box()
     if not box:
@@ -722,7 +721,7 @@ async def teleport_hover(page: Page, locator: Locator):
     Performs an instantaneous 'teleport' hover by moving the mouse instantly
     to the center of the target element.
     """
-    print(f"Performing teleport hover on element.")
+    print("Performing teleport hover on element.")
     await locator.scroll_into_view_if_needed(timeout=10000)
     box = await locator.bounding_box()
     if not box:
