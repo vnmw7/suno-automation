@@ -38,14 +38,24 @@ GOOGLE_AI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
 
 async def upload_file_to_google_ai(file_path: str, api_key: str) -> Optional[Dict[str, Any]]:
-    """Upload a file to Google AI Files API.
-    
+    """
+    Uploads a file to Google AI Files API using resumable upload protocol.
+
+    This function handles the entire upload process including:
+    1. Initializing the resumable upload session
+    2. Uploading the file content
+    3. Finalizing the upload
+
     Args:
-        file_path (str): Path to the file to upload
-        api_key (str): Google AI API key
-        
+        file_path (str): Absolute path to the file to upload
+        api_key (str): Google AI API key for authentication
+
     Returns:
-        Optional[Dict[str, Any]]: File metadata including URI if successful, None otherwise
+        Optional[Dict[str, Any]]: Dictionary containing file metadata (name, uri, mimeType)
+        on success, None on failure
+
+    Raises:
+        None: Errors are caught and logged internally
     """
     try:
         # Get file info
@@ -111,17 +121,26 @@ async def send_prompt_to_google_ai(
     api_key: str = None,
     previous_messages: Optional[list] = None
 ) -> Optional[str]:
-    """Send a prompt to Google AI API with optional file attachment.
-    
+    """
+    Sends a prompt to Google AI API with optional file attachment and conversation history.
+
+    This function constructs a request to Google's Gemini model that may include:
+    - Text prompts
+    - Attached files (audio/images)
+    - Conversation history for contextual interactions
+
     Args:
-        prompt (str): The prompt text to send
-        file_uri (str, optional): URI of uploaded file
-        mime_type (str, optional): MIME type of the file
-        api_key (str): Google AI API key
-        previous_messages (list, optional): Previous conversation messages
-        
+        prompt (str): Text prompt to send to the AI model
+        file_uri (str, optional): URI of previously uploaded file for multimodal input
+        mime_type (str, optional): MIME type of attached file (required if file_uri provided)
+        api_key (str): Google AI API key for authentication
+        previous_messages (list, optional): Conversation history in Google AI format
+
     Returns:
-        Optional[str]: AI response text if successful, None otherwise
+        Optional[str]: AI-generated text response on success, None on failure
+
+    Raises:
+        None: Errors are caught and logged internally
     """
     try:
         async with aiohttp.ClientSession() as session:
@@ -196,26 +215,31 @@ async def generate_song_handler(
     strStyle: str,
     strTitle: str,
 ) -> Dict[str, Any]:
-    """Handles song generation requests by coordinating with Suno API.
+    """
+    Coordinates the song generation workflow by validating inputs and calling generate_song.
 
-    This function serves as the primary handler for song generation requests.
-    It validates input parameters and delegates the song creation process to
-    the generate_song function.
+    This is the primary entry point for song generation requests. It ensures:
+    - All required parameters are present
+    - Input values meet expected formats
+    - Errors are caught and properly handled
 
     Args:
-        strBookName (str): Name of the Bible book (e.g., "Genesis", "Exodus")
-        intBookChapter (int): Chapter number within the specified book
-        strVerseRange (str): Verse range to include in the song (e.g., "1-5")
-        strStyle (str): Musical style/genre for the song (e.g., "Pop", "Rock")
+        strBookName (str): Canonical Bible book name (e.g., "Genesis", "Exodus")
+        intBookChapter (int): Chapter number (1-indexed)
+        strVerseRange (str): Verse range in format "start-end" (e.g., "1-5")
+        strStyle (str): Musical style/genre (e.g., "Pop", "Rock")
         strTitle (str): Title for the generated song
 
     Returns:
-        Dict[str, Any]: Dictionary containing:
-            - 'success': Boolean indicating operation success
-            - 'song_id': ID of the generated song (if successful)
-            - 'lyrics': Lyrics used for song generation
-            - 'style': Musical style applied
-            - 'title': Song title
+        Dict[str, Any]: Result dictionary with:
+            - success (bool): Operation status
+            - song_id (str): Suno song ID if successful
+            - lyrics (str): Lyrics used in generation
+            - style (str): Applied musical style
+            - title (str): Song title
+
+    Raises:
+        ValueError: If inputs are invalid or song structure not found
     """
     return await generate_song(
         strBookName=strBookName,
@@ -233,29 +257,35 @@ async def generate_song(
     strStyle: str,
     strTitle: str,
 ) -> Union[Dict[str, Any], bool]:
-    """Generates a song using Suno's API by automating browser interactions.
+    """
+    Generates a song using Suno's API through automated browser interactions.
 
-    This function orchestrates the entire song generation process:
-    1. Retrieves song structure from the database
-    2. Converts the structure to lyrics
-    3. Automates the Suno website to create the song
-    4. Saves generation results to the database
+    This function handles the entire song creation workflow:
+    1. Fetches song structure from database
+    2. Converts structure to properly formatted lyrics
+    3. Automates Suno website to input song details
+    4. Initiates song creation
+    5. Captures and saves generated song metadata
 
     Args:
-        strBookName (str): Name of the Bible book
-        intBookChapter (int): Chapter number within the book
-        strVerseRange (str): Verse range to include in the song
-        strStyle (str): Musical style/genre for the song
-        strTitle (str): Title for the generated song
+        strBookName (str): Canonical Bible book name
+        intBookChapter (int): Chapter number (1-indexed)
+        strVerseRange (str): Verse range in "start-end" format
+        strStyle (str): Musical style/genre
+        strTitle (str): Song title
 
     Returns:
-        Union[Dict[str, Any], bool]: On success, returns dictionary with:
-            - 'success': True
-            - 'song_id': Generated song ID
-            - 'lyrics': Lyrics used
-            - 'style': Applied musical style
-            - 'title': Song title
-        On failure, returns False
+        Union[Dict[str, Any], bool]: On success: dictionary with:
+            - success (bool): True
+            - song_id (str): Suno-generated song ID
+            - lyrics (str): Lyrics used for generation
+            - style (str): Applied musical style
+            - title (str): Song title
+        On failure: False
+
+    Raises:
+        ValueError: If lyrics generation fails or inputs are invalid
+        Exception: For browser automation failures
     """
     from utils.converter import song_strcture_to_lyrics
 
@@ -487,24 +517,27 @@ async def generate_song(
 async def review_song_with_ai(
     audio_file_path: str, song_structure_id: int
 ) -> Dict[str, Any]:
-    """Reviews a generated song using Google AI API for quality assurance.
+    """
+    Reviews generated song quality using Google AI API in a two-step process.
 
-    This function performs a two-step review process:
-    1. Asks AI to transcribe and evaluate the audio for common issues
-    2. Compares transcribed lyrics with original structure for accuracy
+    Step 1: Audio transcription and initial quality assessment
+    Step 2: Comparison between transcribed lyrics and original structure
 
     Args:
-        audio_file_path (str): Path to the generated audio file
-        song_structure_id (int): ID of the song structure in the database
+        audio_file_path (str): Absolute path to generated audio file (MP3/WAV)
+        song_structure_id (int): Database ID of song structure
 
     Returns:
-        Dict[str, Any]: Review results containing:
-            - 'success': Boolean indicating review process success
-            - 'error': Error message if review failed
-            - 'first_response': AI's initial transcription and evaluation
-            - 'second_response': AI's comparison with original lyrics
-            - 'verdict': Final quality verdict ('re-roll' or 'continue')
-            - 'audio_file': Path to reviewed audio file
+        Dict[str, Any]: Dictionary containing:
+            - success (bool): Review process completion status
+            - error (str): Error message if any step fails
+            - first_response (str): AI's initial transcription and evaluation
+            - second_response (str): Lyrics comparison results
+            - verdict (str): Final quality decision ('re-roll' or 'continue')
+            - audio_file (str): Path to reviewed audio file
+
+    Raises:
+        None: All exceptions are caught and returned in result dictionary
     """
     try:
         # Validate audio file exists
@@ -688,14 +721,21 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
 
 async def teleport_click(page: Page, locator: Locator, button: str = "left", delay: int = 30):
     """
-    Performs an instantaneous 'teleport' click by moving the mouse instantly
-    and then performing a down/up action. This avoids all visible mouse travel.
+    Performs instantaneous 'teleport' click without visible mouse movement.
+
+    This technique is useful for bypassing bot detection that monitors mouse movements.
+    It combines:
+    1. Instant mouse positioning
+    2. Programmatic click events
 
     Args:
-        page (Page): The Playwright page object.
-        locator (Locator): The Playwright locator for the element to click.
-        button (str): 'left', 'right', or 'middle'. Defaults to 'left'.
-        delay (int): Milliseconds to wait between mouse down and up.
+        page (Page): Playwright Page instance
+        locator (Locator): Playwright Locator for target element
+        button (str): Mouse button ('left'/'right'/'middle') - defaults to 'left'
+        delay (int): Milliseconds between mouse down/up events (default: 30ms)
+
+    Raises:
+        Exception: If bounding box can't be determined for element
     """
     print("Performing teleport click on element.")
     await locator.scroll_into_view_if_needed(timeout=10000)
@@ -718,8 +758,14 @@ async def teleport_click(page: Page, locator: Locator, button: str = "left", del
 
 async def teleport_hover(page: Page, locator: Locator):
     """
-    Performs an instantaneous 'teleport' hover by moving the mouse instantly
-    to the center of the target element.
+    Performs instantaneous 'teleport' hover without visible mouse movement.
+
+    Args:
+        page (Page): Playwright Page instance
+        locator (Locator): Playwright Locator for target element
+
+    Raises:
+        Exception: If bounding box can't be determined for element
     """
     print("Performing teleport hover on element.")
     await locator.scroll_into_view_if_needed(timeout=10000)
@@ -737,37 +783,31 @@ async def teleport_hover(page: Page, locator: Locator):
 async def download_song_handler(
     strTitle: str, intIndex: int, download_path: str
 ) -> Dict[str, Any]:
-    """Downloads a song from Suno by automating browser interactions.
+    """
+    Downloads a song from Suno.com using automated browser interactions.
 
-    This function provides an improved song download experience with enhanced
-    error handling, robust element finding, and configurable download paths.
-    It navigates to the user's Suno songs page, finds the target song by title
-    and index, and downloads it as MP3.
+    Features:
+    - Enhanced error handling for common failure points
+    - Robust element location with multiple fallback strategies
+    - Configurable download paths
+    - Duplicate song handling
+    - Premium content warning bypass
 
     Args:
-        strTitle (str): Title of the song to download (must match exactly)
-        intIndex (int): Index of the song to download. Positive values (1-based from start)
-                        are internally converted to negative indices for consistent processing.
-                        Negative values (-1 = last, -2 = second to last) are used directly.
-        download_path (str, optional): Directory to save the downloaded file.
-                                     Defaults to "backend/downloaded_songs"
+        strTitle (str): Exact title of song to download
+        intIndex (int): Song position (positive: 1-based from start, negative: from end)
+        download_path (str): Directory to save downloaded MP3
 
     Returns:
-        Dict[str, Any]: Download result containing:
-            - 'success': Boolean indicating download success
-            - 'file_path': Path to downloaded file (if successful)
-            - 'error': Error message (if failed)
-            - 'song_title': Title of the song
-            - 'song_index': Index used for download
+        Dict[str, Any]: Result dictionary with:
+            - success (bool): Download status
+            - file_path (str): Saved file path if successful
+            - error (str): Failure reason if applicable
+            - song_title (str): Original song title
+            - song_index (int): Original song index
 
-    Examples:
-        >>> result = await download_song_handler("Amazing Grace", 1)
-        >>> if result['success']:
-        ...     print(f"Downloaded to: {result['file_path']}")
-
-        >>> result = await download_song_handler("Psalm 23", -1, "custom/path")
-        >>> if not result['success']:
-        ...     print(f"Download failed: {result['error']}")
+    Note:
+        Uses 'teleport' techniques to bypass bot detection during interactions
     """
     result = {
         "success": False,
