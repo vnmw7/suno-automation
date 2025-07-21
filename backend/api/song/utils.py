@@ -11,7 +11,9 @@ import re
 import traceback
 import importlib.util
 import datetime  # Added for timestamp generation
-from typing import Dict, Any, Union
+import aiohttp
+import asyncio
+from typing import Dict, Any, Union, Optional
 from slugify import slugify  # Added for filename sanitization
 from camoufox import AsyncCamoufox
 from playwright.async_api import expect, Page, Locator
@@ -27,6 +29,165 @@ supabase_utils = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(supabase_utils)
 
 supabase = supabase_utils.supabase
+
+# Google AI API configuration
+GOOGLE_AI_API_KEY = os.getenv("GOOGLE_AI_API_KEY")
+if not GOOGLE_AI_API_KEY:
+    raise ValueError("GOOGLE_AI_API_KEY environment variable is required")
+
+GOOGLE_AI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+
+async def upload_file_to_google_ai(file_path: str, api_key: str) -> Optional[Dict[str, Any]]:
+    """Upload a file to Google AI Files API.
+    
+    Args:
+        file_path (str): Path to the file to upload
+        api_key (str): Google AI API key
+        
+    Returns:
+        Optional[Dict[str, Any]]: File metadata including URI if successful, None otherwise
+    """
+    try:
+        # Get file info
+        file_size = os.path.getsize(file_path)
+        file_name = os.path.basename(file_path)
+        
+        # Determine MIME type
+        mime_type = "audio/mpeg" if file_path.endswith(".mp3") else "audio/wav"
+        
+        async with aiohttp.ClientSession() as session:
+            # Step 1: Initialize resumable upload
+            init_url = f"{GOOGLE_AI_API_BASE}/files?key={api_key}"
+            init_headers = {
+                "X-Goog-Upload-Protocol": "resumable",
+                "X-Goog-Upload-Command": "start",
+                "X-Goog-Upload-Header-Content-Length": str(file_size),
+                "X-Goog-Upload-Header-Content-Type": mime_type,
+                "Content-Type": "application/json"
+            }
+            init_data = {
+                "file": {
+                    "display_name": file_name
+                }
+            }
+            
+            async with session.post(init_url, headers=init_headers, json=init_data) as resp:
+                if resp.status != 200:
+                    print(f"Failed to initialize upload: {resp.status}")
+                    return None
+                    
+                upload_url = resp.headers.get("X-Goog-Upload-URL")
+                if not upload_url:
+                    print("No upload URL received")
+                    return None
+            
+            # Step 2: Upload the file
+            upload_headers = {
+                "Content-Length": str(file_size),
+                "X-Goog-Upload-Offset": "0",
+                "X-Goog-Upload-Command": "upload, finalize"
+            }
+            
+            with open(file_path, "rb") as f:
+                file_data = f.read()
+                
+            async with session.put(upload_url, headers=upload_headers, data=file_data) as resp:
+                if resp.status != 200:
+                    print(f"Failed to upload file: {resp.status}")
+                    return None
+                    
+                result = await resp.json()
+                return result.get("file")
+                
+    except Exception as e:
+        print(f"Error uploading file to Google AI: {e}")
+        return None
+
+
+async def send_prompt_to_google_ai(
+    prompt: str, 
+    file_uri: Optional[str] = None,
+    mime_type: Optional[str] = None,
+    api_key: str = None,
+    previous_messages: Optional[list] = None
+) -> Optional[str]:
+    """Send a prompt to Google AI API with optional file attachment.
+    
+    Args:
+        prompt (str): The prompt text to send
+        file_uri (str, optional): URI of uploaded file
+        mime_type (str, optional): MIME type of the file
+        api_key (str): Google AI API key
+        previous_messages (list, optional): Previous conversation messages
+        
+    Returns:
+        Optional[str]: AI response text if successful, None otherwise
+    """
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"{GOOGLE_AI_API_BASE}/models/gemini-1.5-flash:generateContent?key={api_key}"
+            
+            # Build contents array
+            contents = []
+            
+            # Add previous messages if provided
+            if previous_messages:
+                contents.extend(previous_messages)
+            
+            # Build current message parts
+            parts = []
+            
+            # Add file if provided
+            if file_uri and mime_type:
+                parts.append({
+                    "file_data": {
+                        "mime_type": mime_type,
+                        "file_uri": file_uri
+                    }
+                })
+            
+            # Add text prompt
+            parts.append({"text": prompt})
+            
+            # Add current message
+            contents.append({
+                "role": "user",
+                "parts": parts
+            })
+            
+            # Prepare request data
+            data = {
+                "contents": contents,
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "topK": 40,
+                    "topP": 0.95,
+                    "maxOutputTokens": 8192,
+                }
+            }
+            
+            async with session.post(url, json=data) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    print(f"Failed to get AI response: {resp.status} - {error_text}")
+                    return None
+                    
+                result = await resp.json()
+                
+                # Extract text from response
+                if "candidates" in result and len(result["candidates"]) > 0:
+                    candidate = result["candidates"][0]
+                    if "content" in candidate and "parts" in candidate["content"]:
+                        parts = candidate["content"]["parts"]
+                        if len(parts) > 0 and "text" in parts[0]:
+                            return parts[0]["text"]
+                
+                return None
+                
+    except Exception as e:
+        print(f"Error sending prompt to Google AI: {e}")
+        return None
 
 
 async def generate_song_handler(
@@ -327,7 +488,7 @@ async def generate_song(
 async def review_song_with_ai(
     audio_file_path: str, song_structure_id: int
 ) -> Dict[str, Any]:
-    """Reviews a generated song using Google AI Studio for quality assurance.
+    """Reviews a generated song using Google AI API for quality assurance.
 
     This function performs a two-step review process:
     1. Asks AI to transcribe and evaluate the audio for common issues
@@ -335,7 +496,7 @@ async def review_song_with_ai(
 
     Args:
         audio_file_path (str): Path to the generated audio file
-        song_structure (Dict[str, Any]): Original song structure with lyrics
+        song_structure_id (int): ID of the song structure in the database
 
     Returns:
         Dict[str, Any]: Review results containing:
@@ -418,108 +579,63 @@ async def review_song_with_ai(
         finally:
             service.close_connection()
 
-        async with AsyncCamoufox(
-            headless=False,
-            persistent_context=True,
-            user_data_dir="backend/camoufox_session_data",
-            os=("windows"),
-            config=config,
-            humanize=True,
-            main_world_eval=True,
-            geoip=True,
-            i_know_what_im_doing=True,
-        ) as browser:
-            page = await browser.new_page()
-
-            # Navigate to AI Studio
-            await page.goto(
-                "https://aistudio.google.com/prompts/new_chat",
-                wait_until="domcontentloaded",
-                timeout=30000,
-            )
-
-            await page.wait_for_timeout(2000)
-            await page.wait_for_load_state("load")
-
-            await page.mouse.click(10, 10)
-
-            # Wait for prompt textarea
-            prompt_textarea_selector = 'textarea[aria-label="Type something or tab to choose an example prompt"]'
-            await page.locator(prompt_textarea_selector).wait_for(
-                state="visible", timeout=30000
-            )
-
-            # Upload audio file
-            add_button = page.locator(
-                'button[aria-label="Insert assets such as images, videos, files, or audio"]'
-            )
-            await add_button.wait_for(state="visible", timeout=10000)
-            await add_button.click()
-            await page.wait_for_timeout(1000)
-
-            try:
-                file_input_locator = page.locator('input[type="file"]')
-                await file_input_locator.wait_for(state="attached", timeout=5000)
-                await file_input_locator.set_input_files(audio_file_path)
-            except Exception as e:
-                return {
-                    "success": False,
-                    "error": f"Failed to upload audio file: {str(e)}",
-                    "verdict": "error",
-                }
-
-            # Handle acknowledge button if present
-            try:
-                acknowledge_bttn = page.locator('span:has-text("Acknowledge")')
-                await acknowledge_bttn.wait_for(state="visible", timeout=2000)
-                if await acknowledge_bttn.is_visible():
-                    await acknowledge_bttn.click()
-            except Exception:
-                pass  # Acknowledge button may not appear
-
-            # First prompt - transcription and initial review
-            prompt_textarea = page.locator(prompt_textarea_selector)
-            await prompt_textarea.wait_for(state="visible", timeout=5000)
-
-            first_prompt = """This is a song generated by AI and we need to check it's quality. The AI has a tendency of making a few common mistakes. Please write out the lyrics that you hear and note what is spoken and what is rapped, and what is sung. If the song is unclear or sounds messy and unmusical, the song needs to be deleted and remade. If it is more than 30% spoken it needs to be deleted and remade. If it cuts off abruptly and doesnt resolve naturally, it needs to be deleted and remade, and if the song feels like it ends, but then it picks back up again, it needs to be deleted and remade. Please write out the lyrics as requested and let me know if any red flags require the song to be deleted and remade. Don't attempt to recognize the lyrics source and infer what they should be, just write what you hear without inference or adjustment. If a word doesn't make sense, just spell it out phonetically. Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
-
-            await prompt_textarea.fill(first_prompt)
-
-            # Focus textarea and run first prompt
-            box = await prompt_textarea.bounding_box()
-            if box:
-                x = box["x"] + box["width"] / 2
-                y = box["y"] + box["height"] / 2
-                await page.mouse.click(x, y)
-
-            run_bttn = page.locator('button[aria-label="Run"]')
-            await expect(run_bttn).to_be_enabled(timeout=20000)
-
-            # Handle overlay if present
-            overlay_selector = "div.cdk-overlay-backdrop.cdk-overlay-transparent-backdrop.cdk-overlay-backdrop-showing"
-            overlay = page.locator(overlay_selector)
-            try:
-                await overlay.wait_for(state="hidden", timeout=10000)
-            except Exception:
-                await page.keyboard.press("Escape")
-                await page.wait_for_timeout(500)
-
-            await run_bttn.click(timeout=15000)
-            await page.wait_for_timeout(60000)
-
-            # Get first AI response
-            ai_response = page.locator("ms-text-chunk.ng-star-inserted").last
-            await ai_response.wait_for(state="visible", timeout=30000)
-            first_response = await ai_response.inner_text()
-
-            # Second prompt - compare with intended lyrics
-            try:
-                prompt_textarea = page.locator(
-                    'textarea[aria-label="Start typing a prompt"]'
-                )
-                await prompt_textarea.wait_for(state="visible", timeout=20000)
-
-                second_prompt = f"""You are our primary proofreader, and we need to confirm the AI has not made any mistakes with our lyrics while singing. Below, I will give you the intended lyrics for the song, please compare them to the lyrics you transcribed above for inaccuracies.
+        # Upload audio file to Google AI
+        print(f"Uploading audio file to Google AI: {audio_file_path}")
+        file_metadata = await upload_file_to_google_ai(audio_file_path, GOOGLE_AI_API_KEY)
+        
+        if not file_metadata:
+            return {
+                "success": False,
+                "error": "Failed to upload audio file to Google AI",
+                "verdict": "error",
+            }
+        
+        file_uri = file_metadata.get("uri")
+        mime_type = file_metadata.get("mimeType", "audio/mpeg")
+        print(f"File uploaded successfully. URI: {file_uri}")
+        
+        # First prompt - transcription and initial review
+        first_prompt = """This is a song generated by AI and we need to check it's quality. The AI has a tendency of making a few common mistakes. Please write out the lyrics that you hear and note what is spoken and what is rapped, and what is sung. If the song is unclear or sounds messy and unmusical, the song needs to be deleted and remade. If it is more than 30% spoken it needs to be deleted and remade. If it cuts off abruptly and doesnt resolve naturally, it needs to be deleted and remade, and if the song feels like it ends, but then it picks back up again, it needs to be deleted and remade. Please write out the lyrics as requested and let me know if any red flags require the song to be deleted and remade. Don't attempt to recognize the lyrics source and infer what they should be, just write what you hear without inference or adjustment. If a word doesn't make sense, just spell it out phonetically. Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
+        
+        print("Sending first prompt for transcription and initial review...")
+        first_response = await send_prompt_to_google_ai(
+            prompt=first_prompt,
+            file_uri=file_uri,
+            mime_type=mime_type,
+            api_key=GOOGLE_AI_API_KEY
+        )
+        
+        if not first_response:
+            return {
+                "success": False,
+                "error": "Failed to get first AI response",
+                "verdict": "error",
+            }
+        
+        print("First AI response received")
+        
+        # Prepare conversation history for second prompt
+        conversation_history = [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "file_data": {
+                            "mime_type": mime_type,
+                            "file_uri": file_uri
+                        }
+                    },
+                    {"text": first_prompt}
+                ]
+            },
+            {
+                "role": "model",
+                "parts": [{"text": first_response}]
+            }
+        ]
+        
+        # Second prompt - compare with intended lyrics
+        second_prompt = f"""You are our primary proofreader, and we need to confirm the AI has not made any mistakes with our lyrics while singing. Below, I will give you the intended lyrics for the song, please compare them to the lyrics you transcribed above for inaccuracies.
 
 Original song structure: {song_structure}
 
@@ -529,51 +645,42 @@ Actual lyrics used in generation:
 We are looking for things that don't match which indicates the song must be deleted and remade. Our goal is to go verse by verse and stay perfectly in order without skipping or adjusting or repeating. If the song has adlibs near the start, this is acceptable. If the song repeats a single sentence or a few words directly after that sentence or phrase has been said, this is an acceptable creative decision. If the song fully completes the lyrics, any repetition that comes after is acceptable as long as the lyrics were completely sung through at least once fully in order. Since some words may not have been recognized by you, if you notice that a word is spelled differently, but with similar phonetics, assume that the word is correct and you just misheard before. Please tell me if the song needs to be deleted and remade, or if it is safe to keep.
 
 Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
-
-                await prompt_textarea.fill(second_prompt)
-
-                run_bttn = page.locator('button[aria-label="Run"]')
-                await expect(run_bttn).to_be_enabled(timeout=20000)
-
-                # Handle overlay again
-                try:
-                    await overlay.wait_for(state="hidden", timeout=10000)
-                except Exception:
-                    await page.keyboard.press("Escape")
-                    await page.wait_for_timeout(500)
-
-                await run_bttn.click(timeout=15000)
-                await page.wait_for_timeout(60000)
-
-                # Get second AI response
-                ai_response = page.locator("ms-text-chunk.ng-star-inserted").last
-                await ai_response.wait_for(state="visible", timeout=30000)
-                second_response = await ai_response.inner_text()
-
-                # Determine final verdict
-                verdict = "continue"
-                if "[re-roll]" in second_response.lower():
-                    verdict = "re-roll"
-                elif "[continue]" in second_response.lower():
-                    verdict = "continue"
-
-                return {
-                    "success": True,
-                    "first_response": first_response,
-                    "second_response": second_response,
-                    "verdict": verdict,
-                    "audio_file": audio_file_path,
-                }
-
-            except Exception as e:
-                return {
-                    "success": False,
-                    "error": f"Second prompt failed: {str(e)}",
-                    "first_response": first_response,
-                    "verdict": "error",
-                }
+        
+        print("Sending second prompt for comparison with original lyrics...")
+        second_response = await send_prompt_to_google_ai(
+            prompt=second_prompt,
+            api_key=GOOGLE_AI_API_KEY,
+            previous_messages=conversation_history
+        )
+        
+        if not second_response:
+            return {
+                "success": False,
+                "error": "Failed to get second AI response",
+                "first_response": first_response,
+                "verdict": "error",
+            }
+        
+        print("Second AI response received")
+        
+        # Determine final verdict
+        verdict = "continue"
+        if "[re-roll]" in second_response.lower():
+            verdict = "re-roll"
+        elif "[continue]" in second_response.lower():
+            verdict = "continue"
+        
+        return {
+            "success": True,
+            "first_response": first_response,
+            "second_response": second_response,
+            "verdict": verdict,
+            "audio_file": audio_file_path,
+        }
 
     except Exception as e:
+        print(f"Review process failed: {str(e)}")
+        print(traceback.format_exc())
         return {
             "success": False,
             "error": f"Review process failed: {str(e)}",
