@@ -2,3 +2,4 @@
 .env
 __pycache__
 camoufox_session_data
+.log
