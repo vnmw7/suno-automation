@@ -26,6 +26,8 @@ class SongReviewResponse(BaseModel):
     second_response: Optional[str] = None
     error: Optional[str] = None
     audio_file: Optional[str] = None
+    deletion_message: Optional[str] = None
+    move_message: Optional[str] = None
 
 @router.post("/review/", response_model=SongReviewResponse)
 async def review_song_endpoint(request: SongReviewRequest):
@@ -75,7 +77,9 @@ async def review_song_endpoint(request: SongReviewRequest):
             verdict=review_result["verdict"],
             first_response=review_result.get("first_response"),
             second_response=review_result.get("second_response"),
-            audio_file=review_result.get("audio_file")
+            audio_file=review_result.get("audio_file"),
+            deletion_message=review_result.get("deletion_message"),
+            move_message=review_result.get("move_message")
         )
 
     except HTTPException:
