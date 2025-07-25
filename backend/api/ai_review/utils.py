@@ -49,7 +49,7 @@ async def upload_file_to_google_ai(file_path: str, api_key: str) -> Optional[Dic
         
         async with aiohttp.ClientSession() as session:
             # Step 1: Initialize resumable upload
-            init_url = f"{GOOGLE_AI_API_BASE}/files?key={api_key}"
+            init_url = f"https://generativelanguage.googleapis.com/upload/v1beta/files?key={api_key}"
             init_headers = {
                 "X-Goog-Upload-Protocol": "resumable",
                 "X-Goog-Upload-Command": "start",
@@ -126,7 +126,7 @@ async def send_prompt_to_google_ai(
     """
     try:
         async with aiohttp.ClientSession() as session:
-            url = f"{GOOGLE_AI_API_BASE}/models/gemini-1.5-flash:generateContent?key={api_key}"
+            url = f"{GOOGLE_AI_API_BASE}/models/gemini-2.5-pro:generateContent?key={api_key}"
             
             # Build contents array
             contents = []
