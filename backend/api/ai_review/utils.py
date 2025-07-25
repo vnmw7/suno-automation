@@ -8,6 +8,7 @@ import os
 import json
 import traceback
 import logging
+import shutil
 from typing import Dict, Any, Optional
 import aiohttp
 from services.supabase_service import SupabaseService
@@ -414,13 +415,54 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
         else:
             logger.warning("Verdict tag not found in response, defaulting to CONTINUE")
         
+        # Handle file operations based on verdict
+        deletion_message = None
+        move_message = None
+        new_audio_path = audio_file_path
+        
+        if verdict == "re-roll":
+            try:
+                if os.path.exists(audio_file_path):
+                    os.remove(audio_file_path)
+                    deletion_message = f"Deleted file: {audio_file_path}"
+                    logger.info(deletion_message)
+                    new_audio_path = None
+                else:
+                    deletion_message = f"File not found: {audio_file_path}"
+                    logger.warning(deletion_message)
+            except Exception as e:
+                deletion_message = f"Deletion failed: {str(e)}"
+                logger.error(deletion_message)
+                
+        elif verdict == "continue":
+            try:
+                base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+                target_dir = os.path.join(base_dir, "songs", "final_review")
+                os.makedirs(target_dir, exist_ok=True)
+                
+                if os.path.exists(audio_file_path):
+                    filename = os.path.basename(audio_file_path)
+                    new_path = os.path.join(target_dir, filename)
+                    shutil.move(audio_file_path, new_path)
+                    move_message = f"Moved file to: {new_path}"
+                    logger.info(move_message)
+                    new_audio_path = new_path
+                else:
+                    move_message = f"File not found: {audio_file_path}"
+                    logger.warning(move_message)
+            except Exception as e:
+                move_message = f"Move failed: {str(e)}"
+                logger.error(move_message)
+
         logger.info(f"Review completed for ID: {song_structure_id}")
         return {
             "success": True,
             "first_response": first_response,
             "second_response": second_response,
             "verdict": verdict,
-            "audio_file": audio_file_path,
+            "audio_file": new_audio_path,
+            "deletion_message": deletion_message,
+            "move_message": move_message
         }
 
     except Exception as e:
