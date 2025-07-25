@@ -9,11 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import traceback
 from api.song.routes import router as song_router
+from api.ai_review.routes import router as ai_review_router
 
 app = FastAPI()
 
 # Include routers
 app.include_router(song_router)
+app.include_router(ai_review_router)
 
 app.add_middleware(
     CORSMiddleware,
