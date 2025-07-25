@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from typing import Optional
 import traceback
 import os
-from .utils import review_song_with_ai, generate_song_handler, download_song_handler
+from .utils import generate_song_handler, download_song_handler
 
 router = APIRouter(prefix="/song", tags=["song"])
 
@@ -186,92 +186,3 @@ async def download_song_endpoint(request: SongDownloadRequest):
             status_code=500,
             detail=f"Internal server error during song download: {str(e)}",
         )
-
-
-@router.post("/review/", response_model=SongReviewResponse)
-async def review_song_endpoint(request: SongReviewRequest):
-    """
-    Review a song using AI to check for quality issues and lyric accuracy.
-
-    Args:
-        request: SongReviewRequest containing audio file path and song structure
-
-    Returns:
-        SongReviewResponse with review results and verdict
-    """
-    try:
-        print(
-            f"[review_song_endpoint] Starting review for audio file: {request.audio_file_path}"
-        )
-
-        # Validate audio file path
-        if not request.audio_file_path:
-            raise HTTPException(status_code=400, detail="Audio file path is required")
-
-        # Validate song structure ID
-        if not request.song_structure_id:
-            raise HTTPException(status_code=400, detail="Song structure ID is required")
-
-        # Check if audio file exists
-        if not os.path.exists(request.audio_file_path):
-            raise HTTPException(
-                status_code=404,
-                detail=f"Audio file not found at path: {request.audio_file_path}",
-            )
-
-        print(
-            "[review_song_endpoint] Audio file validated, starting AI review process..."
-        )
-
-        # Perform the AI review
-        review_result = await review_song_with_ai(
-            audio_file_path=request.audio_file_path,
-            song_structure_id=request.song_structure_id,
-        )
-
-        if not review_result["success"]:
-            print(
-                f"[review_song_endpoint] Review failed: {review_result.get('error', 'Unknown error')}"
-            )
-            return SongReviewResponse(
-                success=False,
-                verdict="error",
-                error=review_result.get("error", "Review process failed"),
-                audio_file=request.audio_file_path,
-            )
-
-        print(
-            f"[review_song_endpoint] Review completed successfully with verdict: {review_result['verdict']}"
-        )
-
-        return SongReviewResponse(
-            success=True,
-            verdict=review_result["verdict"],
-            first_response=review_result.get("first_response"),
-            second_response=review_result.get("second_response"),
-            audio_file=review_result.get("audio_file"),
-        )
-
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
-        raise
-    except Exception as e:
-        print(f"[review_song_endpoint] Critical error occurred: {e}")
-        print(traceback.format_exc())
-
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error during song review: {str(e)}",
-        )
-
-
-@router.get("/review/health")
-async def review_health_check():
-    """
-    Health check endpoint for the song review service.
-    """
-    return {
-        "status": "healthy",
-        "service": "song_review",
-        "message": "Song review service is operational",
-    }
