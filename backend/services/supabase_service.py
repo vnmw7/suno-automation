@@ -211,6 +211,32 @@ class SupabaseService:
             if cursor:
                 cursor.close()
 
+    def delete_song(self, song_structure_id: int) -> bool:
+        """
+        Deletes the song entry from tblprogress_v1 by song_structure_id.
+
+        Args:
+            song_structure_id (int): The song structure ID to delete.
+
+        Returns:
+            bool: True if deletion was successful, False otherwise.
+        """
+        # TODO: Consider adding transaction handling for atomic operations
+        # TODO: Should we also delete from song_structure_tbl to avoid orphaned structures?
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            query = "DELETE FROM tblprogress_v1 WHERE pg1_song_struct_id = %s"
+            cursor.execute(query, (song_structure_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error deleting song with structure_id {song_structure_id}: {e}")
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+
     def get_all_song_structures(self, limit: int = 100, offset: int = 0) -> List[Dict]:
         """
         Retrieve all song structures with pagination
