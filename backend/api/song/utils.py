@@ -338,65 +338,53 @@ async def generate_song(
         print(traceback.format_exc())
         return False
 
-async def teleport_click(page: Page, locator: Locator, button: str = "left", delay: int = 30):
+async def teleport_click(page: Page, locator: Locator, button: str = "left", delay: int = 50):
     """
-    Performs instantaneous 'teleport' click without visible mouse movement.
-
-    This technique is useful for bypassing bot detection that monitors mouse movements.
-    It combines:
-    1. Instant mouse positioning
-    2. Programmatic click events
+    Bypasses Camoufox's humanization by executing a direct JavaScript click.
+    This is a true, instantaneous "teleport" click.
 
     Args:
         page (Page): Playwright Page instance
         locator (Locator): Playwright Locator for target element
         button (str): Mouse button ('left'/'right'/'middle') - defaults to 'left'
-        delay (int): Milliseconds between mouse down/up events (default: 30ms)
+        delay (int): Milliseconds to wait after click (default: 50ms)
 
     Raises:
-        Exception: If bounding box can't be determined for element
+        Exception: If element interaction fails
     """
-    print("Performing teleport click on element.")
+    print(f"Teleporting via JS click (button: {button})")
     await locator.scroll_into_view_if_needed(timeout=10000)
-    box = await locator.bounding_box()
-    if not box:
-        raise Exception("Could not get bounding box for locator to perform teleport click.")
-
-    dest_x = box['x'] + box['width'] / 2
-    dest_y = box['y'] + box['height'] / 2
-
-    # 1. Move the mouse instantly to the target coordinates.
-    await page.mouse.move(dest_x, dest_y)
     
-    # 2. Perform the click using low-level down/up events at the new location.
-    await page.mouse.down(button=button)
-    await page.wait_for_timeout(delay)  # A small delay makes the click more reliable
-    await page.mouse.up(button=button)
+    # This executes a click directly in the browser's engine, bypassing Python patches.
+    if button == 'right':
+        # Dispatch 'contextmenu' event for a right-click.
+        await locator.dispatch_event('contextmenu', {'button': 2})
+    else:
+        # Use JavaScript click() for a standard left-click.
+        await locator.evaluate("element => element.click()")
     
+    await page.wait_for_timeout(delay)
     print("Teleport click completed.")
 
-async def teleport_hover(page: Page, locator: Locator):
+async def teleport_hover(page: Page, locator: Locator, delay: int = 50):
     """
-    Performs instantaneous 'teleport' hover without visible mouse movement.
+    Bypasses Camoufox's humanization by executing a direct JavaScript mouseover event.
+    This is a true, instantaneous "teleport" hover.
 
     Args:
         page (Page): Playwright Page instance
         locator (Locator): Playwright Locator for target element
+        delay (int): Milliseconds to wait after hover (default: 50ms)
 
     Raises:
-        Exception: If bounding box can't be determined for element
+        Exception: If element interaction fails
     """
-    print("Performing teleport hover on element.")
+    print("Teleporting via JS hover")
     await locator.scroll_into_view_if_needed(timeout=10000)
-    box = await locator.bounding_box()
-    if not box:
-        raise Exception("Could not get bounding box for locator to perform teleport hover.")
     
-    dest_x = box['x'] + box['width'] / 2
-    dest_y = box['y'] + box['height'] / 2
-
-    # Instantly move the mouse to the target coordinates.
-    await page.mouse.move(dest_x, dest_y)
+    # This dispatches a mouseover event directly to the element in the browser.
+    await locator.dispatch_event('mouseover')
+    await page.wait_for_timeout(delay)
     print("Teleport hover completed.")
 
 async def download_song_handler(
@@ -404,6 +392,9 @@ async def download_song_handler(
 ) -> Dict[str, Any]:
     """
     Downloads a song from Suno.com using automated browser interactions.
+
+    Uses instantaneous "teleport" actions for speed, except for a regular 
+    humanized hover on the download sub-menu trigger to ensure it opens correctly.
 
     Features:
     - Enhanced error handling for common failure points
@@ -450,7 +441,7 @@ async def download_song_handler(
             user_data_dir="backend/camoufox_session_data",
             os=("windows"),
             config=config,
-            humanize=True,
+            humanize=True,  # IMPORTANT: Keep this True for the one special hover to work
             i_know_what_im_doing=True,
         ) as browser:
             page = await browser.new_page()
@@ -595,7 +586,7 @@ async def download_song_handler(
                         f"Target song at index {intIndex} is not visible after scrolling"
                     )
 
-                # Right-click to open context menu
+                # Right-click to open context menu (INSTANT)
                 print(f"Right-clicking on song at index {intIndex}...")
                 await teleport_click(page, target_song, button="right")
 
@@ -647,7 +638,14 @@ async def download_song_handler(
                 if not download_trigger:
                     raise Exception("Download option not found in context menu")
 
-                await teleport_hover(page, download_trigger)
+                # ################################################################## #
+                # ##                  THE CRITICAL EXCEPTION                      ## #
+                # ## Here, we use the NORMAL hover to ensure the menu triggers.  ## #
+                # ################################################################## #
+                print("Performing REGULAR (humanized) hover on Download trigger...")
+                await download_trigger.hover()  # Use the standard hover to trigger the sub-menu
+                # ################################################################## #
+
                 await page.wait_for_timeout(1000)
 
                 # Wait for download submenu panel
@@ -709,9 +707,15 @@ async def download_song_handler(
 
                 try:
                     async with page.expect_download(timeout=60000) as download_info:
-                        print("Starting download with teleport click...")
+                        # Hover over MP3 option (INSTANT)
+                        print("Hovering over MP3 download option with teleport hover...")
+                        await teleport_hover(page, mp3_option)
+                        await page.wait_for_timeout(500)
+                        
+                        # Click MP3 option (INSTANT)
+                        print("Clicking MP3 download option with teleport click...")
                         await teleport_click(page, mp3_option)
-                        print("Clicked MP3 Audio option with teleport click.")
+                        print("Clicked MP3 Audio option.")
 
                         # Check for "Download Anyway" button (premium content warning)
                         try:
