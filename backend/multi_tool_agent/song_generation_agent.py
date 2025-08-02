@@ -1,5 +1,5 @@
 from google.adk.agents import Agent
-from .config import AI_MODEL
+from ._config import AI_MODEL
 
 # TODO: Future Improvements
 # 1. Integrate with centralized prompt constants once created
