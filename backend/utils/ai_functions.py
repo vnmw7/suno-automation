@@ -76,9 +76,9 @@ def _run_agent(prompt: str) -> str:
             
             # Run the agent
             response_text = ""
-            async for event in agent_runner.run(
-                user_id=DEFAULT_USER_ID, 
-                session_id=DEFAULT_SESSION_ID, 
+            for event in agent_runner.run(
+                user_id=DEFAULT_USER_ID,
+                session_id=DEFAULT_SESSION_ID,
                 new_message=content
             ):
                 if event.is_final_response():
