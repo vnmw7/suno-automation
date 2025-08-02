@@ -3,10 +3,9 @@ from .config import AI_MODEL
 
 # TODO: Future Improvements
 # 1. Integrate with centralized prompt constants once created
-# 2. Add support for different Bible versions (NIV, KJV, ESV, etc.)
-# 3. Consider adding context about the book/chapter to improve AI understanding
-# 4. Implement prompt versioning for A/B testing different approaches
-# 5. Add support for custom song structure templates
+# 2. Consider adding context about the book/chapter to improve AI understanding
+# 3. Implement prompt versioning for A/B testing different approaches
+# 4. Add support for custom song structure templates
 
 def generate_verse_ranges(book_name: str, book_chapter: int, num_sections: int) -> str:
     """Generate verse ranges for a Bible chapter using AI."""
@@ -25,15 +24,14 @@ def generate_song_structure(book_name: str, book_chapter: int, verse_range: str)
     1. Verse - To tell the story, set the scene, and provide details
     2. Chorus - To state the main idea or theme of the song
     3. Bridge - To provide a contrast and a break from repetition
-    4. Intro - To set the mood, key, and tempo
-    5. Outro - To bring the song to a conclusion
-    6. Pre-Chorus - A short section that builds anticipation before the chorus
-    7. Post-Chorus - A section that comes immediately after a chorus
-    8. Hook - The single most catchy, memorable part
-    9. Refrain - A line or phrase that repeats
-    10. Solo/Instrumental Break - Showcases a particular instrument
-    11. Middle 8 - Another name for a Bridge
-    12. Breakdown - Stripped back arrangement section
+    4. Outro - To bring the song to a conclusion
+    5. Pre-Chorus - A short section that builds anticipation before the chorus
+    6. Post-Chorus - A section that comes immediately after a chorus
+    7. Hook - The single most catchy, memorable part
+    8. Refrain - A line or phrase that repeats
+    9. Solo/Instrumental Break - Showcases a particular instrument
+    10. Middle 8 - Another name for a Bridge
+    11. Breakdown - Stripped back arrangement section
     """
     
     return prompt
