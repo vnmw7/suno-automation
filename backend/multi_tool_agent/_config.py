@@ -5,4 +5,4 @@
 # - Timeout values
 # - Temperature settings
 # - Max tokens
-AI_MODEL = "gemini-2.5-flash-lite-06-17"
+AI_MODEL = "gemini-2.5-pro"
