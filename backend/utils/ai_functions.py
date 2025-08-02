@@ -13,6 +13,18 @@ from utils.llm_chat_backup import (
 from utils.assign_styles import get_style_by_chapter
 from lib.supabase import supabase
 
+# TODO: Future Improvements
+# 1. Centralize AI Prompts - Create backend/constants/song_prompts.py to store all prompts
+#    This will provide a single source of truth and avoid duplication with song_generation_agent.py
+# 2. Add Caching for AI Responses - Implement caching mechanism for verse ranges and song structures
+#    since Bible content doesn't change. This will reduce API calls and costs.
+# 3. Validate Song Structure JSON - Add validation function to ensure AI-generated structures
+#    meet minimum requirements (e.g., must have verse and chorus sections)
+# 4. Logging Improvements - Replace print statements with structured logging using Python's
+#    logging module for better debugging and monitoring in production
+# 5. Consider upgrading from deepseek/deepseek-r1-0528:free to a more capable model
+#    for better Bible verse analysis and structure generation
+
 
 def generate_verse_ranges(book_name: str, book_chapter: int) -> list[str]:
     print(
@@ -23,6 +35,7 @@ def generate_verse_ranges(book_name: str, book_chapter: int) -> list[str]:
     print(
         f"[generate_verse_ranges()] Splitting {book_name} {book_chapter} into sections: {split_chapter}"
     )
+    # TODO: Move this prompt to centralized constants file
     prompt = f"Split {book_name} {book_chapter} in Christian NIV Bible into {split_chapter} sections of similar size which stand alone. Give the range of verses separated by commas. Provide the output as numbers in oneline, nothing extra like explanations. Do not iclude the thinking and thought process to save output tokens."
     verse_ranges_str = llm_general_query(prompt)
 
@@ -104,6 +117,8 @@ def generate_song_structure(
     styles = []
 
     # Generate song structure using LLM
+    # TODO: Move this prompt to centralized constants file
+    # TODO: Add caching mechanism to avoid regenerating structures for same inputs
     prompt = f"""
             Make a song structure using the Book of {strBookName} chapter {intBookChapter}, strictly from verses {strVerseRange} in the Bible only. The song will have 4-6 (or more if applicable) naturally segmented based on the Bible verse contents. Strictly do not overlap nor reuse the verses in each segment. Strictly the output should be in json format: {{'stanza label': 'bible verse range number only', 'stanza label': 'bible verse range number only'}}. Do not provide any explanation only the json output.
 
@@ -184,6 +199,10 @@ def generate_song_structure(
         return {}
 
     print(f"Parsed song structure: {song_structure}")
+
+    # TODO: Add validation function to ensure song structure meets requirements
+    # Example: validate_song_structure(song_structure)
+    # Should check for minimum sections (verse, chorus), proper format, etc.
 
     # Analyze passage tone
     tone_prompt = f"Analyze the overall Bible passage tone for {strBookName} {intBookChapter}:{strVerseRange}. Strictly the output should be 0 or 1 only. 0 for negative and 1 for positive. Do not provide any explanation only the number."

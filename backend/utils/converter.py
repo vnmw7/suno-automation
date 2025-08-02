@@ -18,6 +18,9 @@ def bookname_to_abrv(bookname: str) -> str:
     Convert book name to a more readable format.
     """
 
+    # TODO: Move book abbreviations to database or external config file
+    # This would allow dynamic updates without code changes and easier maintenance
+    # Consider creating a 'book_abbreviations' table or loading from JSON config
     mapping = {
         "1 Chronicles": "1CH",
         "1 Corinthians": "1CO",
