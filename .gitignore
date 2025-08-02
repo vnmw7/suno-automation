@@ -1,2 +1,6 @@
 .aider*
 *.log
+
+# Backend logs directory
+backend/logs/*.log
+!backend/logs/.gitignore

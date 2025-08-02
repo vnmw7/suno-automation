@@ -1,3 +1,6 @@
+# TODO: Verify google-adk is properly installed with: pip install google-adk
+# TOFIX: If google-adk import fails, consider using google.generativeai directly
+# TOFIX: Add proper error handling for missing API keys (GOOGLE_API_KEY or GEMINI_API_KEY)
 from google.adk.agents import Agent
 from ._config import AI_MODEL
 
@@ -9,6 +12,11 @@ from ._config import AI_MODEL
 
 def generate_verse_ranges(book_name: str, book_chapter: int, num_sections: int) -> str:
     """Generate verse ranges for a Bible chapter using AI."""
+    # TODO: These tool functions currently just return prompts as strings
+    # TOFIX: The Agent framework expects these to actually execute and return results
+    # Consider restructuring to either:
+    # 1. Make these actual executable functions that call the AI
+    # 2. Or use a different approach where the agent handles the prompts internally
     prompt = f"Split {book_name} {book_chapter} in Christian NIV Bible into {num_sections} sections of similar size which stand alone. Give the range of verses separated by commas. Provide the output as numbers in oneline, nothing extra like explanations. Do not include the thinking and thought process to save output tokens."
     
     # Return the prompt for the agent to process
@@ -44,6 +52,11 @@ def analyze_passage_tone(book_name: str, book_chapter: int, verse_range: str) ->
     return prompt
 
 
+# TODO: Add proper exception handling for Agent initialization
+# TOFIX: Consider implementing a fallback mechanism if Agent creation fails
+# TODO: Add retry logic with exponential backoff for API calls
+# TOFIX: Implement request/response validation to ensure proper JSON format
+# TODO: Add performance logging (response time, token usage)
 root_agent = Agent(
     name="song_generation_agent",
     model=AI_MODEL,
