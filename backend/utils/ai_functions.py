@@ -3,13 +3,15 @@ import os
 import json
 import logging
 from datetime import datetime
+import asyncio
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.bible_utils import split_chapter_into_sections
 from utils.assign_styles import get_style_by_chapter
 from lib.supabase import supabase
-from multi_tool_agent.song_generation_agent import root_agent
+from multi_tool_agent.song_generation_agent import agent_runner, session_service, APP_NAME
+from google.genai import types
 
 # Configure logging for AI generations
 # TODO: Add log rotation to prevent files from growing too large
@@ -46,6 +48,65 @@ ai_logger.addHandler(file_handler)
 # 5. Consider upgrading from deepseek/deepseek-r1-0528:free to a more capable model
 #    for better Bible verse analysis and structure generation
 
+# Default user and session IDs for the agent runner
+DEFAULT_USER_ID = "bible_song_user"
+DEFAULT_SESSION_ID = "bible_song_session"
+
+def _run_agent(prompt: str) -> str:
+    """Helper function to run the agent with proper session management."""
+    
+    async def _async_runner():
+        """Inner async function to handle asynchronous operations."""
+        try:
+            # Create content object for the message
+            content = types.Content(role='user', parts=[types.Part(text=prompt)])
+            
+            # Check if session exists, create if not
+            session = await session_service.get_session(
+                app_name=APP_NAME, 
+                user_id=DEFAULT_USER_ID, 
+                session_id=DEFAULT_SESSION_ID
+            )
+            if not session:
+                await session_service.create_session(
+                    app_name=APP_NAME, 
+                    user_id=DEFAULT_USER_ID, 
+                    session_id=DEFAULT_SESSION_ID
+                )
+            
+            # Run the agent
+            response_text = ""
+            async for event in agent_runner.run(
+                user_id=DEFAULT_USER_ID, 
+                session_id=DEFAULT_SESSION_ID, 
+                new_message=content
+            ):
+                if event.is_final_response():
+                    # Extract text from the event
+                    if event.content and event.content.parts:
+                        response_text = event.content.parts[0].text
+                    break
+            
+            return response_text
+        except Exception as e:
+            ai_logger.error(f"Error in async runner: {e}")
+            raise
+    
+    try:
+        # Check if there's already a running event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # Create a new task in the existing loop
+            future = asyncio.create_task(_async_runner())
+            # Wait for it to complete
+            return asyncio.run_coroutine_threadsafe(future, loop).result()
+        except RuntimeError:
+            # No event loop running, create a new one
+            return asyncio.run(_async_runner())
+    except Exception as e:
+        ai_logger.error(f"Error running agent: {e}")
+        raise
+
 
 def generate_verse_ranges(book_name: str, book_chapter: int) -> list[str]:
     print(
@@ -65,13 +126,11 @@ def generate_verse_ranges(book_name: str, book_chapter: int) -> list[str]:
         request_prompt = f"Split {book_name} chapter {book_chapter} into {split_chapter} verse ranges"
         ai_logger.info(f"Agent request: {request_prompt}")
         
-        # TODO: Add validation that root_agent is properly initialized
+        # TODO: Add validation that agent_runner is properly initialized
         # TOFIX: Add timeout handling for long-running requests
         # TODO: Implement retry logic if the agent fails
-        # TOFIX: Fix agent method call - 'LlmAgent' object has no attribute 'run'
-        # Need to check google-adk documentation for correct method (possibly 'query' or 'invoke')
         # The agent will use the generate_verse_ranges tool
-        verse_ranges_str = root_agent.run(request_prompt)
+        verse_ranges_str = _run_agent(request_prompt)
         
         # Log the response
         ai_logger.info(f"Agent response: {verse_ranges_str}")
@@ -161,8 +220,7 @@ def generate_song_structure(
         ai_logger.info(f"Generating song structure for {strBookName} {intBookChapter}:{strVerseRange}")
         ai_logger.info(f"Agent request: {request_prompt}")
         
-        # TOFIX: Update to use correct agent method instead of 'run'
-        song_structure_response = root_agent.run(request_prompt)
+        song_structure_response = _run_agent(request_prompt)
         
         # Log the response
         ai_logger.info(f"Song structure response: {song_structure_response}")
@@ -211,8 +269,7 @@ def generate_song_structure(
         ai_logger.info(f"Analyzing tone for {strBookName} {intBookChapter}:{strVerseRange}")
         ai_logger.info(f"Agent request: {request_prompt}")
         
-        # TOFIX: Update to use correct agent method instead of 'run'
-        passage_tone_response = root_agent.run(request_prompt)
+        passage_tone_response = _run_agent(request_prompt)
         
         # Log the response
         ai_logger.info(f"Tone response: {passage_tone_response}")

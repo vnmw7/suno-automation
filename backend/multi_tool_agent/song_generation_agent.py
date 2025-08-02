@@ -2,6 +2,8 @@
 # TOFIX: If google-adk import fails, consider using google.generativeai directly
 # TOFIX: Add proper error handling for missing API keys (GOOGLE_API_KEY or GEMINI_API_KEY)
 from google.adk.agents import Agent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
 from ._config import AI_MODEL
 
 # TODO: Future Improvements
@@ -12,44 +14,21 @@ from ._config import AI_MODEL
 
 def generate_verse_ranges(book_name: str, book_chapter: int, num_sections: int) -> str:
     """Generate verse ranges for a Bible chapter using AI."""
-    # TODO: These tool functions currently just return prompts as strings
-    # TOFIX: The Agent framework expects these to actually execute and return results
-    # Consider restructuring to either:
-    # 1. Make these actual executable functions that call the AI
-    # 2. Or use a different approach where the agent handles the prompts internally
-    prompt = f"Split {book_name} {book_chapter} in Christian NIV Bible into {num_sections} sections of similar size which stand alone. Give the range of verses separated by commas. Provide the output as numbers in oneline, nothing extra like explanations. Do not include the thinking and thought process to save output tokens."
-    
-    # Return the prompt for the agent to process
-    return prompt
+    # Tool function for the agent to understand its capability
+    # The actual generation will be handled by the agent based on its instruction
+    return f"Splitting {book_name} chapter {book_chapter} into {num_sections} sections"
 
 
 def generate_song_structure(book_name: str, book_chapter: int, verse_range: str) -> str:
     """Generate song structure for Bible verses using AI."""
-    prompt = f"""
-    Make a song structure using the Book of {book_name} chapter {book_chapter}, strictly from verses {verse_range} in the Bible only. The song will have 4-6 (or more if applicable) naturally segmented based on the Bible verse contents. Strictly do not overlap nor reuse the verses in each segment. Strictly the output should be in json format: {{'stanza label': 'bible verse range number only', 'stanza label': 'bible verse range number only'}}. Do not provide any explanation only the json output.
-
-    Here are the core building blocks. 
-    1. Verse - To tell the story, set the scene, and provide details
-    2. Chorus - To state the main idea or theme of the song
-    3. Bridge - To provide a contrast and a break from repetition
-    4. Outro - To bring the song to a conclusion
-    5. Pre-Chorus - A short section that builds anticipation before the chorus
-    6. Post-Chorus - A section that comes immediately after a chorus
-    7. Hook - The single most catchy, memorable part
-    8. Refrain - A line or phrase that repeats
-    9. Solo/Instrumental Break - Showcases a particular instrument
-    10. Middle 8 - Another name for a Bridge
-    11. Breakdown - Stripped back arrangement section
-    """
-    
-    return prompt
+    # Tool function for the agent to understand its capability
+    return f"Creating song structure for {book_name} chapter {book_chapter}, verses {verse_range}"
 
 
 def analyze_passage_tone(book_name: str, book_chapter: int, verse_range: str) -> str:
     """Analyze the emotional tone of a Bible passage."""
-    prompt = f"Analyze the overall Bible passage tone for {book_name} {book_chapter}:{verse_range}. Strictly the output should be 0 or 1 only. 0 for negative and 1 for positive. Do not provide any explanation only the number."
-    
-    return prompt
+    # Tool function for the agent to understand its capability
+    return f"Analyzing tone for {book_name} chapter {book_chapter}, verses {verse_range}"
 
 
 # TODO: Add proper exception handling for Agent initialization
@@ -67,8 +46,35 @@ root_agent = Agent(
         "You are a helpful agent who can:\n"
         "1. Split Bible chapters into verse ranges\n"
         "2. Create song structures mapping sections to verse ranges\n"
-        "3. Analyze the emotional tone of Bible passages\n"
-        "Always return JSON format for song structures."
+        "3. Analyze the emotional tone of Bible passages\n\n"
+        "When asked to split a chapter:\n"
+        "- Split the given Bible chapter into the requested number of sections\n"
+        "- Return ONLY the verse ranges separated by commas (e.g., '1-11, 12-22')\n"
+        "- No explanations or extra text\n\n"
+        "When asked to create a song structure:\n"
+        "- Create a song structure using the given Bible verses\n"
+        "- Use 4-6 sections (or more if needed) based on the verse content\n"
+        "- Include sections like: Verse, Chorus, Bridge, Outro, Pre-Chorus, Post-Chorus, etc.\n"
+        "- Return ONLY valid JSON format like: {'verse1': '1-5', 'chorus': '6-8', 'verse2': '9-12'}\n"
+        "- Do not overlap or reuse verses between sections\n\n"
+        "When asked to analyze tone:\n"
+        "- Analyze the emotional tone of the given Bible passage\n"
+        "- Return ONLY '0' for negative tone or '1' for positive tone\n"
+        "- No explanations"
     ),
     tools=[generate_verse_ranges, generate_song_structure, analyze_passage_tone],
+)
+
+# Create a runner for the agent
+# Define an app name for the runner
+APP_NAME = "song-generation-service"
+
+# Create an instance of the session service for managing conversation history
+session_service = InMemorySessionService()
+
+# Create the runner with all required arguments
+agent_runner = Runner(
+    agent=root_agent,
+    app_name=APP_NAME,
+    session_service=session_service
 )
