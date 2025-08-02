@@ -110,6 +110,9 @@ def send_api_request(
 def llm_general_query(
     prompt: str,
 ):
+    # TODO: Add response caching to reduce API calls for identical prompts
+    # TODO: Implement rate limiting handling with automatic retry
+    # TODO: Add telemetry/metrics for API usage tracking
     response_content = send_api_request(prompt)
     if response_content is None:
         print(

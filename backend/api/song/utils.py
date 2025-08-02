@@ -19,6 +19,13 @@ from playwright.async_api import Page, Locator
 from configs.browser_config import config
 from services.supabase_service import SupabaseService
 
+# TODO: Future Improvements
+# 1. Implement retry logic with exponential backoff for browser automation failures
+# 2. Replace print statements with structured logging for better production monitoring
+# 3. Add health check endpoint to verify Suno login status before operations
+# 4. Consider implementing a queue system for batch song generation
+# 5. Add metrics collection for success/failure rates and performance monitoring
+
 # Import supabase
 lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "lib"))
 supabase_utils_path = os.path.join(lib_path, "supabase.py")
@@ -386,6 +393,16 @@ async def teleport_hover(page: Page, locator: Locator, delay: int = 50):
     await locator.dispatch_event('mouseover')
     await page.wait_for_timeout(delay)
     print("Teleport hover completed.")
+
+# TODO: Implement retry_with_backoff utility function for robust browser operations
+# async def retry_with_backoff(func, max_attempts=3, base_delay=1000):
+#     for attempt in range(max_attempts):
+#         try:
+#             return await func()
+#         except Exception as e:
+#             if attempt == max_attempts - 1:
+#                 raise
+#             await asyncio.sleep(base_delay * (2 ** attempt) / 1000)
 
 async def download_song_handler(
     strTitle: str, intIndex: int, download_path: str
