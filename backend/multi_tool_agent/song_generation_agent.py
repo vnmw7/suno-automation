@@ -4,7 +4,7 @@
 from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.genai.types import GenerateContentConfig, ThinkingConfig
+from google.adk.planners import BuiltInPlanner
 from ._config import AI_MODEL_LITE, THINKING_BUDGET_LITE
 
 # TODO: Future Improvements
@@ -37,18 +37,12 @@ def analyze_passage_tone(book_name: str, book_chapter: int, verse_range: str) ->
 # TODO: Add retry logic with exponential backoff for API calls
 # TOFIX: Implement request/response validation to ensure proper JSON format
 # TODO: Add performance logging, specifically tracking token usage for thinking_budget
-# Create model configuration with thinking budget
 # TODO: Implement graceful fallback for ThinkingConfig initialization errors
-model_config = GenerateContentConfig(
-    thinking_config=ThinkingConfig(
-        thinking_budget=THINKING_BUDGET_LITE
-    )
-)
 
 root_agent = Agent(
     name="song_generation_agent",
     model=AI_MODEL_LITE,
-    model_config=model_config,
+    # planner=BuiltInPlanner(thinking_budget=THINKING_BUDGET_LITE),  # Fixed: Use planner instead of generate_content_config
     description=(
         "Agent to generate verse range from a Bible chapter, analyze tone, and create song structure."
     ),
