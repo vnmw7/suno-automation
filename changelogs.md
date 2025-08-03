@@ -29,8 +29,15 @@
 - Enhanced element location strategies in browser automation
 - Added duplicate song handling in download logic
 - Fixed circular import issue in `backend/multi_tool_agent/__init__.py`
+- Google ADK Agent object method name 'run'
+- Verified google-adk package installation and API key configuration
+
+## [2025-08-03] - Thinking Budget Enhancements
+### Changed
+- Move THINKING_BUDGET to environment variables for better security and flexibility
+- Add validation to ensure THINKING_BUDGET is within the valid range (128-32768 tokens)
+- Add performance logging, specifically tracking token usage for thinking_budget
+- Implement graceful fallback for ThinkingConfig initialization errors
 
 ### Known Issues
-- Google ADK Agent object uses different method name than 'run' - needs investigation
 - Agent tool functions currently return prompts as strings instead of executing them
-- Need to verify google-adk package installation and API key configuration
