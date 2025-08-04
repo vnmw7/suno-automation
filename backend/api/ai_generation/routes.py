@@ -43,6 +43,9 @@ class SongStructureResponse(BaseModel):
     error: Optional[str] = None
 
 
+# TODO: Ensure all endpoints return consistent error structures
+# All endpoints should follow the pattern: success: bool, message: str, error?: str
+# This helps frontend handle errors consistently
 @router.post("/verse-ranges", response_model=VerseRangeResponse)
 async def generate_verse_ranges_endpoint(request: VerseRangeRequest):
     """
@@ -146,3 +149,7 @@ async def generate_song_structure_endpoint(request: SongStructureRequest):
             message="A critical error occurred during the song structure generation.",
             error=str(e)
         )
+
+# TODO: Consider creating a shared types file or code generation tool
+# to ensure type consistency between frontend TypeScript interfaces
+# and backend Pydantic models

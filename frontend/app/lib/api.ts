@@ -101,6 +101,10 @@ export interface SongStructureRequest {
   strBookName: string;
   intBookChapter: number;
   strVerseRange: string;
+  structureId?: string;  // Optional, for regeneration
+  // TODO: Add documentation comment explaining when/how to use structureId
+  // The structureId field is used when regenerating an existing song structure
+  // Pass the ID of the structure you want to regenerate to create a new version
 }
 
 export interface SongStructureResponse {
@@ -116,7 +120,7 @@ export const generateSongStructure = async (
   try {
     console.log("Song structure API request payload:", request);
 
-    const response = await fetch(`${API_BASE_URL}/generate-song-structure`, {
+    const response = await fetch(`${API_BASE_URL}/ai-generation/song-structure`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -144,6 +148,12 @@ export const generateSongStructure = async (
     };
   }
 };
+
+// TODO: Create functions to use the new /ai-generation/verse-ranges endpoints
+// Currently, verse range generation might still be using the old endpoints
+// Need to add:
+// - generateVerseRanges() - POST /ai-generation/verse-ranges
+// - getVerseRanges() - GET /ai-generation/verse-ranges
 
 export interface SongStructure {
   id: number;
@@ -272,6 +282,8 @@ export const fetchStyles = async (
   }
 };
 
+// TOFIX: This function calls /download-song endpoint which doesn't exist in the visible backend files
+// Either the endpoint needs to be implemented in the backend or this should use a different endpoint
 export const calldownloadSongAPI = async (
   request: SongRequest
 ): Promise<SongResponse> => {
@@ -402,3 +414,7 @@ export const fetchSongFilesFromPublic = async (
     return { success: false, error: error instanceof Error ? error.message : "An unknown error occurred" };
   }
 };
+
+// TODO: Consider implementing type safety enhancements
+// Create a shared types package that both frontend and backend can use
+// This would ensure perfect type alignment between TypeScript and Python models
