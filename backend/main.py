@@ -10,12 +10,14 @@ from pydantic import BaseModel
 import traceback
 from api.song.routes import router as song_router
 from api.ai_review.routes import router as ai_review_router
+from api.ai_generation.routes import router as ai_generation_router
 
 app = FastAPI()
 
 # Include routers
 app.include_router(song_router)
 app.include_router(ai_review_router)
+app.include_router(ai_generation_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,21 +45,6 @@ class SongRequest(BaseModel):
     strVerseRange: str
     strStyle: str
     strTitle: str
-
-
-class SongStructureRequest(BaseModel):
-    """
-    Represents a request to generate a song structure.
-
-    Attributes:
-        strBookName (str): The name of the book.
-        intBookChapter (int): The chapter number within the book.
-        strVerseRange (str): The range of verses to consider.
-    """
-
-    strBookName: str
-    intBookChapter: int
-    strVerseRange: str
 
 
 @app.get("/")
@@ -105,6 +92,11 @@ async def login_with_microsoft_endpoint():
     return {"success": is_successful}
 
 
+# TOFIX: These verse range endpoints are duplicated in api.ai_generation.routes
+# Consider removing these endpoints to avoid duplication and maintain consistency
+# with the new modular structure. The new endpoints are at:
+# - /ai-generation/verse-ranges (POST)
+# - /ai-generation/verse-ranges (GET)
 @app.post("/generate-verse-ranges")
 def generate_verse_ranges_endpoint(book_name: str, book_chapter: int):
     """
@@ -172,46 +164,6 @@ def get_verse_ranges_endpoint(book_name: str, book_chapter: int):
         return {"error": str(e)}
 
 
-@app.post("/generate-song-structure")
-async def generate_song_structure_endpoint(request: SongStructureRequest):
-    """
-    Generates a song structure based on book, chapter, and verse range.
-
-    This endpoint takes a `SongStructureRequest` object and uses an AI function
-    to generate a song structure. It logs the process and handles potential errors.
-
-    Args:
-        request (SongStructureRequest): The request object containing book details.
-
-    Returns:
-        dict: A JSON response with the success status, a message, and the generated
-              song structure, or an error message if an exception occurs.
-    """
-    print(
-        f"[generate_song_structure_endpoint()] Generating song structure for {request.strBookName} chapter {request.intBookChapter}"
-    )
-    from utils.ai_functions import generate_song_structure
-
-    try:
-        result = generate_song_structure(
-            strBookName=request.strBookName,
-            intBookChapter=request.intBookChapter,
-            strVerseRange=request.strVerseRange,
-        )
-        return {
-            "success": True,
-            "message": "Song structure generated successfully.",
-            "result": result,
-        }
-    except Exception as e:
-        print(f"A critical error occurred in generate_song_structure_endpoint: {e}")
-        print(traceback.format_exc())
-        return {
-            "error": str(e),
-            "message": "A critical error occurred during the song structure generation.",
-        }
-
-
 @app.get("/debug/song-structures")
 def debug_song_structures_endpoint():
     """
@@ -239,6 +191,9 @@ def debug_song_structures_endpoint():
     except Exception as e:
         return {"error": str(e), "message": "Failed to retrieve song structures"}
 
+
+# TOFIX: Missing /download-song endpoint that frontend's calldownloadSongAPI is calling
+# Either implement this endpoint or update the frontend to use the correct endpoint
 
 if __name__ == "__main__":
     import uvicorn

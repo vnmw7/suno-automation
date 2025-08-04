@@ -1,43 +1,34 @@
-## [2025-08-02] - AI Agent Integration & Future Improvements
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased] - 2024-12-19
+
+### Changed
+- Updated frontend `generateSongStructure` function to use new `/ai-generation/song-structure` endpoint instead of deprecated `/generate-song-structure`
+- Added import for `ai_generation_router` in backend main.py
+- Included `ai_generation_router` in the FastAPI app
 
 ### Added
-- AI prompt functions (`generate_verse_ranges`, `generate_song_structure`, `analyze_passage_tone`) to Google ADK Agent in `backend/multi_tool_agent/song_generation_agent.py`
-- Integration of AI tools with Google ADK Agent framework
-- Comprehensive AI generation logging system in `backend/utils/ai_functions.py`
-  - Logs all AI requests and responses to dated log files
-  - Created log viewer utility (`backend/utils/log_viewer.py`)
-  - Added log directory with proper .gitignore configuration
-- Test script for AI logging functionality (`backend/utils/test_ai_logging.py`)
+- Added optional `structureId` field to frontend `SongStructureRequest` interface for song structure regeneration
+- Added TODO comments throughout codebase for future improvements:
+  - Duplicate verse range endpoints in main.py that need consolidation
+  - Missing frontend integration for new `/ai-generation/verse-ranges` endpoints
+  - Missing `/download-song` endpoint implementation
+  - Need for consistent error response structures across all endpoints
+  - Type safety enhancement suggestions for shared types between frontend and backend
+- Added TOFIX comments for:
+  - Duplicate verse range endpoints in main.py
+  - Missing `/download-song` endpoint that frontend is calling
 
-### Changed
-- Removed placeholder AI comments from `song_generation_agent.py`
-- Replaced direct LLM utility calls (`llm_general_query`, `aimlapi_general_query`) with agent-based approach
-- Simplified JSON extraction logic to handle agent responses
-- Added TODO markers throughout codebase for future improvements:
-  - Centralize AI prompts in constants file
-  - Implement AI response caching
-  - Add song structure validation
-  - Improve logging with structured format
-  - Move book abbreviations to config/database
-  - Add retry logic with exponential backoff
-  - Implement rate limiting for LLM API
-  - Add telemetry/metrics tracking
-  - Fix Agent method calls (use correct method instead of 'run')
+### Removed
+- Removed deprecated `/generate-song-structure` endpoint from backend main.py
+- Removed old `SongStructureRequest` class definition from main.py
 
-### Fixed
-- Improved error handling in song download endpoint
-- Enhanced element location strategies in browser automation
-- Added duplicate song handling in download logic
-- Fixed circular import issue in `backend/multi_tool_agent/__init__.py`
-- Google ADK Agent object method name 'run'
-- Verified google-adk package installation and API key configuration
-
-## [2025-08-03] - Thinking Budget Enhancements
-### Changed
-- Move THINKING_BUDGET to environment variables for better security and flexibility
-- Add validation to ensure THINKING_BUDGET is within the valid range (128-32768 tokens)
-- Add performance logging, specifically tracking token usage for thinking_budget
-- Implement graceful fallback for ThinkingConfig initialization errors
-
-### Known Issues
-- Agent tool functions currently return prompts as strings instead of executing them
+### Technical Debt
+- Identified need to consolidate verse range endpoints (currently duplicated in main.py and ai_generation routes)
+- Identified need to implement or fix `/download-song` endpoint referenced by frontend
+- Identified opportunity for shared type definitions between TypeScript and Python
