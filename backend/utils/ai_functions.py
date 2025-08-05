@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime
 import asyncio
+import ast
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -228,28 +229,44 @@ def generate_song_structure(
         print(f"Song structure response: {song_structure_response}")
 
         # Parse the song structure
-        if song_structure_response:
-            # Try to parse as JSON directly first
-            try:
-                song_structure = json.loads(song_structure_response)
-            except json.JSONDecodeError:
-                # If direct parsing fails, extract JSON from the response
-                # Simple extraction: find content between first { and last }
-                # TODO: Improve JSON extraction to handle nested objects and edge cases
-                # TOFIX: Add validation to ensure extracted JSON has required fields
-                start_idx = song_structure_response.find('{')
-                end_idx = song_structure_response.rfind('}')
-                if start_idx != -1 and end_idx != -1:
-                    json_string = song_structure_response[start_idx:end_idx + 1]
-                    song_structure = json.loads(json_string)
-                    ai_logger.info(f"Extracted JSON: {json_string}")
-                else:
-                    print(f"Error: Could not extract JSON from response: {song_structure_response}")
-                    ai_logger.error(f"Could not extract JSON from response: {song_structure_response}")
-                    return {}
-        else:
+        if not song_structure_response:
             print("Error: Failed to get song structure from agent")
             ai_logger.error("Failed to get song structure from agent")
+            return {}
+
+        try:
+            # First, try to parse as standard JSON
+            song_structure = json.loads(song_structure_response)
+        except json.JSONDecodeError:
+            try:
+                # If that fails, try parsing as Python literal
+                song_structure = ast.literal_eval(song_structure_response)
+            except (SyntaxError, ValueError):
+                # If both fail, try to extract a substring that might be JSON
+                start_idx = song_structure_response.find('{')
+                end_idx = song_structure_response.rfind('}')
+                if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+                    json_string = song_structure_response[start_idx:end_idx+1]
+                    try:
+                        # First try parsing extracted substring as JSON
+                        song_structure = json.loads(json_string)
+                    except json.JSONDecodeError:
+                        try:
+                            # Then try parsing as Python literal
+                            song_structure = ast.literal_eval(json_string)
+                        except (SyntaxError, ValueError):
+                            print(f"Error: Could not parse response as JSON or Python literal: {json_string}")
+                            ai_logger.error(f"Could not parse response as JSON or Python literal: {json_string}")
+                            return {}
+                else:
+                    print(f"Error: Could not extract dictionary from response: {song_structure_response}")
+                    ai_logger.error(f"Could not extract dictionary from response: {song_structure_response}")
+                    return {}
+
+        # Validate that we got a dictionary
+        if not isinstance(song_structure, dict):
+            print(f"Error: Parsed song structure is not a dictionary: {type(song_structure)}")
+            ai_logger.error(f"Parsed song structure is not a dictionary: {type(song_structure)}")
             return {}
     except Exception as e:
         print(f"Error using agent for song structure: {e}")

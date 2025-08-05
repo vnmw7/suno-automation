@@ -59,10 +59,17 @@ root_agent = Agent(
         "- Create a song structure using the given Bible verses\n"
         "- Use 4-6 sections (or more if needed) based on the verse content\n"
         "- Include sections like: Verse, Chorus, Bridge, Outro, Pre-Chorus, Post-Chorus, etc.\n"
+        # TOFIX: Update instruction to explicitly request pure JSON output
+        # TODO: Add example of expected JSON format to reduce parsing errors
         "- Return ONLY valid JSON format like: {'verse1': '1-5', 'chorus': '6-8', 'verse2': '9-12'}\n"
+        "- Return ONLY a JSON object with no additional text or formatting\n"
+        "- Do not include any explanations, markdown, or code blocks\n"
+        "- Ensure the JSON uses double quotes for keys and values\n"
         "- Do not overlap or reuse verses between sections\n\n"
         "When asked to analyze tone:\n"
         "- Analyze the emotional tone of the given Bible passage\n"
+        # TODO: Consider expanding tone scale from binary (0/1) to 1-5 range for more nuance
+        # TOFIX: Add validation that returned value is within expected range
         "- Return ONLY '0' for negative tone or '1' for positive tone\n"
         "- No explanations"
     ),
@@ -74,9 +81,13 @@ root_agent = Agent(
 APP_NAME = "song-generation-service"
 
 # Create an instance of the session service for managing conversation history
+# TODO: Consider implementing persistent session storage instead of InMemorySessionService
+# TOFIX: Add session cleanup mechanism to prevent memory leaks in long-running processes
 session_service = InMemorySessionService()
 
 # Create the runner with all required arguments
+# TODO: Add error handling for runner initialization failures
+# TOFIX: Implement health check mechanism to verify runner is operational
 agent_runner = Runner(
     agent=root_agent,
     app_name=APP_NAME,
