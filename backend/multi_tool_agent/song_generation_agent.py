@@ -4,8 +4,7 @@
 from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.planners import BuiltInPlanner
-from ._config import AI_MODEL_LITE, THINKING_BUDGET_LITE
+from ._config import AI_MODEL_LITE
 
 # TODO: Future Improvements
 # 1. Integrate with centralized prompt constants once created
