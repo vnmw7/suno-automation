@@ -90,14 +90,16 @@ export async function generate_verse_range(bookAbbr: string, chapter: string) {
       `[generate_verse_range] Generating verse range for book: ${bookName} (abbr: ${bookAbbr}), chapter: ${chapter}`
     );
     const response = await fetch(
-      `http://127.0.0.1:8000/generate-verse-ranges?book_name=${encodeURIComponent(
-        bookName
-      )}&book_chapter=${chapter}`,
+      `http://127.0.0.1:8000/ai-generation/verse-ranges`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          book_name: bookName,
+          book_chapter: parseInt(chapter, 10),
+        }),
       }
     );
 

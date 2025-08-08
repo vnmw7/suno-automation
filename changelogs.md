@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2024-12-19
 
+### Fixed
+- Corrected the frontend `generate_verse_range` function to use the correct `/ai-generation/verse-ranges` endpoint and send a JSON payload instead of query parameters.
+
 ### Changed
 - Updated frontend `generateSongStructure` function to use new `/ai-generation/song-structure` endpoint instead of deprecated `/generate-song-structure`
 - Added import for `ai_generation_router` in backend main.py
