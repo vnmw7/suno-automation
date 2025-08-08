@@ -13,10 +13,8 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter
-from google.genai import types
 from lib.supabase import supabase
-from multi_tool_agent.song_generation_agent import (APP_NAME, agent_runner,
-                                                   session_service)
+from middleware.gemini import model_flash
 from pydantic import BaseModel
 from utils.assign_styles import get_style_by_chapter
 from utils.bible_utils import split_chapter_into_sections
@@ -89,46 +87,15 @@ ai_logger.addHandler(file_handler)
 # 5. Consider upgrading from deepseek/deepseek-r1-0528:free to a more capable model
 #    for better Bible verse analysis and structure generation
 
-# Default user and session IDs for the agent runner
-DEFAULT_USER_ID = "bible_song_user"
-DEFAULT_SESSION_ID = "bible_song_session"
 
 
-async def _run_agent(prompt: str) -> str:
-    """Helper function to run the agent with proper session management."""
+async def _run_gemini(prompt: str) -> str:
+    """Helper function to run the Gemini model."""
     try:
-        # Create content object for the message
-        content = types.Content(role='user', parts=[types.Part(text=prompt)])
-        
-        # Check if session exists, create if not
-        session = await session_service.get_session(
-            app_name=APP_NAME, 
-            user_id=DEFAULT_USER_ID, 
-            session_id=DEFAULT_SESSION_ID
-        )
-        if not session:
-            await session_service.create_session(
-                app_name=APP_NAME, 
-                user_id=DEFAULT_USER_ID, 
-                session_id=DEFAULT_SESSION_ID
-            )
-        
-        # Run the agent
-        response_text = ""
-        for event in agent_runner.run(
-            user_id=DEFAULT_USER_ID,
-            session_id=DEFAULT_SESSION_ID,
-            new_message=content
-        ):
-            if event.is_final_response():
-                # Extract text from the event
-                if event.content and event.content.parts:
-                    response_text = event.content.parts[0].text
-                break
-        
-        return response_text
+        response = await model_flash.generate_content_async(prompt)
+        return response.text
     except Exception as e:
-        ai_logger.error(f"Error in async runner: {e}")
+        ai_logger.error(f"Error running Gemini model: {e}")
         raise
 
 
@@ -147,17 +114,18 @@ async def generate_verse_ranges_handler(book_name: str, book_chapter: int) -> li
     # Use the agent to generate verse ranges
     try:
         # Log the request
-        request_prompt = f"Split {book_name} chapter {book_chapter} into {split_chapter} verse ranges"
-        ai_logger.info(f"Agent request: {request_prompt}")
+        request_prompt = (
+            "You are a helpful agent. Split the given Bible chapter into the requested number of sections. "
+            "Return ONLY the verse ranges separated by commas (e.g., '1-11, 12-22'). "
+            "No explanations or extra text.\n\n"
+            f"Task: Split {book_name} chapter {book_chapter} into {split_chapter} verse ranges."
+        )
+        ai_logger.info(f"Gemini request: {request_prompt}")
         
-        # TODO: Add validation that agent_runner is properly initialized
-        # TOFIX: Add timeout handling for long-running requests
-        # TODO: Implement retry logic if the agent fails
-        # The agent will use the generate_verse_ranges tool
-        verse_ranges_str = await _run_agent(request_prompt)
+        verse_ranges_str = await _run_gemini(request_prompt)
         
         # Log the response
-        ai_logger.info(f"Agent response: {verse_ranges_str}")
+        ai_logger.info(f"Gemini response: {verse_ranges_str}")
         
         if verse_ranges_str:
             verse_ranges = verse_ranges_str.split(",")
@@ -181,8 +149,8 @@ async def generate_verse_ranges_handler(book_name: str, book_chapter: int) -> li
             ai_logger.error(f"Failed to get verse ranges for {book_name} {book_chapter}")
             return []
     except Exception as e:
-        print(f"Error using agent for verse ranges: {e}")
-        ai_logger.error(f"Error using agent for verse ranges: {e}")
+        print(f"Error using Gemini for verse ranges: {e}")
+        ai_logger.error(f"Error using Gemini for verse ranges: {e}")
         return []
 
 
@@ -240,11 +208,22 @@ async def generate_song_structure_handler(
     # Generate song structure using the agent
     try:
         # Log the request
-        request_prompt = f"Create a song structure for {strBookName} chapter {intBookChapter}, verses {strVerseRange}"
+        request_prompt = (
+            "You are a helpful agent. When asked to create a song structure:\n"
+            "- Create a song structure using the given Bible verses\n"
+            "- Use 4-6 sections (or more if needed) based on the verse content\n"
+            "- Include sections like: Verse, Chorus, Bridge, Outro, Pre-Chorus, Post-Chorus, etc.\n"
+            "- Return ONLY valid JSON format like: {'verse1': '1-5', 'chorus': '6-8', 'verse2': '9-12'}\n"
+            "- Return ONLY a JSON object with no additional text or formatting\n"
+            "- Do not include any explanations, markdown, or code blocks\n"
+            "- Ensure the JSON uses double quotes for keys and values\n"
+            "- Do not overlap or reuse verses between sections\n\n"
+            f"Task: Create a song structure for {strBookName} chapter {intBookChapter}, verses {strVerseRange}"
+        )
         ai_logger.info(f"Generating song structure for {strBookName} {intBookChapter}:{strVerseRange}")
-        ai_logger.info(f"Agent request: {request_prompt}")
+        ai_logger.info(f"Gemini request: {request_prompt}")
         
-        song_structure_response = await _run_agent(request_prompt)
+        song_structure_response = await _run_gemini(request_prompt)
         
         # Log the response
         ai_logger.info(f"Song structure response: {song_structure_response}")
@@ -292,8 +271,8 @@ async def generate_song_structure_handler(
             ai_logger.error(f"Parsed song structure is not a dictionary: {type(song_structure)}")
             return {}
     except Exception as e:
-        print(f"Error using agent for song structure: {e}")
-        ai_logger.error(f"Error using agent for song structure: {e}")
+        print(f"Error using Gemini for song structure: {e}")
+        ai_logger.error(f"Error using Gemini for song structure: {e}")
         return {}
 
     print(f"Parsed song structure: {song_structure}")
@@ -305,11 +284,17 @@ async def generate_song_structure_handler(
     # Analyze passage tone using the agent
     try:
         # Log the request
-        request_prompt = f"Analyze the tone of {strBookName} chapter {intBookChapter}, verses {strVerseRange}"
+        request_prompt = (
+            "You are a helpful agent. When asked to analyze tone:\n"
+            "- Analyze the emotional tone of the given Bible passage\n"
+            "- Return ONLY '0' for negative tone or '1' for positive tone\n"
+            "- No explanations\n\n"
+            f"Task: Analyze the tone of {strBookName} chapter {intBookChapter}, verses {strVerseRange}"
+        )
         ai_logger.info(f"Analyzing tone for {strBookName} {intBookChapter}:{strVerseRange}")
-        ai_logger.info(f"Agent request: {request_prompt}")
+        ai_logger.info(f"Gemini request: {request_prompt}")
         
-        passage_tone_response = await _run_agent(request_prompt)
+        passage_tone_response = await _run_gemini(request_prompt)
         
         # Log the response
         ai_logger.info(f"Tone response: {passage_tone_response}")
