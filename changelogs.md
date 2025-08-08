@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Corrected the frontend `generate_verse_range` function to use the correct `/ai-generation/verse-ranges` endpoint and send a JSON payload instead of query parameters.
 
 ### Changed
+- Refactored `ai_generation` routes to use the Gemini middleware directly (`middleware/gemini.py`) instead of the multi-tool agent (`multi_tool_agent/song_generation_agent.py`).
 - Updated frontend `generateSongStructure` function to use new `/ai-generation/song-structure` endpoint instead of deprecated `/generate-song-structure`
 - Added import for `ai_generation_router` in backend main.py
 - Included `ai_generation_router` in the FastAPI app
