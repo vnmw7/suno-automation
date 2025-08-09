@@ -11,13 +11,11 @@ import re
 import traceback
 import importlib.util
 import datetime  # Added for timestamp generation
-import aiohttp
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Union
 from slugify import slugify  # Added for filename sanitization
 from camoufox import AsyncCamoufox
 from playwright.async_api import Page, Locator
 from configs.browser_config import config
-from services.supabase_service import SupabaseService
 
 # TODO: Future Improvements
 # 1. Implement retry logic with exponential backoff for browser automation failures
@@ -35,10 +33,6 @@ supabase_utils = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(supabase_utils)
 
 supabase = supabase_utils.supabase
-
-# Import review function from ai_review module
-from api.ai_review.utils import review_song_with_ai
-
 
 async def generate_song_handler(
     strBookName: str,
