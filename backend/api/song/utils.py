@@ -292,7 +292,7 @@ async def generate_song(
 
                 await create_button.click()
                 await page.wait_for_timeout(5000)
-                await page.wait_for_load_state("networkidle", timeout=180000)
+                await page.wait_for_load_state("networkidle", timeout=3000)
                 print("Song creation initiated and page loaded.")
 
                 # Get the song ID from the URL
