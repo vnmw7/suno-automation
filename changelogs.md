@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Corrected the frontend `generate_verse_range` function to use the correct `/ai-generation/verse-ranges` endpoint and send a JSON payload instead of query parameters.
+- Reduced timeout for page load state during song creation to improve responsiveness
 
 ### Changed
 - Refactored `ai_generation` routes to use the Gemini middleware directly (`middleware/gemini.py`) instead of the multi-tool agent (`multi_tool_agent/song_generation_agent.py`).
