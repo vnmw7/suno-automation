@@ -358,9 +358,9 @@ export const reviewSongAPI = async (
   request: SongReviewRequest
 ): Promise<SongReviewResponse> => {
   try {
-    console.log("API request payload for /song/review:", request);
+    console.log("API request payload for /ai_review/review:", request);
 
-    const response = await fetch(`${API_BASE_URL}/song/review/`, {
+    const response = await fetch(`${API_BASE_URL}/ai_review/review/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -372,7 +372,7 @@ export const reviewSongAPI = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Error response from /song/review:", errorText);
+      console.error("Error response from /ai_review/review:", errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const data = await response.json();

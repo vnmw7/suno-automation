@@ -12,6 +12,7 @@ import shutil
 from typing import Dict, Any, Optional
 import aiohttp
 from services.supabase_service import SupabaseService
+from middleware.gemini import model_pro, api_key
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -28,13 +29,6 @@ file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
-
-# Google AI API configuration
-GOOGLE_AI_API_KEY = os.getenv("GOOGLE_AI_API_KEY")
-if not GOOGLE_AI_API_KEY:
-    raise ValueError("GOOGLE_AI_API_KEY environment variable is required")
-
-GOOGLE_AI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
 
 async def upload_file_to_google_ai(file_path: str, api_key: str) -> Optional[Dict[str, Any]]:
@@ -115,11 +109,10 @@ async def upload_file_to_google_ai(file_path: str, api_key: str) -> Optional[Dic
 
 
 async def send_prompt_to_google_ai(
-    prompt: str, 
+    prompt: str,
     file_uri: Optional[str] = None,
     mime_type: Optional[str] = None,
-    api_key: str = None,
-    previous_messages: Optional[list] = None
+    previous_messages: Optional[list] = None,
 ) -> Optional[str]:
     """
     Sends a prompt to Google AI API with optional file attachment and conversation history.
@@ -133,7 +126,6 @@ async def send_prompt_to_google_ai(
         prompt (str): Text prompt to send to the AI model
         file_uri (str, optional): URI of previously uploaded file for multimodal input
         mime_type (str, optional): MIME type of attached file (required if file_uri provided)
-        api_key (str): Google AI API key for authentication
         previous_messages (list, optional): Conversation history in Google AI format
 
     Returns:
@@ -143,66 +135,42 @@ async def send_prompt_to_google_ai(
         None: Errors are caught and logged internally
     """
     try:
-        async with aiohttp.ClientSession() as session:
-            url = f"{GOOGLE_AI_API_BASE}/models/gemini-2.5-pro:generateContent?key={api_key}"
-            
-            # Build contents array
-            contents = []
-            
-            # Add previous messages if provided
-            if previous_messages:
-                contents.extend(previous_messages)
-            
-            # Build current message parts
-            parts = []
-            
-            # Add file if provided
-            if file_uri and mime_type:
-                parts.append({
-                    "file_data": {
-                        "mime_type": mime_type,
-                        "file_uri": file_uri
-                    }
-                })
-            
-            # Add text prompt
-            parts.append({"text": prompt})
-            
-            # Add current message
-            contents.append({
-                "role": "user",
-                "parts": parts
-            })
-            
-            # Prepare request data
-            data = {
-                "contents": contents,
-                "generationConfig": {
-                    "temperature": 0.7,
-                    "topK": 40,
-                    "topP": 0.95,
-                    "maxOutputTokens": 8192,
-                }
-            }
-            
-            async with session.post(url, json=data) as resp:
-                if resp.status != 200:
-                    error_text = await resp.text()
-                    print(f"Failed to get AI response: {resp.status} - {error_text}")
-                    return None
-                    
-                result = await resp.json()
-                
-                # Extract text from response
-                if "candidates" in result and len(result["candidates"]) > 0:
-                    candidate = result["candidates"][0]
-                    if "content" in candidate and "parts" in candidate["content"]:
-                        parts = candidate["content"]["parts"]
-                        if len(parts) > 0 and "text" in parts[0]:
-                            return parts[0]["text"]
-                
-                return None
-                
+        # Build contents array
+        contents = []
+
+        # Add previous messages if provided
+        if previous_messages:
+            contents.extend(previous_messages)
+
+        # Build current message parts
+        parts = []
+
+        # Add file if provided
+        if file_uri and mime_type:
+            parts.append(
+                {"file_data": {"mime_type": mime_type, "file_uri": file_uri}}
+            )
+
+        # Add text prompt
+        parts.append({"text": prompt})
+
+        # Add current message
+        contents.append({"role": "user", "parts": parts})
+
+        # Prepare request data
+        generation_config = {
+            "temperature": 0.7,
+            "topK": 40,
+            "topP": 0.95,
+            "maxOutputTokens": 8192,
+        }
+
+        response = await model_pro.generate_content_async(
+            contents, generation_config=generation_config
+        )
+
+        return response.text
+
     except Exception as e:
         print(f"Error sending prompt to Google AI: {e}")
         return None
@@ -321,7 +289,7 @@ async def review_song_with_ai(
         # Note: We don't close the service here anymore - it will be closed later
 
         logger.info(f"Uploading audio file to Google AI: {audio_file_path}")
-        file_metadata = await upload_file_to_google_ai(audio_file_path, GOOGLE_AI_API_KEY)
+        file_metadata = await upload_file_to_google_ai(audio_file_path, api_key)
         
         if not file_metadata:
             error_msg = "Failed to upload audio file to Google AI"
@@ -346,7 +314,6 @@ async def review_song_with_ai(
             prompt=first_prompt,
             file_uri=file_uri,
             mime_type=mime_type,
-            api_key=GOOGLE_AI_API_KEY
         )
         
         if not first_response:
@@ -396,7 +363,6 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
         logger.info("Sending second prompt for lyrics comparison")
         second_response = await send_prompt_to_google_ai(
             prompt=second_prompt,
-            api_key=GOOGLE_AI_API_KEY,
             previous_messages=conversation_history
         )
         

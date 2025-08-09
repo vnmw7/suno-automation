@@ -28,25 +28,6 @@ app.add_middleware(
 )
 
 
-class SongRequest(BaseModel):
-    """
-    Represents a request to generate or download a song.
-
-    Attributes:
-        strBookName (str): The name of the book.
-        intBookChapter (int): The chapter number within the book.
-        strVerseRange (str): The range of verses to consider.
-        strStyle (str): The desired style for the song.
-        strTitle (str): The title of the song.
-    """
-
-    strBookName: str
-    intBookChapter: int
-    strVerseRange: str
-    strStyle: str
-    strTitle: str
-
-
 @app.get("/")
 def read_root():
     """
@@ -90,78 +71,6 @@ async def login_with_microsoft_endpoint():
     await login_google()
     is_successful = await suno_login_microsoft()
     return {"success": is_successful}
-
-
-# TOFIX: These verse range endpoints are duplicated in api.ai_generation.routes
-# Consider removing these endpoints to avoid duplication and maintain consistency
-# with the new modular structure. The new endpoints are at:
-# - /ai-generation/verse-ranges (POST)
-# - /ai-generation/verse-ranges (GET)
-@app.post("/generate-verse-ranges")
-def generate_verse_ranges_endpoint(book_name: str, book_chapter: int):
-    """
-    Generates verse ranges for a given book and chapter.
-
-    This endpoint takes a book name and chapter number, then uses an AI function
-    to generate corresponding verse ranges. It includes error handling for
-    unexpected issues during the generation process.
-
-    Args:
-        book_name (str): The name of the book (e.g., "Genesis").
-        book_chapter (int): The chapter number (e.g., 1).
-
-    Returns:
-        dict: A JSON response containing the success status, a message, and the
-              generated verse ranges, or an error message if an exception occurs.
-    """
-    from utils.ai_functions import generate_verse_ranges
-
-    try:
-        print(
-            f"[generate_verse_ranges_endpoint({book_name}, {book_chapter})] Generating verse ranges for {book_name} chapter {book_chapter}"
-        )
-        verse_ranges = generate_verse_ranges(book_name, book_chapter)
-        return {
-            "success": True,
-            "message": "Verse ranges generated successfully.",
-            "verse_ranges": verse_ranges,
-        }
-    except Exception as e:
-        print(f"A critical error occurred in generate_verse_ranges_endpoint: {e}")
-        print(traceback.format_exc())
-        return {
-            "error": str(e),
-            "message": "A critical error occurred during the verse ranges generation.",
-        }
-
-
-@app.get("/get-verse-ranges")
-def get_verse_ranges_endpoint(book_name: str, book_chapter: int):
-    """
-    Retrieves pre-generated verse ranges for a given book and chapter.
-
-    This endpoint fetches verse ranges from a data source using the provided
-    book name and chapter number. It handles potential errors during retrieval.
-
-    Args:
-        book_name (str): The name of the book (e.g., "Genesis").
-        book_chapter (int): The chapter number (e.g., 1).
-
-    Returns:
-        dict: A JSON response containing the success status, a message, and the
-              retrieved verse ranges, or an error message if an exception occurs.
-    """
-    from utils.ai_functions import get_verse_ranges
-
-    try:
-        verse_ranges = get_verse_ranges(book_name, book_chapter)
-        return {
-            "success": True,
-            "message": "Verse ranges retrieved successfully.",
-            "verse_ranges": verse_ranges,
-        }
-    except Exception as e:
-        return {"error": str(e)}
 
 
 @app.get("/debug/song-structures")

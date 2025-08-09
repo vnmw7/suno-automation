@@ -19,20 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added optional `structureId` field to frontend `SongStructureRequest` interface for song structure regeneration
 - Added TODO comments throughout codebase for future improvements:
-  - Duplicate verse range endpoints in main.py that need consolidation
   - Missing frontend integration for new `/ai-generation/verse-ranges` endpoints
   - Missing `/download-song` endpoint implementation
   - Need for consistent error response structures across all endpoints
   - Type safety enhancement suggestions for shared types between frontend and backend
 - Added TOFIX comments for:
-  - Duplicate verse range endpoints in main.py
   - Missing `/download-song` endpoint that frontend is calling
 
 ### Removed
-- Removed deprecated `/generate-song-structure` endpoint from backend main.py
-- Removed old `SongStructureRequest` class definition from main.py
+- Removed deprecated `/generate-song-structure` endpoint from backend main.py.
+- Removed deprecated `/generate-verse-ranges` and `/get-verse-ranges` endpoints from `main.py`.
+- Removed unused `SongRequest` Pydantic model from `main.py`.
+- Removed old `SongStructureRequest` class definition from main.py.
 
 ### Technical Debt
-- Identified need to consolidate verse range endpoints (currently duplicated in main.py and ai_generation routes)
 - Identified need to implement or fix `/download-song` endpoint referenced by frontend
 - Identified opportunity for shared type definitions between TypeScript and Python
