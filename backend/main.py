@@ -6,8 +6,6 @@ Purpose: Main FastAPI application setup, including routing, middleware, and API 
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import traceback
 from api.song.routes import router as song_router
 from api.ai_review.routes import router as ai_review_router
 from api.ai_generation.routes import router as ai_generation_router
