@@ -801,6 +801,15 @@ async def download_song_handler(
 async def delete_song_from_suno_handler(song_title: str, intIndex: int = -1) -> Dict[str, Any]:
     """
     Handles the deletion of a song from Suno.com.
+    
+    Args:
+        song_title (str): Title of the song to delete
+        intIndex (int): Index of the song (default: -1 for last song)
+    
+    Returns:
+        Dict[str, Any]: Result dictionary with:
+            - success (bool): Deletion status
+            - error (str): Error message if deletion failed
     """
     try:
         success = await delete_suno_song(song_title, intIndex)
