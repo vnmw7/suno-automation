@@ -232,10 +232,10 @@ async def delete_song_files_endpoint(request: SongDeleteRequest):
 
         # --- Delete from Suno.com ---
         try:
-            # Note: suno_index from the frontend is 1-based. The handler expects this.
-            # However, the delete function on suno.com might be more reliable with negative indexing
-            # if we always want to delete the latest. Assuming 1 and 2 are the two latest songs.
-            suno_deletion_result = await delete_song_from_suno_handler(request.song_title, intIndex=song.suno_index)
+            # Note: The suno_index from the frontend (e.g., 1, 2) is converted to a
+            # negative index (-1, -2) to reliably delete the most recent songs from Suno,
+            # which are located at the end of the list retrieved by the automation.
+            suno_deletion_result = await delete_song_from_suno_handler(request.song_title, intIndex=-song.suno_index)
             if not suno_deletion_result["success"]:
                 errors.append({"song_title": request.song_title, "suno_index": song.suno_index, "error": suno_deletion_result.get("error", "Unknown error deleting from Suno")})
         except Exception as e:
