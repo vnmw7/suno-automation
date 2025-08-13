@@ -3,6 +3,11 @@
 This module provides utility functions for generating songs using Suno's API
 and reviewing generated songs with Google AI Studio. It handles the entire
 song creation workflow from lyric generation to quality review.
+
+TODO: Refactor common logic. The `download_song_handler` and `delete_suno_song`
+functions share similar logic for navigating to the Suno.com user page and
+finding a song by its title. This common logic should be extracted into a
+shared helper function to reduce code duplication and improve maintainability.
 """
 
 import os
@@ -16,6 +21,7 @@ from slugify import slugify  # Added for filename sanitization
 from camoufox import AsyncCamoufox
 from playwright.async_api import Page, Locator
 from configs.browser_config import config
+from utils.suno_functions import delete_suno_song
 
 # TODO: Future Improvements
 # 1. Implement retry logic with exponential backoff for browser automation failures
@@ -355,7 +361,7 @@ async def teleport_click(page: Page, locator: Locator, button: str = "left", del
     """
     print(f"Teleporting via JS click (button: {button})")
     await locator.scroll_into_view_if_needed(timeout=10000)
-    
+
     # This executes a click directly in the browser's engine, bypassing Python patches.
     if button == 'right':
         # Dispatch 'contextmenu' event for a right-click.
@@ -363,7 +369,7 @@ async def teleport_click(page: Page, locator: Locator, button: str = "left", del
     else:
         # Use JavaScript click() for a standard left-click.
         await locator.evaluate("element => element.click()")
-    
+
     await page.wait_for_timeout(delay)
     print("Teleport click completed.")
 
@@ -382,7 +388,7 @@ async def teleport_hover(page: Page, locator: Locator, delay: int = 50):
     """
     print("Teleporting via JS hover")
     await locator.scroll_into_view_if_needed(timeout=10000)
-    
+
     # This dispatches a mouseover event directly to the element in the browser.
     await locator.dispatch_event('mouseover')
     await page.wait_for_timeout(delay)
@@ -404,7 +410,7 @@ async def download_song_handler(
     """
     Downloads a song from Suno.com using automated browser interactions.
 
-    Uses instantaneous "teleport" actions for speed, except for a regular 
+    Uses instantaneous "teleport" actions for speed, except for a regular
     humanized hover on the download sub-menu trigger to ensure it opens correctly.
 
     Features:
@@ -722,7 +728,7 @@ async def download_song_handler(
                         print("Hovering over MP3 download option with teleport hover...")
                         await teleport_hover(page, mp3_option)
                         await page.wait_for_timeout(500)
-                        
+
                         # Click MP3 option (INSTANT)
                         print("Clicking MP3 download option with teleport click...")
                         await teleport_click(page, mp3_option)
@@ -791,3 +797,15 @@ async def download_song_handler(
         result.update({"success": False, "error": error_msg})
 
     return result
+
+async def delete_song_from_suno_handler(song_title: str, intIndex: int = -1) -> Dict[str, Any]:
+    """
+    Handles the deletion of a song from Suno.com.
+    """
+    try:
+        success = await delete_suno_song(song_title, intIndex)
+        return {"success": success}
+    except Exception as e:
+        print(f"An error occurred in delete_song_from_suno_handler: {e}")
+        print(traceback.format_exc())
+        return {"success": False, "error": str(e)}

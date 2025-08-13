@@ -4,14 +4,24 @@ Module: api.song
 Purpose: Defines the API routes for song-related operations, including generation, download, and review.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Union
 import traceback
 import os
-from .utils import generate_song_handler, download_song_handler
+from .utils import generate_song_handler, download_song_handler, delete_song_from_suno_handler
 
 router = APIRouter(prefix="/song", tags=["song"])
+
+
+class SongToDelete(BaseModel):
+    file_path: str
+    suno_index: int
+
+class SongDeleteRequest(BaseModel):
+    """Request model for deleting song files."""
+    song_title: str
+    songs: List[SongToDelete]
 
 
 class SongReviewRequest(BaseModel):
@@ -186,3 +196,58 @@ async def download_song_endpoint(request: SongDownloadRequest):
             status_code=500,
             detail=f"Internal server error during song download: {str(e)}",
         )
+
+
+@router.post("/delete-files")
+async def delete_song_files_endpoint(request: SongDeleteRequest):
+    """
+    Delete one or more song files from the server and from suno.com.
+
+    Args:
+        request: SongDeleteRequest containing a list of songs to delete.
+
+    Returns:
+        JSON response with success status and details of deleted/not found files.
+    """
+    deleted_files = []
+    not_found_files = []
+    errors = []
+
+    allowed_directory = os.path.abspath("backend/songs/pending_review")
+
+    for song in request.songs:
+        # --- Delete local file ---
+        try:
+            absolute_file_path = os.path.abspath(song.file_path)
+            if not absolute_file_path.startswith(allowed_directory):
+                not_found_files.append(song.file_path)
+                continue
+            if os.path.exists(absolute_file_path):
+                os.remove(absolute_file_path)
+                deleted_files.append(song.file_path)
+            else:
+                not_found_files.append(song.file_path)
+        except Exception as e:
+            errors.append({"file_path": song.file_path, "error": str(e)})
+
+        # --- Delete from Suno.com ---
+        try:
+            # Note: suno_index from the frontend is 1-based. The handler expects this.
+            # However, the delete function on suno.com might be more reliable with negative indexing
+            # if we always want to delete the latest. Assuming 1 and 2 are the two latest songs.
+            suno_deletion_result = await delete_song_from_suno_handler(request.song_title, intIndex=song.suno_index)
+            if not suno_deletion_result["success"]:
+                errors.append({"song_title": request.song_title, "suno_index": song.suno_index, "error": suno_deletion_result.get("error", "Unknown error deleting from Suno")})
+        except Exception as e:
+            errors.append({"song_title": request.song_title, "suno_index": song.suno_index, "error": str(e)})
+
+
+    if errors:
+        raise HTTPException(status_code=500, detail={"message": "Errors occurred during file deletion.", "errors": errors})
+
+    return {
+        "success": True,
+        "message": "File deletion process completed.",
+        "deleted_files": deleted_files,
+        "not_found_files": not_found_files,
+    }

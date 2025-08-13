@@ -415,6 +415,37 @@ export const fetchSongFilesFromPublic = async (
   }
 };
 
+export interface SongToDelete {
+  file_path: string;
+  suno_index: number;
+}
+
+export const deleteSongFilesAPI = async (
+  songs: SongToDelete[],
+  songTitle: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/song/delete-files`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ songs: songs, song_title: songTitle }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Network response was not ok" }));
+      return { success: false, error: errorData.error || `HTTP error! status: ${response.statusText} (${response.status})` };
+    }
+
+    const data = await response.json();
+    return { success: data.success, error: data.error };
+  } catch (error) {
+    console.error("Failed to delete song files:", error);
+    return { success: false, error: error instanceof Error ? error.message : "An unknown error occurred" };
+  }
+};
+
 // TODO: Consider implementing type safety enhancements
 // Create a shared types package that both frontend and backend can use
 // This would ensure perfect type alignment between TypeScript and Python models
