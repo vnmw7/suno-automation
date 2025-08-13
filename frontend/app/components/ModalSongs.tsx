@@ -6,11 +6,13 @@ import {
   fetchStyles,
   downloadSongAPI,
   reviewSongAPI,
+  deleteSongFilesAPI,
   fetchSongFilesFromPublic,
   type SongStructure,
   type Style,
   type SongDownloadRequest,
   type SongReviewRequest,
+  type SongToDelete,
 } from "../lib/api";
 
 const SONG_DIRECTORY = "/songs";
@@ -155,104 +157,102 @@ const ModalSongs = ({
     setGeneratingStyle(selectedStyle);
     setMessage(null);
     setError(null);
+    const title = `${bookName} ${chapter}:${range}`;
+    const songsToDelete: SongToDelete[] = [];
+    const downloadedFilePaths: string[] = [];
+
     try {
-      const title = `${bookName} ${chapter}:${range}`;
-      const requestPayload = {
+      // Step 1: Generate the song (this prepares it on the backend)
+      const generateRequestPayload = {
         strBookName: bookName,
         intBookChapter: chapter,
         strVerseRange: range,
-        strStyle: `${selectedStyle}`,
+        strStyle: selectedStyle,
         strTitle: title,
       };
-
-      console.log("Sending request payload:", requestPayload);
-
-      // Step 1: Generate the song
-      const result = await callGenerateSongAPI(requestPayload);
-
-      if (!result.success) {
-        setError(result.error || result.message || "Failed to generate song");
-        return;
+      setMessage(`Generating song with style '${selectedStyle}'...`);
+      const generateResult = await callGenerateSongAPI(generateRequestPayload);
+      if (!generateResult.success) {
+        throw new Error(generateResult.error || "Failed to generate song");
       }
-
-      setMessage(`Song with style '${selectedStyle}' generated successfully! Starting download...`);
-      console.log("Song generation result:", result.result);
-
-      // Step 2: Wait for generation to complete (3 minutes)
-      setMessage(`Song generated! Waiting for processing to complete...`);
+      setMessage("Song generated! Waiting for processing to complete (this may take a few minutes)...");
+      // TODO: Improve Song Generation UX.
+      // The frontend currently waits for a fixed 3 minutes for the song to be
+      // generated on the backend. This can be a bit rigid. For a better user
+      // experience, you might consider implementing a polling mechanism that
+      // periodically checks the song's status, or using WebSockets for
+      // real-time updates. This would allow the UI to reflect the actual
+      // progress more accurately.
       await new Promise((resolve) => setTimeout(resolve, 3 * 60 * 1000));
 
-      // Step 3: Download the song using the new downloadSongAPI
-      setMessage(`Downloading song...`);
-      const downloadRequest: SongDownloadRequest = {
-        strTitle: title,
-        intIndex: 1, // Default to index 1, could be made configurable
-        download_path: undefined // Let the backend use default path
-      };
-
-      const downloadResult = await downloadSongAPI(downloadRequest);
-
-      if (!downloadResult.success) {
-        setError(downloadResult.error || "Failed to download song");
-        return;
+      // Step 2: Download and Review Index 1
+      setMessage("Downloading song (index 1)...");
+      const downloadRequest1: SongDownloadRequest = { strTitle: title, intIndex: 1 };
+      const downloadResult1 = await downloadSongAPI(downloadRequest1);
+      if (!downloadResult1.success || !downloadResult1.file_path) {
+        throw new Error(downloadResult1.error || "Failed to download song at index 1");
       }
+      downloadedFilePaths.push(downloadResult1.file_path);
+      setMessage("Reviewing song (index 1)...");
+      const reviewRequest1: SongReviewRequest = {
+        audio_file_path: downloadResult1.file_path,
+        song_structure_id: songStructures[0].id,
+      };
+      const reviewResult1 = await reviewSongAPI(reviewRequest1);
+      if (!reviewResult1.success) {
+        throw new Error(reviewResult1.error || "Failed to review song at index 1");
+      }
+      if (reviewResult1.verdict === "re-roll") {
+        songsToDelete.push({ file_path: downloadResult1.file_path, suno_index: 1 });
+      }
+      setMessage(`Review 1 verdict: ${reviewResult1.verdict}.`);
 
-      console.log("Song download result:", downloadResult);
-      setMessage(`Song downloaded successfully! Starting review...`);
+      // Step 3: Download and Review Index 2
+      setMessage("Downloading song (index 2)...");
+      const downloadRequest2: SongDownloadRequest = { strTitle: title, intIndex: 2 };
+      const downloadResult2 = await downloadSongAPI(downloadRequest2);
+      if (!downloadResult2.success || !downloadResult2.file_path) {
+        throw new Error(downloadResult2.error || "Failed to download song at index 2");
+      }
+      downloadedFilePaths.push(downloadResult2.file_path);
+      setMessage("Reviewing song (index 2)...");
+      const reviewRequest2: SongReviewRequest = {
+        audio_file_path: downloadResult2.file_path,
+        song_structure_id: songStructures[0].id,
+      };
+      const reviewResult2 = await reviewSongAPI(reviewRequest2);
+      if (!reviewResult2.success) {
+        throw new Error(reviewResult2.error || "Failed to review song at index 2");
+      }
+      if (reviewResult2.verdict === "re-roll") {
+        songsToDelete.push({ file_path: downloadResult2.file_path, suno_index: 2 });
+      }
+      setMessage(`Review 2 verdict: ${reviewResult2.verdict}.`);
 
-      // Step 4: Review the downloaded song
-      if (downloadResult.file_path && songStructures.length > 0) {
-        const reviewRequest: SongReviewRequest = {
-          audio_file_path: downloadResult.file_path,
-          song_structure_id: songStructures[0].id
-        };
-
-        const reviewResult = await reviewSongAPI(reviewRequest);
-        
-        if (reviewResult.success) {
-          console.log("Song review result:", reviewResult);
-          
-          // Handle different review verdicts
-          switch (reviewResult.verdict) {
-            case "continue":
-              setMessage(`Song generated and reviewed successfully! Quality check passed. The song is ready for use.`);
-              break;
-            case "re-roll":
-              setMessage(`Song generated but review suggests regeneration. You may want to try generating again with different parameters.`);
-              break;
-            case "error":
-              setError(`Song review encountered an error: ${reviewResult.error || "Unknown review error"}`);
-              break;
-            default:
-              setMessage(`Song generated and downloaded successfully! Review completed with verdict: ${reviewResult.verdict}`);
-          }
-          
-          // Log review responses for debugging
-          if (reviewResult.first_response) {
-            console.log("Review first response:", reviewResult.first_response);
-          }
-          if (reviewResult.second_response) {
-            console.log("Review second response:", reviewResult.second_response);
-          }
+      // Step 4: Handle Final Verdict
+      if (songsToDelete.length > 0) {
+        setMessage(`Found ${songsToDelete.length} song(s) for re-roll. Deleting...`);
+        const deleteResult = await deleteSongFilesAPI(songsToDelete, title);
+        if (deleteResult.success) {
+          setMessage(`${songsToDelete.length} song(s) have been deleted due to re-roll verdict.`);
         } else {
-          // Review failed, but song was still downloaded successfully
-          setMessage(`Song downloaded successfully, but review failed: ${reviewResult.error || "Unknown review error"}`);
-          console.error("Review error:", reviewResult.error);
+          throw new Error(deleteResult.error || "Failed to delete re-rolled files.");
         }
       } else {
-        // No file path or song structures for review, but download was successful
-        setMessage(`Song downloaded successfully! Review skipped (missing file path or song structure).`);
+        setMessage("Both songs passed the quality check. The process is complete.");
       }
 
-      // Refresh the song files list to show the new song
+      // Refresh the song files list
       const songFilesResponse = await fetchSongFilesFromPublic(bookName, chapter, range);
       if (songFilesResponse.success && songFilesResponse.result) {
         setSongFiles(songFilesResponse.result);
       }
 
     } catch (err) {
-      setError("An unexpected error occurred");
-      console.error("Error generating song:", err);
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      setError(errorMessage);
+      console.error("Error in handleGenerateSong:", err);
+
     } finally {
       setIsLoading(false);
       setGeneratingStyle(null);

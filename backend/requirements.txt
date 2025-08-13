@@ -13,4 +13,4 @@ ruff
 black
 psycopg2-binary
 python-slugify
-google-adk
+google-generativeai

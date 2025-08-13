@@ -24,6 +24,16 @@ export default function handleRequest(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   loadContext: AppLoadContext
 ) {
+  // Sanitize the request URL to prevent open redirect vulnerabilities.
+  try {
+    const { pathname } = new URL(request.url);
+    if (pathname.includes("//")) {
+      return new Response("Bad Request", { status: 400 });
+    }
+  } catch (error) {
+    return new Response("Bad Request", { status: 400 });
+  }
+
   return isbot(request.headers.get("user-agent") || "")
     ? handleBotRequest(
         request,
@@ -85,7 +95,7 @@ function handleBotRequest(
       }
     );
 
-    setTimeout(abort, ABORT_DELAY);
+    setTimeout(() => abort(), ABORT_DELAY);
   });
 }
 
@@ -135,6 +145,6 @@ function handleBrowserRequest(
       }
     );
 
-    setTimeout(abort, ABORT_DELAY);
+    setTimeout(() => abort(), ABORT_DELAY);
   });
 }

@@ -1,6 +1,11 @@
 """
 suno_functions.py
 This file sets up the functions that will be used when automating Suno interactions.
+
+TODO: Enhance browser automation robustness. The scripts in this file are functional
+but could be made more resilient to changes in the Suno website's layout.
+Consider adding more advanced error handling, retry mechanisms with exponential backoff,
+and more flexible selectors to make these scripts less likely to break in the future.
 """
 
 from camoufox.async_api import AsyncCamoufox
@@ -107,6 +112,9 @@ async def login_suno():
                 if not email_input or not await email_input.is_visible():
                     raise Exception("Could not find a visible email input field.")
 
+                # TOFIX: Secure Credential Management.
+                # The credentials should not be hardcoded. They should be loaded
+                # from environment variables or a secure secret management service.
                 print("Typing email...")
                 await email_input.type("pbNJ1sznC2Gr@gmail.com", delay=50)
                 await page.keyboard.press("Enter")
@@ -150,3 +158,51 @@ async def login_suno():
             await page.screenshot(path=screenshot_path)
             print(f"Screenshot saved to {screenshot_path}")
             return False
+
+async def delete_suno_song(song_title: str, intIndex: int = -1):
+    """
+    Deletes a song from Suno.com using browser automation.
+    """
+    try:
+        async with AsyncCamoufox(
+            headless=False,
+            persistent_context=True,
+            user_data_dir="backend/camoufox_session_data",
+            os=("windows"),
+            config=config,
+            humanize=True,
+            i_know_what_im_doing=True,
+        ) as browser:
+            page = await browser.new_page()
+            await page.goto("https://suno.com/me", wait_until="domcontentloaded", timeout=45000)
+
+            # This is a simplified version of the logic in download_song_handler
+            # In a real scenario, you'd want the same robust locator strategies
+            song_elements = page.locator(f'span[title="{song_title}"]')
+            await song_elements.first.wait_for(state="visible", timeout=30000)
+
+            target_song = song_elements.nth(intIndex)
+            await target_song.scroll_into_view_if_needed()
+
+            # Right click to open context menu
+            await target_song.click(button="right")
+
+            # Click the delete option
+            delete_option = page.locator('div[role="menuitem"]:has-text("Delete")')
+            await delete_option.wait_for(state="visible", timeout=10000)
+            await delete_option.click()
+
+            # Handle confirmation dialog
+            # This assumes the confirmation button has a data-testid or a specific text
+            confirm_button = page.locator('button:has-text("Delete")').last
+            await confirm_button.wait_for(state="visible", timeout=10000)
+            await confirm_button.click()
+
+            await page.wait_for_load_state("networkidle", timeout=30000)
+            print(f"Successfully deleted song: {song_title}")
+            return True
+
+    except Exception as e:
+        print(f"An error occurred in delete_suno_song: {e}")
+        print(traceback.format_exc())
+        return False
