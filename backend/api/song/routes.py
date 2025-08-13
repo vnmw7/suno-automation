@@ -4,7 +4,7 @@ Module: api.song
 Purpose: Defines the API routes for song-related operations, including generation, download, and review.
 """
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Union
 import traceback
@@ -251,3 +251,32 @@ async def delete_song_files_endpoint(request: SongDeleteRequest):
         "deleted_files": deleted_files,
         "not_found_files": not_found_files,
     }
+
+
+@router.get("/list")
+async def list_songs_endpoint(request: Request):
+    """
+    List song files from the server.
+    """
+    songs_dir = "backend/songs/pending_review"
+    try:
+        if not os.path.isdir(songs_dir):
+            return {"success": False, "error": "Song directory not found on server."}
+
+        dirents = os.listdir(songs_dir)
+        mp3_files = [f for f in dirents if f.endswith(".mp3")]
+
+        book_name = request.query_params.get("bookName")
+        chapter_param = request.query_params.get("chapter")
+        range_param = request.query_params.get("range")
+
+        if book_name and chapter_param and range_param:
+            normalized_book_name = book_name.replace(" ", "_")
+            expected_file_prefix = f"{normalized_book_name}_{chapter_param}-{range_param}".lower()
+            mp3_files = [f for f in mp3_files if f.lower().startswith(expected_file_prefix)]
+
+        return {"success": True, "files": mp3_files}
+    except Exception as e:
+        print(f"[list_songs_endpoint] Critical error occurred: {e}")
+        print(traceback.format_exc())
+        return {"success": False, "error": "Failed to list song files from server."}

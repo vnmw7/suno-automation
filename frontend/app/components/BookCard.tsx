@@ -225,13 +225,7 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
       const result = await generate_verse_range(bookAbbr, chapter.toString());
 
       if (result.error) {
-        let errorMessage = "An unexpected error occurred.";
-        if (typeof result.error === "string") {
-          errorMessage = result.error;
-        } else if (typeof result.error === "object" && result.error !== null && 'error' in result.error) {
-          errorMessage = (result.error as any).error;
-        }
-        
+        const errorMessage = result.error;
         console.error(
           `[handleGenerateVerseRange] Error generating for ${bookAbbr} chapter ${chapter}:`,
           errorMessage

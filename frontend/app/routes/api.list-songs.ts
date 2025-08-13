@@ -1,10 +1,4 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import fs from "node:fs/promises"; // Using Node.js file system module
-import path from "node:path";
-
-function isErrorWithCode(err: unknown): err is { code: string } {
-  return typeof err === "object" && err !== null && "code" in err;
-}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -12,44 +6,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const chapterParam = url.searchParams.get("chapter");
   const range = url.searchParams.get("range"); // e.g., "1-11"
 
-  // Construct the absolute path to your public/songs directory
-  // process.cwd() typically gives the root of your Remix project
-  const songsPublicDir = path.join(process.cwd(), "public", "songs");
+  const backendUrl = new URL("http://127.0.0.1:8000/song/list");
+  if (bookName) backendUrl.searchParams.append("bookName", bookName);
+  if (chapterParam) backendUrl.searchParams.append("chapter", chapterParam);
+  if (range) backendUrl.searchParams.append("range", range);
 
   try {
-    const dirents = await fs.readdir(songsPublicDir, { withFileTypes: true });
-    let mp3Files = dirents
-      .filter((dirent) => dirent.isFile() && dirent.name.endsWith(".mp3"))
-      .map((dirent) => dirent.name);
-
-    // Optional but recommended: Filter files based on book, chapter, range
-    if (bookName && chapterParam && range) {
-      const normalizedBookName = bookName.replace(/ /g, "_"); // Example: "Exodus" -> "Exodus"
-      // Your filenames are like "Exodus_1-1-11_index_-1.mp3"
-      // The props are bookName="Exodus", chapter=1, range="1-11"
-      // The expected prefix in the filename would be "Exodus_1-1-11"
-      const expectedFilePrefix = `${normalizedBookName}_${chapterParam}-${range}`.toLowerCase();
-
-      mp3Files = mp3Files.filter((fileName) =>
-        fileName.toLowerCase().startsWith(expectedFilePrefix)
-      );
+    const response = await fetch(backendUrl.toString());
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Network response was not ok" }));
+      return json({ success: false, error: errorData.error || `HTTP error! status: ${response.statusText} (${response.status})` }, { status: response.status });
     }
-
-    return json({ success: true, files: mp3Files });
+    const data = await response.json();
+    return json(data);
   } catch (error: unknown) {
-    console.error(`Error listing song files from ${songsPublicDir}:`, error);
-    if (isErrorWithCode(error) && error.code === "ENOENT") {
-      // Directory not found
-      return json(
-        {
-          success: false,
-          error: `Song directory not found on server at ${songsPublicDir}`,
-        },
-        { status: 404 }
-      );
-    }
+    console.error(`Error fetching song files from backend:`, error);
     return json(
-      { success: false, error: "Failed to list song files from server." },
+      { success: false, error: "Failed to fetch song files from backend." },
       { status: 500 }
     );
   }

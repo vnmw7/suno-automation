@@ -72,7 +72,7 @@ export default function BookDetailsView({
         >
           {book.name}
         </h2>{" "}
-        <p className="text-sm text-slate-500 mb-1">{book.testament}</p>
+        {/* <p className="text-sm text-slate-500 mb-1">{book.testament}</p>
         <p className="text-sm text-slate-500 mb-6">Chapters: {book.chapters}</p>
         <div className="space-y-4">
           <div>
@@ -101,7 +101,7 @@ export default function BookDetailsView({
               </p>
             </div>
           )}
-        </div>
+        </div> */}
         <button
           onClick={onClose}
           className="mt-8 w-full px-4 py-2.5 bg-sky-600 text-white rounded-md hover:bg-sky-700 transition-colors font-medium text-sm sm:text-base"
