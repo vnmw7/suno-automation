@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2025-08-13
+
+### Added
+- Implemented a two-song review workflow in the frontend to download and review two songs sequentially.
+- Added a backend endpoint (`/song/delete-files`) to delete song files from the server.
+- Added functionality to delete songs from suno.com using browser automation when a "re-roll" verdict is given.
+- Added `TODO` and `TOFIX` comments in the code to document suggestions for future improvements, including enhancing browser automation robustness, securing credentials, refactoring common code, and improving the song generation UX.
+
+### Changed
+- The song deletion logic is now more granular. It only deletes the specific songs that are marked for "re-roll" by the review process, both locally and from the suno.com website.
+- The `handleGenerateSong` function in `ModalSongs.tsx` was completely restructured to support the new two-song review workflow.
+- The backend deletion endpoint was updated to accept a list of specific songs to delete, including their indices on suno.com.
+
+### Fixed
+- Corrected an issue where only one of the two generated songs was being deleted from suno.com when a "re-roll" was requested. The system now correctly deletes both.
+
 ## [Unreleased] - 2024-12-19
 
 ### Fixed
