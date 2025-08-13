@@ -3,7 +3,7 @@ import type { BibleBook } from "~/routes/main"; // Ensure this path is correct
 
 interface TestamentFilterProps {
   testaments: ("Old Testament" | "New Testament")[];
-  selectedTestament: BibleBook["testament"] | null;
+  selectedTestament: string | null;
   onSelectTestament: (testament: "Old Testament" | "New Testament") => void;
 }
 
