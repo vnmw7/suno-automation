@@ -256,12 +256,15 @@ async def delete_song_files_endpoint(request: SongDeleteRequest):
 @router.get("/list")
 async def list_songs_endpoint(request: Request):
     """
-    List song files from the server.
+    List song files from the server that have passed AI review and are ready for the frontend.
     """
-    songs_dir = "backend/songs/pending_review"
+    # Songs in this directory have been reviewed by the AI and are awaiting final manual review on the frontend.
+    songs_dir = "backend/songs/reviewed"
     try:
         if not os.path.isdir(songs_dir):
-            return {"success": False, "error": "Song directory not found on server."}
+            # It's possible the directory doesn't exist yet if no songs have been reviewed.
+            # Return an empty list instead of an error.
+            return {"success": True, "files": []}
 
         dirents = os.listdir(songs_dir)
         mp3_files = [f for f in dirents if f.endswith(".mp3")]
