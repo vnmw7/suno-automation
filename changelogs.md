@@ -12,14 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a backend endpoint (`/song/delete-files`) to delete song files from the server.
 - Added functionality to delete songs from suno.com using browser automation when a "re-roll" verdict is given.
 - Added `TODO` and `TOFIX` comments in the code to document suggestions for future improvements, including enhancing browser automation robustness, securing credentials, refactoring common code, and improving the song generation UX.
+- Added a new backend endpoint (`/song/list`) to provide the list of reviewed songs to the frontend.
 
 ### Changed
 - The song deletion logic is now more granular. It only deletes the specific songs that are marked for "re-roll" by the review process, both locally and from the suno.com website.
 - The `handleGenerateSong` function in `ModalSongs.tsx` was completely restructured to support the new two-song review workflow.
 - The backend deletion endpoint was updated to accept a list of specific songs to delete, including their indices on suno.com.
+- Updated the backend song list endpoint to serve files from the `reviewed` directory instead of `pending_review` to align with the application's review workflow.
 
 ### Fixed
 - Corrected an issue where only one of the two generated songs was being deleted from suno.com when a "re-roll" was requested. The system now correctly deletes both.
+- Fixed a crash (`ENOENT` error) on the song list page by fetching songs from the backend API instead of the local filesystem.
+- Resolved multiple TypeScript and linting errors in the frontend components to ensure a successful build.
 
 ## [Unreleased] - 2024-12-19
 
