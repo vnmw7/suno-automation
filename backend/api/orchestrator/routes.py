@@ -1,0 +1,115 @@
+"""
+System: backend
+Module: api.orchestrator.routes  
+Purpose: API routes for orchestrator workflow operations - the "mission control"
+         for complex song generation, download, and review workflows.
+"""
+
+from fastapi import APIRouter
+import traceback
+from .models import OrchestratorRequest, OrchestratorResponse
+from .utils import execute_song_workflow
+
+router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
+
+
+@router.post("/workflow", response_model=OrchestratorResponse)
+async def song_workflow_orchestrator(request: OrchestratorRequest):
+    """
+    🎼 SONG WORKFLOW ORCHESTRATOR
+    
+    The "Mission Control" endpoint for complete song creation workflows.
+    
+    This orchestrates the entire song creation process:
+    1. Generate 2 songs on Suno.com (single generation creates 2 variants)
+    2. Wait for Suno processing (3 minutes)
+    3. Download both songs using negative indexing (-1, -2) 
+    4. AI review each song for quality
+    5. Handle verdicts:
+       - "continue": Move to backend/songs/final_review
+       - "re-roll": Delete and retry generation
+    6. Auto-retry up to 3 times if needed
+    7. Fallback: Move final attempt songs to final_review regardless
+    
+    BENEFITS:
+    - Single API call handles entire complex workflow
+    - Intelligent retry logic for quality assurance
+    - Automatic file management (move good, delete bad)
+    - Comprehensive workflow tracking and statistics
+    - Robust error handling at each step
+    
+    Args:
+        request: OrchestratorRequest with book, chapter, verse range, style, and title
+    
+    Returns:
+        OrchestratorResponse: Complete workflow results, statistics, and file locations
+    """
+    print(f"🎼 [ORCHESTRATOR] === WORKFLOW STARTED ===")
+    print(f"🎼 [ORCHESTRATOR] Request: {request.strBookName} {request.intBookChapter}:{request.strVerseRange}")
+    print(f"🎼 [ORCHESTRATOR] Style: {request.strStyle}")
+    print(f"🎼 [ORCHESTRATOR] Title: {request.strTitle}")
+    
+    try:
+        # Execute the core workflow
+        workflow_result = await execute_song_workflow(
+            book_name=request.strBookName,
+            chapter=request.intBookChapter,
+            verse_range=request.strVerseRange,
+            style=request.strStyle,
+            title=request.strTitle,
+            song_structure_id=request.song_structure_id
+        )
+        
+        print(f"🎼 [ORCHESTRATOR] === WORKFLOW COMPLETED ===")
+        print(f"🎼 [ORCHESTRATOR] Success: {workflow_result['success']}")
+        print(f"🎼 [ORCHESTRATOR] Final songs: {workflow_result.get('final_songs_count', 0)}")
+        
+        # Convert workflow result to API response
+        return OrchestratorResponse(
+            success=workflow_result["success"],
+            message=workflow_result["message"],
+            total_attempts=workflow_result["total_attempts"],
+            final_songs_count=workflow_result["final_songs_count"],
+            good_songs=workflow_result.get("good_songs"),
+            re_rolled_songs=workflow_result.get("re_rolled_songs"), 
+            error=workflow_result.get("error"),
+            workflow_details=workflow_result.get("workflow_details")
+        )
+        
+    except Exception as e:
+        error_msg = f"🎼 Orchestrator failed with exception: {str(e)}"
+        print(error_msg)
+        print(traceback.format_exc())
+        
+        return OrchestratorResponse(
+            success=False,
+            message="Orchestrator workflow failed due to unexpected error",
+            total_attempts=0,
+            final_songs_count=0,
+            error=error_msg
+        )
+
+
+@router.get("/status")
+async def orchestrator_status():
+    """
+    Get current orchestrator service status and statistics.
+    
+    Returns basic health check and service information.
+    """
+    return {
+        "status": "operational",
+        "service": "Song Workflow Orchestrator",
+        "version": "1.0.0",
+        "endpoints": [
+            "/orchestrator/workflow - Main workflow execution",
+            "/orchestrator/status - Service health check"
+        ],
+        "workflow_features": [
+            "Automated song generation (2 songs per request)",
+            "Intelligent download with negative indexing",
+            "AI-powered quality review",
+            "3-attempt retry logic with fallback",
+            "Automatic file management and organization"
+        ]
+    }
