@@ -337,7 +337,14 @@ async def generate_song(
     except Exception as e:
         print(f"An error occurred in generate_song: {e}")
         print(traceback.format_exc())
-        return False
+        return {
+            "success": False,
+            "error": f"Song generation failed: {str(e)}",
+            "song_id": None,
+            "lyrics": None,
+            "style": strStyle,
+            "title": strTitle
+        }
 
 async def teleport_click(page: Page, locator: Locator, button: str = "left", delay: int = 50):
     """

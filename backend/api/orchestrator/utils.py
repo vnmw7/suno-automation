@@ -27,7 +27,7 @@ async def execute_song_workflow(
     
     WORKFLOW STEPS:
     1. Generate 2 songs on Suno.com (single generation creates 2 variants)
-    2. Wait for Suno processing (3 minutes) 
+    2. Wait for Suno processing
     3. Download both songs using negative indexing (-1, -2)
     4. AI review each song for quality
     5. Handle verdicts:
@@ -85,29 +85,51 @@ async def execute_song_workflow(
         try:
             # STEP 1: Generate Song (creates 2 songs on Suno)
             print(f"🎼 [WORKFLOW] Step 1: Generating songs...")
+            print(f"🎼 [WORKFLOW] Parameters: book={book_name}, chapter={chapter}, verse={verse_range}, style={style}, title={title}")
+            
             generation_result = await generate_songs(
                 book_name, chapter, verse_range, style, title
             )
             
+            print(f"🎼 [WORKFLOW] Generation result: success={generation_result.get('success')}")
+            
             if not generation_result["success"]:
-                attempt_details["final_action"] = f"generation_failed: {generation_result['error']}"
+                error_msg = generation_result.get('error', 'Unknown generation error')
+                print(f"🎼 [WORKFLOW] ❌ Generation failed on attempt {attempt}: {error_msg}")
+                attempt_details["final_action"] = f"generation_failed: {error_msg}"
                 workflow_details["attempts"].append(attempt_details)
+                print(f"🎼 [WORKFLOW] Will retry generation (attempt {attempt + 1}/{max_attempts})..." if attempt < max_attempts else "🎼 [WORKFLOW] Max attempts reached for generation")
                 continue
                 
             attempt_details["generation_success"] = True
             workflow_details["total_songs_generated"] += 2  # Suno generates 2 songs
             
+            # Log successful generation details
+            if "result" in generation_result:
+                song_id = generation_result["result"].get("song_id")
+                print(f"🎼 [WORKFLOW] ✅ Generation successful! Song ID: {song_id}")
+            
             # STEP 2: Wait for Suno processing
-            print(f"🎼 [WORKFLOW] Step 2: Waiting for Suno processing (3 minutes)...")
-            await asyncio.sleep(3 * 60)  # 3 minutes wait
+            wait_time_seconds = 10  # 10 seconds for testing
+            print(f"🎼 [WORKFLOW] Step 2: Waiting for Suno processing ({wait_time_seconds} seconds)...")
+            print(f"🎼 [WORKFLOW] ⏳ Starting wait at: {asyncio.get_event_loop().time()}")
+            await asyncio.sleep(wait_time_seconds)
+            print(f"🎼 [WORKFLOW] ⏰ Wait completed at: {asyncio.get_event_loop().time()}")
             
             # STEP 3: Download both songs
             print(f"🎼 [WORKFLOW] Step 3: Downloading both generated songs...")
+            print(f"🎼 [WORKFLOW] Download parameters: title='{title}', temp_dir='{temp_dir}'")
+            
             download_results = await download_both_songs(title, temp_dir)
             
+            print(f"🎼 [WORKFLOW] Download result: success={download_results.get('success')}, songs_downloaded={len(download_results.get('downloads', []))}")
+            
             if not download_results["success"]:
-                attempt_details["final_action"] = f"download_failed: {download_results['error']}"
+                error_msg = download_results.get('error', 'Unknown download error')
+                print(f"🎼 [WORKFLOW] ❌ Download failed on attempt {attempt}: {error_msg}")
+                attempt_details["final_action"] = f"download_failed: {error_msg}"
                 workflow_details["attempts"].append(attempt_details)
+                print(f"🎼 [WORKFLOW] Will retry entire workflow (attempt {attempt + 1}/{max_attempts})..." if attempt < max_attempts else "🎼 [WORKFLOW] Max attempts reached for download")
                 continue
                 
             attempt_details["downloads"] = download_results["downloads"]
@@ -216,6 +238,7 @@ async def generate_songs(book_name: str, chapter: int, verse_range: str, style: 
     try:
         from ..song.utils import generate_song_handler
         
+        print(f"🎼 [GENERATE] Calling song generation handler for: {book_name} {chapter}:{verse_range}")
         result = await generate_song_handler(
             strBookName=book_name,
             intBookChapter=chapter, 
@@ -224,13 +247,33 @@ async def generate_songs(book_name: str, chapter: int, verse_range: str, style: 
             strTitle=title
         )
         
-        if result and isinstance(result, dict) and result.get("success"):
-            return {"success": True, "result": result}
+        print(f"🎼 [GENERATE] Raw result type: {type(result)}")
+        print(f"🎼 [GENERATE] Raw result value: {result}")
+        
+        # Handle both dictionary and boolean returns for backward compatibility
+        if result is False:
+            print("🎼 [GENERATE] ❌ Song generation returned False (legacy error format)")
+            return {"success": False, "error": "Song generation returned False (legacy error)"}
+        elif result and isinstance(result, dict):
+            success = result.get("success", False)
+            print(f"🎼 [GENERATE] Result is dict with success={success}")
+            
+            if success:
+                print(f"🎼 [GENERATE] ✅ Song generation successful. Song ID: {result.get('song_id')}")
+                return {"success": True, "result": result}
+            else:
+                error_msg = result.get("error", "Unknown error in song generation")
+                print(f"🎼 [GENERATE] ❌ Song generation failed: {error_msg}")
+                return {"success": False, "error": error_msg}
         else:
-            return {"success": False, "error": "Song generation returned invalid result"}
+            print(f"🎼 [GENERATE] ❌ Unexpected result type: {type(result)}")
+            return {"success": False, "error": f"Song generation returned unexpected type: {type(result)}"}
             
     except Exception as e:
-        return {"success": False, "error": f"Song generation failed: {str(e)}"}
+        print(f"🎼 [GENERATE] ❌ Exception in generate_songs wrapper: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return {"success": False, "error": f"Song generation exception: {str(e)}"}
 
 
 async def download_both_songs(title: str, temp_dir: str) -> Dict[str, Any]:

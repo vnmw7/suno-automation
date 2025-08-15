@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2025-08-15
 
+### Fixed
+- **Orchestrator Loop Issue**: Fixed infinite loop in song generation module preventing workflow progression
+  - Fixed return type mismatch in `generate_song` function (`backend/api/song/utils.py`)
+  - Changed error return from `False` to proper dictionary format `{"success": False, "error": "..."}`
+  - Added backward compatibility in `generate_songs` wrapper to handle both legacy boolean and new dictionary returns
+  - Enhanced error detection and reporting throughout the workflow
+- **Workflow Debugging**: Added comprehensive logging for better troubleshooting
+  - Added detailed parameter logging at each workflow step
+  - Enhanced error messages with contextual information
+  - Added timing information for wait periods
+  - Improved visibility into generation, download, and review processes
+
+### Changed
+- **Wait Time Optimization**: Reduced Suno processing wait time for faster testing
+  - Changed from 3 minutes (180 seconds) to 10 seconds for development/testing
+  - Located in Step 2 of the orchestrator workflow
+  - Allows for faster iteration during development and debugging
+
 ### Added
 - **Orchestrator Module**: Complete automated song workflow system with dedicated API module (`backend/api/orchestrator/`)
   - Created `routes.py` with `/orchestrator/workflow` main endpoint and `/orchestrator/status` health check
