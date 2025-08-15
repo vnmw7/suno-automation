@@ -1,16 +1,11 @@
 import { useState, useEffect } from "react";
 import {
-  generateSong as callGenerateSongAPI,
   generateSongStructure as callGenerateSongStructureAPI,
   fetchSongStructures,
   fetchStyles,
-  downloadSongAPI,
-  reviewSongAPI,
   fetchSongFilesFromPublic,
   type SongStructure,
   type Style,
-  type SongDownloadRequest,
-  type SongReviewRequest,
 } from "../lib/api";
 
 const SONG_DIRECTORY = "/songs";
@@ -155,104 +150,65 @@ const ModalSongs = ({
     setGeneratingStyle(selectedStyle);
     setMessage(null);
     setError(null);
+    
     try {
       const title = `${bookName} ${chapter}:${range}`;
       const requestPayload = {
         strBookName: bookName,
         intBookChapter: chapter,
         strVerseRange: range,
-        strStyle: `${selectedStyle}`,
+        strStyle: selectedStyle,
         strTitle: title,
+        song_structure_id: songStructures.length > 0 ? songStructures[0].id : undefined
       };
 
-      console.log("Sending request payload:", requestPayload);
+      console.log("🎼 [FRONTEND] Sending orchestrator request:", requestPayload);
+      setMessage(`🎼 Starting automated song workflow with style '${selectedStyle}'...`);
 
-      // Step 1: Generate the song
-      const result = await callGenerateSongAPI(requestPayload);
+      // Single API call to orchestrator - handles generation, download, review, and retry logic automatically!
+      const response = await fetch('/orchestrator/workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload)
+      });
+      
+      const result = await response.json();
+      console.log("🎼 [FRONTEND] Orchestrator completed:", result);
 
-      if (!result.success) {
-        setError(result.error || result.message || "Failed to generate song");
-        return;
-      }
-
-      setMessage(`Song with style '${selectedStyle}' generated successfully! Starting download...`);
-      console.log("Song generation result:", result.result);
-
-      // Step 2: Wait for generation to complete (3 minutes)
-      setMessage(`Song generated! Waiting for processing to complete...`);
-      await new Promise((resolve) => setTimeout(resolve, 3 * 60 * 1000));
-
-      // Step 3: Download the song using the new downloadSongAPI
-      setMessage(`Downloading song...`);
-      const downloadRequest: SongDownloadRequest = {
-        strTitle: title,
-        intIndex: 1, // Default to index 1, could be made configurable
-        download_path: undefined // Let the backend use default path
-      };
-
-      const downloadResult = await downloadSongAPI(downloadRequest);
-
-      if (!downloadResult.success) {
-        setError(downloadResult.error || "Failed to download song");
-        return;
-      }
-
-      console.log("Song download result:", downloadResult);
-      setMessage(`Song downloaded successfully! Starting review...`);
-
-      // Step 4: Review the downloaded song
-      if (downloadResult.file_path && songStructures.length > 0) {
-        const reviewRequest: SongReviewRequest = {
-          audio_file_path: downloadResult.file_path,
-          song_structure_id: songStructures[0].id
-        };
-
-        const reviewResult = await reviewSongAPI(reviewRequest);
+      if (result.success) {
+        // Workflow completed successfully
+        const goodSongs = result.good_songs || 0;
+        const reRolledSongs = result.re_rolled_songs || 0;
+        const attempts = result.total_attempts || 1;
         
-        if (reviewResult.success) {
-          console.log("Song review result:", reviewResult);
-          
-          // Handle different review verdicts
-          switch (reviewResult.verdict) {
-            case "continue":
-              setMessage(`Song generated and reviewed successfully! Quality check passed. The song is ready for use.`);
-              break;
-            case "re-roll":
-              setMessage(`Song generated but review suggests regeneration. You may want to try generating again with different parameters.`);
-              break;
-            case "error":
-              setError(`Song review encountered an error: ${reviewResult.error || "Unknown review error"}`);
-              break;
-            default:
-              setMessage(`Song generated and downloaded successfully! Review completed with verdict: ${reviewResult.verdict}`);
-          }
-          
-          // Log review responses for debugging
-          if (reviewResult.first_response) {
-            console.log("Review first response:", reviewResult.first_response);
-          }
-          if (reviewResult.second_response) {
-            console.log("Review second response:", reviewResult.second_response);
-          }
-        } else {
-          // Review failed, but song was still downloaded successfully
-          setMessage(`Song downloaded successfully, but review failed: ${reviewResult.error || "Unknown review error"}`);
-          console.error("Review error:", reviewResult.error);
-        }
+        setMessage(
+          `🎼 Workflow completed successfully! ` +
+          `Generated ${goodSongs} high-quality song(s) in ${attempts} attempt(s). ` +
+          `${reRolledSongs > 0 ? `${reRolledSongs} song(s) were re-rolled for quality.` : ''} ` +
+          `✅ FINAL SONGS are now available in: backend/songs/final_review`
+        );
+        
+        setStepCompleted((prev) => ({ ...prev, song: true }));
+        
       } else {
-        // No file path or song structures for review, but download was successful
-        setMessage(`Song downloaded successfully! Review skipped (missing file path or song structure).`);
+        // Workflow failed after all attempts
+        const attempts = result.total_attempts || 0;
+        const errorDetails = result.error ? ` (${result.error})` : '';
+        
+        setError(
+          `🎼 Workflow failed after ${attempts} attempt(s): ${result.message}${errorDetails}`
+        );
       }
 
-      // Refresh the song files list to show the new song
+      // Refresh the song files list
       const songFilesResponse = await fetchSongFilesFromPublic(bookName, chapter, range);
       if (songFilesResponse.success && songFilesResponse.result) {
         setSongFiles(songFilesResponse.result);
       }
 
     } catch (err) {
-      setError("An unexpected error occurred");
-      console.error("Error generating song:", err);
+      console.error("🎼 [FRONTEND] Orchestrator error:", err);
+      setError("🎼 Network error occurred while communicating with the orchestrator");
     } finally {
       setIsLoading(false);
       setGeneratingStyle(null);
@@ -607,8 +563,9 @@ const ModalSongs = ({
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <h3 className="text-lg font-medium text-purple-900 mb-2">Step 3: Generate Your Song</h3>
                 <p className="text-sm text-purple-700 mb-4">
-                  Now we&apos;ll create your final song using the structure and style you&apos;ve selected.
-                  This process may take a few minutes as we generate and process the audio.
+                  Now we&apos;ll run the complete automated workflow: generate 2 songs, download them, 
+                  AI review for quality, and automatically retry up to 3 times until we get high-quality results.
+                  This single process takes about 6-10 minutes and handles everything automatically - no more manual steps!
                 </p>
 
                 {selectedStyle && (
@@ -626,12 +583,14 @@ const ModalSongs = ({
 
                 {message && (
                   <div className="p-3 mb-4 bg-green-100 border border-green-300 rounded text-green-700">
+                    <div className="font-medium mb-1">🎼 Automated Workflow Progress</div>
                     {message}
                   </div>
                 )}
 
                 {error && (
                   <div className="p-3 mb-4 bg-red-100 border border-red-300 rounded text-red-700">
+                    <div className="font-medium mb-1">🎼 Workflow Error</div>
                     {error}
                   </div>
                 )}
@@ -652,8 +611,8 @@ const ModalSongs = ({
                     disabled={isLoading || !stepCompleted.style || !selectedStyle}
                   >
                     {isLoading && generatingStyle === selectedStyle
-                      ? `Generating Song (${generatingStyle})...`
-                      : "Generate Final Song"}
+                      ? `🎼 Running Automated Workflow (${generatingStyle})...`
+                      : "🎼 Generate & Review Songs (Automated)"}
                   </button>
                 </div>
               </div>
