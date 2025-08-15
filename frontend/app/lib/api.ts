@@ -56,6 +56,26 @@ export interface SongReviewResponse {
   audio_file?: string;
 }
 
+export interface OrchestratorRequest {
+  strBookName: string;
+  intBookChapter: number;
+  strVerseRange: string;
+  strStyle: string;
+  strTitle: string;
+  song_structure_id?: number;
+}
+
+export interface OrchestratorResponse {
+  success: boolean;
+  message: string;
+  total_attempts: number;
+  final_songs_count: number;
+  good_songs?: number;
+  re_rolled_songs?: number;
+  error?: string;
+  workflow_details?: any;
+}
+
 export interface SongResponse {
   success: boolean;
   message: string;
@@ -385,6 +405,43 @@ export const reviewSongAPI = async (
       verdict: "error",
       error: error instanceof Error ? error.message : "Unknown error",
       audio_file: request.audio_file_path,
+    };
+  }
+};
+
+export const orchestratorWorkflow = async (
+  request: OrchestratorRequest
+): Promise<OrchestratorResponse> => {
+  try {
+    console.log("🎼 [API] Orchestrator request payload:", request);
+
+    const response = await fetch(`${API_BASE_URL}/orchestrator/workflow`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    console.log("🎼 [API] Orchestrator response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("🎼 [API] Orchestrator error response:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("🎼 [API] Orchestrator response data:", data);
+    return data;
+  } catch (error) {
+    console.error("🎼 [API] Orchestrator error:", error);
+    return {
+      success: false,
+      message: "Failed to execute orchestrator workflow",
+      error: error instanceof Error ? error.message : "Unknown error",
+      total_attempts: 0,
+      final_songs_count: 0,
     };
   }
 };

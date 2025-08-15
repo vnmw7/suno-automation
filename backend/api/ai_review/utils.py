@@ -4,6 +4,7 @@ This module provides functions for reviewing generated songs using Google AI Stu
 It handles audio file upload, transcription, and quality assessment.
 """
 
+import datetime
 import os
 import json
 import traceback
@@ -21,7 +22,8 @@ logger.setLevel(logging.DEBUG)
 # Create logs directory if it doesn't exist
 log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
 os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "ai_review.log")
+log_file = os.path.join(log_dir, "ai-review",  , ".log")
+f"{datetime.now().strftime('%Y%m%d')}"
 
 # Create file handler
 file_handler = logging.FileHandler(log_file)

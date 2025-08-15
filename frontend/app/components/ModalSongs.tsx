@@ -4,8 +4,10 @@ import {
   fetchSongStructures,
   fetchStyles,
   fetchSongFilesFromPublic,
+  orchestratorWorkflow,
   type SongStructure,
   type Style,
+  type OrchestratorRequest,
 } from "../lib/api";
 
 const SONG_DIRECTORY = "/songs";
@@ -153,7 +155,7 @@ const ModalSongs = ({
     
     try {
       const title = `${bookName} ${chapter}:${range}`;
-      const requestPayload = {
+      const requestPayload: OrchestratorRequest = {
         strBookName: bookName,
         intBookChapter: chapter,
         strVerseRange: range,
@@ -165,14 +167,8 @@ const ModalSongs = ({
       console.log("🎼 [FRONTEND] Sending orchestrator request:", requestPayload);
       setMessage(`🎼 Starting automated song workflow with style '${selectedStyle}'...`);
 
-      // Single API call to orchestrator - handles generation, download, review, and retry logic automatically!
-      const response = await fetch('/orchestrator/workflow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestPayload)
-      });
-      
-      const result = await response.json();
+      // Use the API function instead of direct fetch
+      const result = await orchestratorWorkflow(requestPayload);
       console.log("🎼 [FRONTEND] Orchestrator completed:", result);
 
       if (result.success) {
