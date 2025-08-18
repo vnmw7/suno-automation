@@ -217,17 +217,31 @@ const ModalSongs = ({
     setStructureError(null);
 
     try {
-      // Check if any structures exist for this verse range
-      if (songStructures.length > 0) {
-        // Regenerate the first structure
-        const structureId = String(songStructures[0].id);
+      // First, fetch the current structures from the database for this range.
+      const response = await fetchSongStructures(range);
+
+      if (!response.success || !response.result) {
+        setStructureError(
+          response.error || "Failed to fetch song structures from the database."
+        );
+        setIsStructureLoading(false);
+        return;
+      }
+
+      const existingStructures = response.result;
+      setSongStructures(existingStructures); // Update state with the latest data
+
+      // Now, decide whether to generate or regenerate based on the fetched data.
+      if (existingStructures.length > 0) {
+        // Regenerate the first existing structure.
+        const structureId = String(existingStructures[0].id);
         console.log("Regenerating structure with ID:", structureId);
 
         const requestPayload = {
           strBookName: bookName,
           intBookChapter: chapter,
           strVerseRange: range,
-          structureId: structureId
+          structureId: structureId,
         };
 
         const result = await callGenerateSongStructureAPI(requestPayload);
@@ -237,11 +251,13 @@ const ModalSongs = ({
           console.log("Regenerated structure result:", result.result);
         } else {
           setStructureError(
-            result.error || result.message || "Failed to regenerate song structure"
+            result.error ||
+              result.message ||
+              "Failed to regenerate song structure"
           );
         }
       } else {
-        // Generate new structure
+        // No existing structure, so generate a new one.
         const requestPayload = {
           strBookName: bookName,
           intBookChapter: chapter,
@@ -257,15 +273,17 @@ const ModalSongs = ({
           console.log("Song structure generation result:", result.result);
         } else {
           setStructureError(
-            result.error || result.message || "Failed to generate song structure"
+            result.error ||
+              result.message ||
+              "Failed to generate song structure"
           );
         }
       }
 
       // Mark structure step as completed
-      setStepCompleted(prev => ({ ...prev, structure: true }));
-      
-      // Refetch updated song structures and styles
+      setStepCompleted((prev) => ({ ...prev, structure: true }));
+
+      // Refetch updated song structures and styles to ensure UI is in sync
       await fetchAndSetSongStructures();
       await fetchAndSetStyles();
     } catch (err) {
