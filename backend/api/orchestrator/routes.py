@@ -8,6 +8,7 @@ Purpose: API routes for orchestrator workflow operations - the "mission control"
 from fastapi import APIRouter
 import traceback
 from pydantic import BaseModel
+from typing import Optional
 from .models import OrchestratorRequest, OrchestratorResponse
 from .utils import execute_song_workflow, download_both_songs
 
@@ -23,7 +24,7 @@ class DownloadTestResponse(BaseModel):
     success: bool
     message: str
     downloads: list = []
-    error: str = None
+    error: Optional[str] = None
 
 
 @router.post("/workflow", response_model=OrchestratorResponse)
@@ -151,12 +152,18 @@ async def debug_download_both_songs(request: DownloadTestRequest):
         
         print(f"🔧 [DEBUG-DOWNLOAD] Download result: {result}")
         
-        return DownloadTestResponse(
-            success=result["success"],
-            message=result.get("message", "Download test completed"),
-            downloads=result.get("downloads", []),
-            error=result.get("error")
-        )
+        # Build response, only including error if it exists
+        response_data = {
+            "success": result["success"],
+            "message": result.get("message", "Download test completed"),
+            "downloads": result.get("downloads", [])
+        }
+        
+        # Only add error field if it exists and is not None
+        if "error" in result and result["error"] is not None:
+            response_data["error"] = result["error"]
+        
+        return DownloadTestResponse(**response_data)
         
     except Exception as e:
         error_msg = f"Debug download test failed: {str(e)}"
