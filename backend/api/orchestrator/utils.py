@@ -51,7 +51,7 @@ async def execute_song_workflow(
     
     # Use verification function to ensure we have the correct final destination
     final_dir = verify_final_destination_folder()
-    temp_dir = "backend/songs/temp"
+    temp_dir = "backend/songs/pending_review"
     
     # Ensure required directories exist
     os.makedirs(temp_dir, exist_ok=True)

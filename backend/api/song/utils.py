@@ -290,9 +290,28 @@ async def generate_song(
                 if not create_button:
                     raise Exception("Could not find a visible create button.")
 
+                song_play_button_selector = "[aria-label='Play Song']"
+                initial_song_count = await page.locator(song_play_button_selector).count()
+                print(f"Initial song count: {initial_song_count}")
+
                 await create_button.click()
-                await page.wait_for_timeout(5000)
-                await page.wait_for_load_state("networkidle", timeout=3000)
+                print("Create button clicked. Waiting for new songs to appear...")
+
+                expected_song_count = initial_song_count + 2
+                
+                try:
+                    # Wait for the number of songs to increase by 2
+                    expression = f"() => document.querySelectorAll(\"{song_play_button_selector}\").length >= {expected_song_count}"
+                    await page.wait_for_function(expression, timeout=5000)
+                    
+                    new_song_count = await page.locator(song_play_button_selector).count()
+                    print(f"New songs detected. Current song count: {new_song_count}")
+                except Exception as e:
+                    new_song_count = await page.locator(song_play_button_selector).count()
+                    error_message = f"Timeout waiting for new songs. Initial: {initial_song_count}, Current: {new_song_count}. Error: {e}"
+                    print(error_message)
+                    raise Exception(error_message)
+
                 print("Song creation initiated and page loaded.")
 
                 # Get the song ID from the URL
@@ -510,8 +529,8 @@ async def download_song_handler(
                 print(f"Searching for songs with title: '{strTitle}'")
                 song_locator_patterns = [
                     f'span[title="{strTitle}"]',
-                    f'*:has-text("{strTitle}")',
-                    f'[data-testid*="song"]:has-text("{strTitle}")',
+                    f'*:has-text("{strTitle}")', 
+                    f'[data-testid*="song"]:has-text("{strTitle}")', 
                 ]
 
                 song_elements = None
