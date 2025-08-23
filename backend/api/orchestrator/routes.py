@@ -6,6 +6,7 @@ Purpose: API routes for orchestrator workflow operations - the "mission control"
 """
 
 from fastapi import APIRouter
+import os
 import traceback
 from pydantic import BaseModel
 from typing import Optional
@@ -24,6 +25,19 @@ class DownloadTestResponse(BaseModel):
     success: bool
     message: str
     downloads: list = []
+    error: Optional[str] = None
+
+
+class ReviewTestRequest(BaseModel):
+    audio_file_path: str
+    song_structure_id: int = 0
+
+
+class ReviewTestResponse(BaseModel):
+    success: bool
+    message: str
+    verdict: Optional[str] = None
+    review_details: dict = {}
     error: Optional[str] = None
 
 
@@ -117,7 +131,9 @@ async def orchestrator_status():
         "version": "1.0.0",
         "endpoints": [
             "/orchestrator/workflow - Main workflow execution",
-            "/orchestrator/status - Service health check"
+            "/orchestrator/status - Service health check",
+            "/orchestrator/debug/download - Test song download functionality",
+            "/orchestrator/debug/review - Test song review functionality"
         ],
         "workflow_features": [
             "Automated song generation (2 songs per request)",
@@ -174,5 +190,74 @@ async def debug_download_both_songs(request: DownloadTestRequest):
             success=False,
             message="Download test failed with exception",
             downloads=[],
+            error=error_msg
+        )
+
+
+@router.post("/debug/review", response_model=ReviewTestResponse)
+async def debug_review_song(request: ReviewTestRequest):
+    """
+    🔧 DEBUG ENDPOINT: Test song review functionality
+    
+    This endpoint allows direct testing of the AI song review process without
+    running the full orchestrator workflow. Useful for testing review logic,
+    checking AI response parsing, and debugging review verdicts.
+    
+    Args:
+        request: ReviewTestRequest with audio file path and song structure ID
+    
+    Returns:
+        ReviewTestResponse: Review results and debug information
+    """
+    print(f"🔧 [DEBUG-REVIEW] Starting review test for file: '{request.audio_file_path}'")
+    print(f"🔧 [DEBUG-REVIEW] Using song_structure_id: {request.song_structure_id}")
+    
+    try:
+        # Import the review function from utils
+        from .utils import call_review_api
+        
+        # Verify the file exists
+        if not os.path.exists(request.audio_file_path):
+            return ReviewTestResponse(
+                success=False,
+                message="Review test failed - file not found",
+                error=f"Audio file not found: {request.audio_file_path}"
+            )
+        
+        # Call the review API function directly
+        review_result = await call_review_api(
+            file_path=request.audio_file_path,
+            song_structure_id=request.song_structure_id
+        )
+        
+        print(f"🔧 [DEBUG-REVIEW] Review result: {review_result}")
+        
+        # Build response
+        response_data = {
+            "success": review_result.get("success", False),
+            "message": "Review test completed",
+            "verdict": review_result.get("verdict"),
+            "review_details": {
+                "first_response": review_result.get("first_response"),
+                "second_response": review_result.get("second_response"),
+                "audio_file": review_result.get("audio_file"),
+                "raw_result": review_result
+            }
+        }
+        
+        # Only add error field if it exists and is not None
+        if "error" in review_result and review_result["error"] is not None:
+            response_data["error"] = review_result["error"]
+        
+        return ReviewTestResponse(**response_data)
+        
+    except Exception as e:
+        error_msg = f"Debug review test failed: {str(e)}"
+        print(f"🔧 [DEBUG-REVIEW] {error_msg}")
+        print(traceback.format_exc())
+        
+        return ReviewTestResponse(
+            success=False,
+            message="Review test failed with exception",
             error=error_msg
         )
