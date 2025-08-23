@@ -125,23 +125,22 @@ class SupabaseService:
             if cursor:
                 cursor.close()
 
-    def get_song_with_lyrics(self, structure_id: int) -> Optional[Dict]:
+    def get_song_with_lyrics(self, pg1_id: int) -> Optional[Dict]:
         """
-        Retrieve combined song structure and lyrics data by structure ID
-        
+        Retrieve combined song structure and a specific lyric entry by pg1_id.
+
         Args:
-            structure_id (int): The song structure ID
-            
+            pg1_id (int): The ID from tblprogress_v1.
+
         Returns:
-            Optional[Dict]: Combined data with song structure and associated lyrics
+            Optional[Dict]: Combined data with song structure and the specific lyric entry.
         """
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
-            
-            # Join query to get both song structure and lyrics data
+
             query = """
-            SELECT 
+            SELECT
                 s.id,
                 s.book_name,
                 s.chapter,
@@ -157,55 +156,48 @@ class SupabaseService:
                 p.pg1_status,
                 p.pg1_reviews,
                 p.pg1_updated_at
-            FROM song_structure_tbl s
-            LEFT JOIN tblprogress_v1 p ON s.id = p.pg1_song_struct_id
-            WHERE s.id = %s
-            ORDER BY p.pg1_created_at DESC
+            FROM tblprogress_v1 p
+            LEFT JOIN song_structure_tbl s ON s.id = p.pg1_song_struct_id
+            WHERE p.pg1_id = %s
             """
             
-            cursor.execute(query, (structure_id,))
-            results = cursor.fetchall()
-            
-            if not results:
+            cursor.execute(query, (pg1_id,))
+            result = cursor.fetchone()
+
+            if not result:
+                print(f"No data found for pg1_id: {pg1_id}")
                 return None
-            
-            # Structure the data
-            song_data = None
-            lyrics_list = []
-            
-            for result in results:
-                # Song structure data (same for all rows)
-                if song_data is None:
-                    song_data = {
-                        'id': result[0],
-                        'book_name': result[1],
-                        'chapter': result[2],
-                        'verse_range': result[3],
-                        'song_structure': result[4],
-                        'tone': result[5],
-                        'styles': result[6]
-                    }
-                
-                # Lyrics data (multiple rows possible)
-                if result[7] is not None:  # pg1_id exists
-                    lyrics_list.append({
-                        'pg1_id': result[7],
-                        'pg1_created_at': result[8],
-                        'pg1_style': result[9],
-                        'pg1_lyrics': result[10],
-                        'pg1_song_id': result[11],
-                        'pg1_status': result[12],
-                        'pg1_reviews': result[13],
-                        'pg1_updated_at': result[14]
-                    })
-            
-            return {
-                'song_structure': song_data,
-                'lyrics': lyrics_list
+
+            song_structure_data = None
+            if result[0] is not None: # Check if song structure data exists
+                song_structure_data = {
+                    'id': result[0],
+                    'book_name': result[1],
+                    'chapter': result[2],
+                    'verse_range': result[3],
+                    'song_structure': result[4],
+                    'tone': result[5],
+                    'styles': result[6]
+                }
+
+            lyric_data = {
+                'pg1_id': result[7],
+                'pg1_created_at': result[8],
+                'pg1_style': result[9],
+                'pg1_lyrics': result[10],
+                'pg1_song_id': result[11],
+                'pg1_status': result[12],
+                'pg1_reviews': result[13],
+                'pg1_updated_at': result[14]
             }
-            
+
+            return {
+                'song_structure': song_structure_data,
+                'lyrics': [lyric_data]
+            }
+
         except Exception as e:
-            print(f"Error retrieving combined song data for ID {structure_id}: {e}")
+            print(f"Error retrieving combined song data for pg1_id {pg1_id}: {e}")
             return None
         finally:
             if cursor:
@@ -335,19 +327,19 @@ def get_lyrics_by_song_struct_id(song_struct_id: int) -> List[Dict]:
         service.close_connection()
 
 
-def get_song_with_lyrics(structure_id: int) -> Optional[Dict]:
+def get_song_with_lyrics(pg1_id: int) -> Optional[Dict]:
     """
-    Convenience function to get combined song structure and lyrics data
+    Convenience function to get combined song structure and lyrics data by pg1_id.
     
     Args:
-        structure_id (int): The song structure ID
+        pg1_id (int): The ID from tblprogress_v1.
         
     Returns:
-        Optional[Dict]: Combined data with song structure and associated lyrics
+        Optional[Dict]: Combined data with song structure and associated lyrics.
     """
     service = SupabaseService()
     try:
-        return service.get_song_with_lyrics(structure_id)
+        return service.get_song_with_lyrics(pg1_id)
     finally:
         service.close_connection()
 
@@ -373,15 +365,25 @@ if __name__ == "__main__":
         print(f"Found {len(lyrics)} lyrics entries")
         for lyric in lyrics:
             print(f"  - Lyric ID: {lyric['pg1_id']}, Status: {lyric['pg1_status']}")
+    else:
+        print("Skipping lyric test as no structure was found.")
     
     # Test getting combined data
-    print("\n3. Testing get_song_with_lyrics(1):")
-    combined = service.get_song_with_lyrics(1)
-    if combined:
-        print("Combined data found:")
-        print(f"  - Structure: {combined['song_structure']['book_name']} {combined['song_structure']['chapter']}:{combined['song_structure']['verse_range']}")
-        print(f"  - Lyrics count: {len(combined['lyrics'])}")
+    if 'lyrics' in locals() and lyrics:
+        test_pg1_id = lyrics[0]['pg1_id']
+        print(f"\n3. Testing get_song_with_lyrics(pg1_id={test_pg1_id}):")
+        combined = service.get_song_with_lyrics(test_pg1_id)
+        if combined:
+            print("Combined data found:")
+            if combined.get('song_structure'):
+                print(f"  - Structure: {combined['song_structure']['book_name']} {combined['song_structure']['chapter']}:{combined['song_structure']['verse_range']}")
+            else:
+                print("  - Structure: Not found")
+            print(f"  - Lyrics count: {len(combined['lyrics'])}")
+            print(f"  - Fetched Lyric ID: {combined['lyrics'][0]['pg1_id']}")
+        else:
+            print("No combined data found")
     else:
-        print("No combined data found")
+        print("\n3. Skipping get_song_with_lyrics test because no lyrics were found.")
     
     service.close_connection()

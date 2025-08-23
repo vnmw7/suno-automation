@@ -351,9 +351,9 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
         for i, song in enumerate(downloaded_songs):
             print(f"🎼 [REVIEW] Reviewing song {i+1}/{len(downloaded_songs)}: {song['file_path']}")
             
-            # Call the review function with pg1_id parameter - logic moved inline below
-            review_result = await review_song_with_ai(
-                audio_file_path=song["file_path"],
+            # Call the review function directly
+            review_result = await call_review_api(
+                file_path=song["file_path"],
                 pg1_id=pg1_id or 0  # Use 0 as fallback if None
             )
             
@@ -761,38 +761,37 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
         }
 
 
-async def call_review_api(file_path: str, song_structure_id: int) -> Dict[str, Any]:
-    """Call the AI review API for a single song."""
+async def call_review_api(file_path: str, pg1_id: int) -> Dict[str, Any]:
+    """
+    Call the AI review functionality for a single song.
+    
+    This function directly uses the review_song_with_ai function that's already
+    in this module, eliminating unnecessary abstraction layers.
+    
+    Args:
+        file_path (str): Path to the audio file to review
+        pg1_id (int): Database ID for song structure lookup
+        
+    Returns:
+        Dict[str, Any]: Review results including verdict and AI responses
+    """
     try:
-        # Import the actual review function from ai_review module
-        from ..ai_review.routes import review_song_endpoint
-        from ..ai_review.routes import SongReviewRequest
-        
-        print(f"🎼 [REVIEW_API] Calling AI review for: {file_path}")
-        print(f"🎼 [REVIEW_API] Using pg1_id: {song_structure_id}")
-        
-        # Create the review request with pg1_id parameter
-        review_request = SongReviewRequest(
+        print(f"🎼 [REVIEW_API] Starting review for: {file_path}")
+        print(f"🎼 [REVIEW_API] Using pg1_id: {pg1_id}")
+
+        # Directly call the review function that's in this same file
+        review_result = await review_song_with_ai(
             audio_file_path=file_path,
-            pg1_id=song_structure_id or 0  # Use 0 as fallback if None
+            pg1_id=pg1_id
         )
         
-        # Call the review endpoint directly
-        review_response = await review_song_endpoint(review_request)
+        print(f"🎼 [REVIEW_API] Review completed. Verdict: {review_result.get('verdict', 'error')}")
         
-        print(f"🎼 [REVIEW_API] Review completed. Verdict: {review_response.verdict}")
-        
-        return {
-            "success": review_response.success,
-            "verdict": review_response.verdict,
-            "first_response": review_response.first_response,
-            "second_response": review_response.second_response,
-            "error": review_response.error,
-            "audio_file": review_response.audio_file
-        }
+        # Return the result directly as it already has the correct structure
+        return review_result
         
     except Exception as e:
-        error_msg = f"AI review API call failed: {str(e)}"
+        error_msg = f"AI review failed: {str(e)}"
         print(f"🎼 [REVIEW_API] {error_msg}")
         print(traceback.format_exc())
         
