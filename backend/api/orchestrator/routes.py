@@ -7,10 +7,23 @@ Purpose: API routes for orchestrator workflow operations - the "mission control"
 
 from fastapi import APIRouter
 import traceback
+from pydantic import BaseModel
 from .models import OrchestratorRequest, OrchestratorResponse
-from .utils import execute_song_workflow
+from .utils import execute_song_workflow, download_both_songs
 
 router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
+
+
+class DownloadTestRequest(BaseModel):
+    title: str
+    temp_dir: str = "backend/songs/pending_review"
+
+
+class DownloadTestResponse(BaseModel):
+    success: bool
+    message: str
+    downloads: list = []
+    error: str = None
 
 
 @router.post("/workflow", response_model=OrchestratorResponse)
@@ -113,3 +126,46 @@ async def orchestrator_status():
             "Automatic file management and organization"
         ]
     }
+
+
+@router.post("/debug/download", response_model=DownloadTestResponse)
+async def debug_download_both_songs(request: DownloadTestRequest):
+    """
+    🔧 DEBUG ENDPOINT: Test download_both_songs function
+    
+    This endpoint allows direct testing of the download functionality without
+    running the full orchestrator workflow.
+    
+    Args:
+        request: DownloadTestRequest with song title and temp directory
+    
+    Returns:
+        DownloadTestResponse: Download results and debug information
+    """
+    print(f"🔧 [DEBUG-DOWNLOAD] Starting download test for title: '{request.title}'")
+    print(f"🔧 [DEBUG-DOWNLOAD] Using temp directory: {request.temp_dir}")
+    
+    try:
+        # Call the download function directly
+        result = await download_both_songs(request.title, request.temp_dir)
+        
+        print(f"🔧 [DEBUG-DOWNLOAD] Download result: {result}")
+        
+        return DownloadTestResponse(
+            success=result["success"],
+            message=result.get("message", "Download test completed"),
+            downloads=result.get("downloads", []),
+            error=result.get("error")
+        )
+        
+    except Exception as e:
+        error_msg = f"Debug download test failed: {str(e)}"
+        print(f"🔧 [DEBUG-DOWNLOAD] {error_msg}")
+        print(traceback.format_exc())
+        
+        return DownloadTestResponse(
+            success=False,
+            message="Download test failed with exception",
+            downloads=[],
+            error=error_msg
+        )
