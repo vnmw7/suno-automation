@@ -3,6 +3,7 @@
 ## [Unreleased] - 2025-08-18
 
 ### Fixed
+- Corrected `GenerationConfig` parameters in `backend/api/orchestrator/utils.py` from camelCase to snake_case to fix errors when calling the Google AI API.
 - Fixed a bug in `get_song_with_lyrics` where it was incorrectly called with a `pg1_id` instead of a `structure_id`. The function now correctly accepts a `pg1_id` and fetches the associated song and lyric data more efficiently.
 - Fixed Pydantic validation error in `DownloadTestResponse` where the `error` field was receiving `None` instead of a string. Updated the field type to `Optional[str]` and modified the response building logic in `debug_download_both_songs` function to only include the `error` field when it actually has a value.
 - Resolved "`& was unexpected at this time`" error in logging setup by changing the log file directory structure to place log files directly in the `backend\logs` directory without creating subdirectories.

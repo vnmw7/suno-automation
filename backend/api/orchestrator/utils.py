@@ -510,9 +510,9 @@ async def send_prompt_to_google_ai(
         # Prepare request data
         generation_config = {
             "temperature": 0.7,
-            "topK": 40,
-            "topP": 0.95,
-            "maxOutputTokens": 8192,
+            "top_k": 40,
+            "top_p": 0.95,
+            "max_output_tokens": 8192,
         }
 
         response = await model_pro.generate_content_async(
@@ -596,7 +596,7 @@ async def review_song_with_ai(
             if isinstance(song_structure, str):
                 try:
                     # Handle potential escape sequence issues in JSON
-                    cleaned_json = song_structure.replace('\\\\', '\\\\\\\\')
+                    cleaned_json = song_structure.replace('\\', '\\\\')
                     song_structure = json.loads(cleaned_json)
                 except json.JSONDecodeError as e:
                     # Try alternative parsing methods
