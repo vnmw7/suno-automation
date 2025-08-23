@@ -30,7 +30,7 @@ class DownloadTestResponse(BaseModel):
 
 class ReviewTestRequest(BaseModel):
     audio_file_path: str
-    song_structure_id: int = 0
+    pg1_id: int = 0
 
 
 class ReviewTestResponse(BaseModel):
@@ -210,8 +210,8 @@ async def debug_review_song(request: ReviewTestRequest):
         ReviewTestResponse: Review results and debug information
     """
     print(f"🔧 [DEBUG-REVIEW] Starting review test for file: '{request.audio_file_path}'")
-    print(f"🔧 [DEBUG-REVIEW] Using song_structure_id: {request.song_structure_id}")
-    
+    print(f"🔧 [DEBUG-REVIEW] Using pg1_id: {request.pg1_id}")
+
     try:
         # Import the review function from utils
         from .utils import call_review_api
@@ -227,7 +227,7 @@ async def debug_review_song(request: ReviewTestRequest):
         # Call the review API function directly
         review_result = await call_review_api(
             file_path=request.audio_file_path,
-            song_structure_id=request.song_structure_id
+            pg1_id=request.pg1_id
         )
         
         print(f"🔧 [DEBUG-REVIEW] Review result: {review_result}")

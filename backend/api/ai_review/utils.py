@@ -178,7 +178,7 @@ async def send_prompt_to_google_ai(
 
 
 async def review_song_with_ai(
-    audio_file_path: str, song_structure_id: int
+    audio_file_path: str, pg1_id: int
 ) -> Dict[str, Any]:
     """
     Reviews generated song quality using Google AI API in a two-step process.
@@ -188,7 +188,7 @@ async def review_song_with_ai(
 
     Args:
         audio_file_path (str): Absolute path to generated audio file (MP3/WAV)
-        song_structure_id (int): Database ID of song structure
+        pg1_id (int): Database ID of tblprogress
 
     Returns:
         Dict[str, Any]: Dictionary containing:
@@ -204,7 +204,7 @@ async def review_song_with_ai(
     """
     try:
         # Validate audio file exists
-        logger.info(f"Starting review for song structure ID: {song_structure_id}")
+        logger.info(f"Starting review for pg1_id: {pg1_id}")
         logger.info(f"Audio file path: {audio_file_path}")
         
         if not os.path.exists(audio_file_path):
@@ -219,10 +219,10 @@ async def review_song_with_ai(
         # Fetch song data using SupabaseService
         service = SupabaseService()
         try:
-            logger.debug(f"Fetching song data for ID: {song_structure_id}")
-            song_data = service.get_song_with_lyrics(song_structure_id)
+            logger.debug(f"Fetching song data for ID: {pg1_id}")
+            song_data = service.get_song_with_lyrics(pg1_id)
             if not song_data or not song_data.get('lyrics'):
-                error_msg = f"No lyrics data found for song_structure_id: {song_structure_id}"
+                error_msg = f"No lyrics data found for pg1_id: {pg1_id}"
                 logger.error(error_msg)
                 return {
                     "success": False,
@@ -235,7 +235,7 @@ async def review_song_with_ai(
             if not original_song_structure or not original_song_structure.get('song_structure'):
                 return {
                     "success": False,
-                    "error": f"No song_structure found for song_structure_id: {song_structure_id}",
+                    "error": f"No song_structure found for pg1_id: {pg1_id}",
                     "verdict": "error",
                 }
             
@@ -265,7 +265,7 @@ async def review_song_with_ai(
             if not pg1_lyrics:
                 return {
                     "success": False,
-                    "error": f"No pg1_lyrics found for song_structure_id: {song_structure_id}",
+                    "error": f"No pg1_lyrics found for pg1_id: {pg1_id}",
                     "verdict": "error",
                 }
             
@@ -384,10 +384,10 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
         verdict = "continue"
         if "[re-roll]" in second_response.lower():
             verdict = "re-roll"
-            logger.warning(f"Verdict: RE-ROLL required for ID: {song_structure_id}")
+            logger.warning(f"Verdict: RE-ROLL required for ID: {pg1_id}")
         elif "[continue]" in second_response.lower():
             verdict = "continue"
-            logger.info(f"Verdict: CONTINUE approved for ID: {song_structure_id}")
+            logger.info(f"Verdict: CONTINUE approved for ID: {pg1_id}")
         else:
             logger.warning("Verdict tag not found in response, defaulting to CONTINUE")
         
@@ -398,11 +398,11 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
         
         if verdict == "re-roll":
             # Delete the database entry for this song
-            deletion_db_success = service.delete_song(song_structure_id)
+            deletion_db_success = service.delete_song(pg1_id)
             if deletion_db_success:
-                logger.info(f"Deleted database entry for song_structure_id: {song_structure_id}")
+                logger.info(f"Deleted database entry for pg1_id: {pg1_id}")
             else:
-                logger.error(f"Failed to delete database entry for song_structure_id: {song_structure_id}")
+                logger.error(f"Failed to delete database entry for pg1_id: {pg1_id}")
                 # TODO: Consider whether to abort process if DB deletion fails
                 # TODO: Add retry logic for transient errors
             
@@ -444,7 +444,7 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
         # Close the service connection now that we're done with database operations
         service.close_connection()
 
-        logger.info(f"Review completed for ID: {song_structure_id}")
+        logger.info(f"Review completed for ID: {pg1_id}")
         return {
             "success": True,
             "first_response": first_response,
