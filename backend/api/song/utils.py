@@ -317,13 +317,14 @@ async def generate_song(
                 # Get the song ID from the URL
                 current_url = page.url
                 suno_song_id = None
+                pg1_id = None  # Initialize pg1_id
                 if "suno.com/song/" in current_url:
                     suno_song_id = current_url.split("suno.com/song/")[1].split("/")[0]
                     print(f"Extracted suno_song_id: {suno_song_id}")
 
                     # Save to progress_v1_tbl
                     try:
-                        data = (
+                        response = (
                             supabase.table("tblprogress_v1")
                             .insert(
                                 {
@@ -337,7 +338,10 @@ async def generate_song(
                             )
                             .execute()
                         )
-                        print(f"Saved to progress_v1_tbl: {data}")
+                        print(f"Saved to progress_v1_tbl: {response}")
+                        if response.data:
+                            pg1_id = response.data[0].get('pg1_id')
+                            print(f"Extracted pg1_id: {pg1_id}")
                     except Exception as db_error:
                         print(f"Error saving to Supabase: {db_error}")
 
@@ -347,6 +351,7 @@ async def generate_song(
                     "lyrics": strLyrics,
                     "style": strStyle,
                     "title": strTitle,
+                    "pg1_id": pg1_id,
                 }
 
             except Exception as e:
@@ -529,8 +534,8 @@ async def download_song_handler(
                 print(f"Searching for songs with title: '{strTitle}'")
                 song_locator_patterns = [
                     f'span[title="{strTitle}"]',
-                    f'*:has-text("{strTitle}")', 
-                    f'[data-testid*="song"]:has-text("{strTitle}")', 
+                    f'*:has-text("{strTitle}")',
+                    f'[data-testid*="song"]:has-text("{strTitle}")',
                 ]
 
                 song_elements = None

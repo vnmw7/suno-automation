@@ -13,6 +13,7 @@
 - Created reusable AI review utilities module at `backend\utils\ai_review.py` by extracting the `review_song_with_ai` function from `backend\api\ai_review\utils.py`. This module includes all necessary helper functions (`upload_file_to_google_ai`, `send_prompt_to_google_ai`) and can now be imported from anywhere in the project for song quality assessment.
 
 ### Changed
+- Updated the song generation workflow to ensure the `pg1_id` from `tblprogress_v1` is saved and passed to the review process. The `generate_song` function now returns the `pg1_id`, which is then propagated through the orchestrator to the AI review functions.
 - Refactored the `review_all_songs` function in the orchestrator workflow to run AI reviews in parallel using `asyncio.gather`. This improves performance by not waiting for each song review to finish sequentially.
 - Aligned the main song review workflow with the debug endpoint's logic by moving the file existence check into the `review_all_songs` function, ensuring consistent behavior and cleaner code.
 - Refactored the song structure generation logic in the Song Management modal to ensure it fetches the most up-to-date structure information from the database before deciding to generate a new structure or regenerate an existing one. This prevents using stale data and ensures the correct action (generate vs. regenerate) is always taken.
