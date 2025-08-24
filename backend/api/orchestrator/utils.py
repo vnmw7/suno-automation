@@ -9,8 +9,7 @@ import os
 import shutil
 import asyncio
 import traceback
-import json
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Optional
 
 
 async def execute_song_workflow(
@@ -344,42 +343,71 @@ async def download_both_songs(title: str, temp_dir: str) -> Dict[str, Any]:
 
 
 async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Dict[str, Any]]:
-    """Review all downloaded songs using AI review system."""
-    review_results = []
+    """Review all downloaded songs concurrently using AI review system."""
+
+    async def review_single_song(song: Dict[str, Any]) -> Dict[str, Any]:
+        """Helper coroutine to review one song, mirroring the debug endpoint's logic."""
+        file_path = song["file_path"]
+        print(f"🎼 [REVIEW] Starting concurrent review for: {file_path}")
+
+        # Verify the file exists before attempting review
+        if not os.path.exists(file_path):
+            print(f"🎼 [REVIEW] ❌ File not found for review: {file_path}")
+            return {
+                "file_path": file_path,
+                "index": song["index"],
+                "title": song["title"],
+                "verdict": "error",
+                "review_details": {"error": f"Audio file not found: {file_path}"}
+            }
+
+        # Call the review API function directly, as done in the debug endpoint
+        review_result = await call_review_api(
+            file_path=file_path,
+            pg1_id=pg1_id or 0
+        )
+
+        print(f"🎼 [REVIEW] Review completed for {file_path}. Verdict: {review_result.get('verdict', 'error')}")
+
+        # Structure the final result for this song
+        return {
+            "file_path": file_path,
+            "index": song["index"],
+            "title": song["title"],
+            "verdict": review_result.get("verdict", "error"),
+            "review_details": review_result
+        }
+
+    if not downloaded_songs:
+        return []
+
+    # Create a list of tasks to run concurrently
+    tasks = [review_single_song(song) for song in downloaded_songs]
     
-    try:
-        for i, song in enumerate(downloaded_songs):
-            print(f"🎼 [REVIEW] Reviewing song {i+1}/{len(downloaded_songs)}: {song['file_path']}")
-            
-            # Call the review function directly
-            review_result = await call_review_api(
-                file_path=song["file_path"],
-                pg1_id=pg1_id or 0  # Use 0 as fallback if None
-            )
-            
-            print(f"🎼 [REVIEW] Review completed. Verdict: {review_result.get('verdict', 'error')}")
-            
-            review_results.append({
+    # Run tasks in parallel
+    print(f"🎼 [REVIEW] Running {len(tasks)} review(s) in parallel...")
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    print("🎼 [REVIEW] All concurrent reviews completed.")
+
+    # Process results, handling any exceptions that may have occurred during the gather
+    final_results = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            song = downloaded_songs[i]
+            error_msg = f"Exception during review for {song['file_path']}: {result}"
+            print(f"🎼 [REVIEW] ❌ {error_msg}")
+            print(traceback.format_exc())
+            final_results.append({
                 "file_path": song["file_path"],
                 "index": song["index"],
                 "title": song["title"],
-                "verdict": review_result.get("verdict", "error"),
-                "review_details": review_result
+                "verdict": "error",
+                "review_details": {"error": error_msg}
             })
+        else:
+            final_results.append(result)
             
-        return review_results
-        
-    except Exception as e:
-        print(f"🎼 [REVIEW] Review process failed: {e}")
-        print(traceback.format_exc())
-        # Return error verdicts for all songs
-        return [{
-            "file_path": song["file_path"],
-            "index": song["index"], 
-            "title": song["title"],
-            "verdict": "error",
-            "review_details": {"error": str(e)}
-        } for song in downloaded_songs]
+    return final_results
 
 
 async def upload_file_to_google_ai(file_path: str, api_key: str) -> Optional[Dict[str, Any]]:
@@ -555,18 +583,9 @@ async def review_song_with_ai(
         from services.supabase_service import SupabaseService
         from middleware.gemini import api_key
         
-        # Validate audio file exists
+        # File existence is checked in the calling function (review_all_songs)
         print(f"Starting review for pg1_id: {pg1_id}")
         print(f"Audio file path: {audio_file_path}")
-        
-        if not os.path.exists(audio_file_path):
-            error_msg = f"Audio file not found at path: {audio_file_path}"
-            print(error_msg)
-            return {
-                "success": False,
-                "error": error_msg,
-                "verdict": "error",
-            }
 
         # Fetch song data using SupabaseService
         service = SupabaseService()
@@ -707,7 +726,7 @@ Actual lyrics used in generation:
 
 We are looking for things that don't match which indicates the song must be deleted and remade. Our goal is to go verse by verse and stay perfectly in order without skipping or adjusting or repeating. If the song has adlibs near the start, this is acceptable. If the song repeats a single sentence or a few words directly after that sentence or phrase has been said, this is an acceptable creative decision. If the song fully completes the lyrics, any repetition that comes after is acceptable as long as the lyrics were completely sung through at least once fully in order. Since some words may not have been recognized by you, if you notice that a word is spelled differently, but with similar phonetics, assume that the word is correct and you just misheard before. Please tell me if the song needs to be deleted and remade, or if it is safe to keep.
 
-Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
+Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'"""
         
         print("Sending second prompt for lyrics comparison")
         second_response = await send_prompt_to_google_ai(
