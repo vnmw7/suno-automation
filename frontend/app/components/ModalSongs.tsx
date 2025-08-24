@@ -59,8 +59,8 @@ const ModalSongs = ({
       setFetchStructuresStylesError(null);
       try {
         const [structuresResponse, stylesResponse] = await Promise.all([
-          fetchSongStructures(range),
-          fetchStyles(range),
+          fetchSongStructures(bookName, chapter, range),
+          fetchStyles(bookName, chapter, range),
         ]);
 
         const errors: string[] = [];
@@ -218,7 +218,7 @@ const ModalSongs = ({
 
     try {
       // First, fetch the current structures from the database for this range.
-      const response = await fetchSongStructures(range);
+      const response = await fetchSongStructures(bookName, chapter, range);
 
       if (!response.success || !response.result) {
         setStructureError(
@@ -296,7 +296,7 @@ const ModalSongs = ({
 
   const fetchAndSetSongStructures = async () => {
     try {
-      const response = await fetchSongStructures(range);
+      const response = await fetchSongStructures(bookName, chapter, range);
       if (response.success && response.result) {
         setSongStructures(response.result);
       } else {
@@ -309,7 +309,7 @@ const ModalSongs = ({
 
   const fetchAndSetStyles = async () => {
     try {
-      const stylesResponse = await fetchStyles(range);
+      const stylesResponse = await fetchStyles(bookName, chapter, range);
       if (stylesResponse.success && stylesResponse.result) {
         setStyles(stylesResponse.result);
       } else {

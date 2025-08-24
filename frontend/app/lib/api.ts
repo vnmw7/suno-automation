@@ -206,10 +206,12 @@ export interface FetchStylesResponse {
 }
 
 export const fetchSongStructures = async (
+  bookName?: string,
+  chapter?: number,
   verseRange?: string
 ): Promise<FetchSongStructuresResponse> => {
   try {
-    console.log("Fetching song structures from Supabase...");
+    console.log(`Fetching song structures of ${bookName} ${chapter}:${verseRange} from Supabase...`);
 
     let query = supabase
       .from("song_structure_tbl")
@@ -218,6 +220,12 @@ export const fetchSongStructures = async (
       .not("song_structure", "eq", "")
       .order("id", { ascending: false });
 
+    if (bookName) {
+      query = query.eq("book_name", bookName);
+    }
+    if (chapter) {
+      query = query.eq("chapter", chapter);
+    }
     if (verseRange) {
       query = query.eq("verse_range", verseRange);
     }
@@ -251,6 +259,8 @@ export const fetchSongStructures = async (
 };
 
 export const fetchStyles = async (
+  bookName?: string,
+  chapter?: number,
   verseRange?: string
 ): Promise<FetchStylesResponse> => {
   try {
@@ -261,6 +271,12 @@ export const fetchStyles = async (
       .select("styles")
       .not("styles", "is", null);
 
+    if (bookName) {
+      query = query.eq("book_name", bookName);
+    }
+    if (chapter) {
+      query = query.eq("chapter", chapter);
+    }
     if (verseRange) {
       query = query.eq("verse_range", verseRange);
     }
