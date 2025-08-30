@@ -40,27 +40,71 @@ A full-stack application that automates song generation using Suno.ai API, featu
 ## Project Structure
 ```
 suno-automation/
-├── backend/               # FastAPI backend
-│   ├── api/               # API routes
-│   ├── configs/           # Configuration files
-│   ├── services/              # <--- NEW: For business logic and external services
+├── backend/                    # FastAPI backend
+│   ├── api/                    # API modules
+│   │   ├── ai_generation/      # AI song generation endpoints
+│   │   ├── ai_review/          # AI review endpoints  
+│   │   ├── orchestrator/       # Orchestration logic
+│   │   └── song/               # Song management endpoints
+│   ├── configs/                # Configuration files
+│   ├── constants/              # Application constants
+│   ├── database_migration/     # Database migration scripts
+│   ├── lab/                    # Experimental code
+│   ├── lib/                    # Core libraries
+│   │   ├── login.py            # Authentication logic
+│   │   └── supabase.py         # Supabase client
+│   ├── logs/                   # Application logs
+│   ├── middleware/             # FastAPI middleware
+│   ├── misc/                   # Miscellaneous files
+│   ├── multi_tool_agent/       # AI agent tools
+│   ├── routes/                 # API route handlers
+│   │   └── songs.py            # Song-related routes
+│   ├── services/               # Business logic services
 │   │   ├── __init__.py
-│   │   └── supabase_service.py # <--- ALL your Supabase logic goes here
-│   ├── tests/             # Directory for all tests
-│   │   ├── conftest.py    # Shared pytest fixtures for the backend
+│   │   └── supabase_service.py # Supabase operations
+│   ├── songs/                  # Song data storage
+│   ├── tests/                  # Test suite
+│   │   ├── conftest.py         # Shared pytest fixtures
 │   │   ├── test_api/
 │   │   └── test_utils/
-│   ├── utils/             # Utility functions
-│   ├── uploads/
-│   │   ├── pending_review/
-│   │   └── final_review/
-│   └── main.py            # Entry point
-├── frontend/              # RemixJS frontend
-│   ├── app/               # Application code
-│   │   ├── routes/        # Page routes
-│   │   └── components/    # UI components
-│   └── public/            # Static assets
-└── README.md              # Project documentation
+│   ├── utils/                  # Utility functions
+│   │   ├── ai_functions.py     # AI helper functions
+│   │   ├── ai_review.py        # Review utilities
+│   │   ├── assign_styles.py    # Style assignment
+│   │   ├── bible_utils.py      # Bible-related utilities
+│   │   ├── converter.py        # Data converters
+│   │   ├── llm_chat_utils.py   # LLM chat utilities
+│   │   └── suno_functions.py   # Suno API functions
+│   └── main.py                 # FastAPI application entry
+├── frontend/                   # RemixJS frontend
+│   ├── app/                    # Application code
+│   │   ├── components/         # React components
+│   │   │   ├── BookCard.tsx
+│   │   │   ├── BookDetailsView.tsx
+│   │   │   ├── BookFilter.tsx
+│   │   │   ├── CardChapter.tsx
+│   │   │   ├── CardVerseRange.tsx
+│   │   │   ├── DisplayGeneratedSongs.tsx
+│   │   │   ├── GenreFilter.tsx
+│   │   │   ├── ModalSongs.tsx
+│   │   │   ├── SidebarFilters.tsx
+│   │   │   ├── TestamentFilter.tsx
+│   │   │   └── ui/             # UI components library
+│   │   ├── constants/          # Frontend constants
+│   │   ├── lib/                # Frontend libraries
+│   │   │   ├── api.ts          # API client
+│   │   │   └── supabase.ts     # Supabase client
+│   │   ├── routes/             # Page routes
+│   │   │   ├── $.tsx           # Catch-all route
+│   │   │   ├── _index.tsx      # Home page
+│   │   │   ├── api.list-songs.ts # API route
+│   │   │   └── main.tsx        # Main dashboard
+│   │   ├── entry.client.tsx    # Client entry point
+│   │   ├── entry.server.tsx    # Server entry point
+│   │   ├── root.tsx            # Root component
+│   │   └── tailwind.css        # Tailwind styles
+│   └── public/                 # Static assets
+└── README.md                   # Project documentation
 ```
 
 ## Getting Started

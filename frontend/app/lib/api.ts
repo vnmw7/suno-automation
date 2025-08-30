@@ -1,4 +1,5 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
+export const API_SONGS_URL = `${API_BASE_URL}/api/songs`;
 import { supabase } from "../lib/supabase";
 
 export interface SongRequest {

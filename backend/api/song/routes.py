@@ -320,8 +320,8 @@ async def manual_review_endpoint(request: ManualReviewRequest):
             parsed = parse_song_filename(filename)
             
             if parsed and parsed['title_slug'] == search_slug:
-                # Create the accessible path for frontend
-                relative_path = f"/songs/{filename}"
+                # Create the accessible path for frontend - include subdirectory
+                relative_path = f"final_review/{filename}"
                 
                 matching_files.append(SongFileInfo(
                     filename=filename,

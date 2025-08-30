@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { API_SONGS_URL } from '../lib/api';
 
 interface Song {
   fileName: string;
@@ -30,9 +31,12 @@ interface SongState {
   reviewStatus: ReviewStatus;
   reviewNotes: string;
   isSelected: boolean;
+  loadError?: string;
+  isLoading?: boolean;
 }
 
-const SONG_DIRECTORY = "/songs";
+// Using backend API endpoint for song streaming
+const SONG_DIRECTORY = "";
 const PLAYBACK_SPEEDS: PlaybackSpeed[] = [1, 2, 3];
 
 const DisplayGeneratedSongs = ({
@@ -42,12 +46,28 @@ const DisplayGeneratedSongs = ({
   fetchSongFilesError,
   manualReviewData,
 }: DisplayGeneratedSongsProps) => {
+  // Create a mapping of filenames to their full paths
+  const filePathMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    if (manualReviewData?.files) {
+      console.log('[DisplayGeneratedSongs] Building file path map from manual review data:', manualReviewData.files);
+      manualReviewData.files.forEach(file => {
+        // Use the path from backend which includes the subdirectory
+        map.set(file.filename, file.path);
+        console.log(`[DisplayGeneratedSongs] Mapped ${file.filename} -> ${file.path}`);
+      });
+    } else {
+      console.log('[DisplayGeneratedSongs] No manual review data available for path mapping');
+    }
+    return map;
+  }, [manualReviewData]);
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
   const progressRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   
   const [songStates, setSongStates] = useState<{ [key: string]: SongState }>({});
   const [globalPlaybackSpeed, setGlobalPlaybackSpeed] = useState<PlaybackSpeed>(1);
   const [useGlobalSpeed, setUseGlobalSpeed] = useState(true);
+  const [debugMode, setDebugMode] = useState(false); // Toggle with Ctrl+Shift+D
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [bulkReviewStatus, setBulkReviewStatus] = useState<ReviewStatus>('pending');
 
@@ -122,20 +142,57 @@ const DisplayGeneratedSongs = ({
   }, [songFiles]);
 
   // Handle play/pause
-  const togglePlayPause = useCallback((fileName: string) => {
+  const togglePlayPause = useCallback(async (fileName: string) => {
+    console.log(`[DisplayGeneratedSongs] Toggle play/pause for: ${fileName}`);
     const audio = audioRefs.current[fileName];
-    if (!audio) return;
+    if (!audio) {
+      console.error(`[DisplayGeneratedSongs] No audio element found for: ${fileName}`);
+      return;
+    }
+
+    // Check if there's a load error
+    if (songStates[fileName]?.loadError) {
+      console.error(`[DisplayGeneratedSongs] Cannot play song with load error: ${fileName}`, songStates[fileName].loadError);
+      return;
+    }
 
     if (songStates[fileName]?.isPlaying) {
+      console.log(`[DisplayGeneratedSongs] Pausing: ${fileName}`);
       audio.pause();
     } else {
+      console.log(`[DisplayGeneratedSongs] Playing: ${fileName}`);
       // Pause all other songs
       Object.keys(audioRefs.current).forEach(key => {
         if (key !== fileName && audioRefs.current[key]) {
           audioRefs.current[key]!.pause();
         }
       });
-      audio.play();
+      
+      try {
+        // Set loading state
+        setSongStates(prev => ({
+          ...prev,
+          [fileName]: {
+            ...prev[fileName],
+            isLoading: true,
+            loadError: undefined,
+          },
+        }));
+        
+        await audio.play();
+        console.log(`[DisplayGeneratedSongs] Successfully started playback: ${fileName}`);
+      } catch (error) {
+        console.error(`[DisplayGeneratedSongs] Failed to play: ${fileName}`, error);
+        setSongStates(prev => ({
+          ...prev,
+          [fileName]: {
+            ...prev[fileName],
+            isPlaying: false,
+            isLoading: false,
+            loadError: error instanceof Error ? error.message : 'Failed to play audio',
+          },
+        }));
+      }
     }
 
     setSongStates(prev => ({
@@ -339,6 +396,8 @@ const DisplayGeneratedSongs = ({
 
   // Setup audio event listeners
   const setupAudioListeners = useCallback((audio: HTMLAudioElement, fileName: string) => {
+    console.log(`[DisplayGeneratedSongs] Setting up audio listeners for: ${fileName}`);
+    
     const handleTimeUpdate = () => {
       setSongStates(prev => ({
         ...prev,
@@ -351,6 +410,7 @@ const DisplayGeneratedSongs = ({
     };
 
     const handleEnded = () => {
+      console.log(`[DisplayGeneratedSongs] Song ended: ${fileName}`);
       setSongStates(prev => ({
         ...prev,
         [fileName]: {
@@ -362,6 +422,7 @@ const DisplayGeneratedSongs = ({
     };
 
     const handlePlay = () => {
+      console.log(`[DisplayGeneratedSongs] Play event: ${fileName}`);
       // Pause all other songs
       Object.keys(audioRefs.current).forEach(key => {
         if (key !== fileName && audioRefs.current[key] && !audioRefs.current[key]!.paused) {
@@ -381,11 +442,14 @@ const DisplayGeneratedSongs = ({
         [fileName]: {
           ...prev[fileName],
           isPlaying: true,
+          isLoading: false,
+          loadError: undefined,
         },
       }));
     };
 
     const handlePause = () => {
+      console.log(`[DisplayGeneratedSongs] Pause event: ${fileName}`);
       setSongStates(prev => ({
         ...prev,
         [fileName]: {
@@ -395,24 +459,103 @@ const DisplayGeneratedSongs = ({
       }));
     };
 
+    const handleError = (e: Event) => {
+      const error = e as ErrorEvent;
+      console.error(`[DisplayGeneratedSongs] Audio error for ${fileName}:`, error);
+      console.error(`[DisplayGeneratedSongs] Audio src: ${audio.src}`);
+      console.error(`[DisplayGeneratedSongs] Audio error code: ${audio.error?.code}`);
+      console.error(`[DisplayGeneratedSongs] Audio error message: ${audio.error?.message}`);
+      
+      let errorMessage = 'Failed to load audio';
+      if (audio.error) {
+        switch (audio.error.code) {
+          case 1: // MEDIA_ERR_ABORTED
+            errorMessage = 'Audio loading was aborted';
+            break;
+          case 2: // MEDIA_ERR_NETWORK
+            errorMessage = 'Network error while loading audio';
+            break;
+          case 3: // MEDIA_ERR_DECODE
+            errorMessage = 'Audio decoding error';
+            break;
+          case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+            errorMessage = 'Audio format not supported or file not found';
+            break;
+        }
+      }
+      
+      setSongStates(prev => ({
+        ...prev,
+        [fileName]: {
+          ...prev[fileName],
+          isPlaying: false,
+          isLoading: false,
+          loadError: errorMessage,
+        },
+      }));
+    };
+
+    const handleLoadStart = () => {
+      console.log(`[DisplayGeneratedSongs] Load started for: ${fileName}`);
+      console.log(`[DisplayGeneratedSongs] Audio source URL: ${audio.src}`);
+      setSongStates(prev => ({
+        ...prev,
+        [fileName]: {
+          ...prev[fileName],
+          isLoading: true,
+          loadError: undefined,
+        },
+      }));
+    };
+
+    const handleCanPlay = () => {
+      console.log(`[DisplayGeneratedSongs] Can play: ${fileName}`);
+      setSongStates(prev => ({
+        ...prev,
+        [fileName]: {
+          ...prev[fileName],
+          isLoading: false,
+        },
+      }));
+    };
+
+    const handleLoadedMetadata = () => {
+      console.log(`[DisplayGeneratedSongs] Metadata loaded for ${fileName}: duration=${audio.duration}s`);
+      handleTimeUpdate();
+    };
+
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
-    audio.addEventListener('loadedmetadata', handleTimeUpdate);
+    audio.addEventListener('error', handleError);
+    audio.addEventListener('loadstart', handleLoadStart);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('loadedmetadata', handleTimeUpdate);
+      audio.removeEventListener('error', handleError);
+      audio.removeEventListener('loadstart', handleLoadStart);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
   }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // Toggle debug mode with Ctrl+Shift+D
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setDebugMode(prev => !prev);
+        console.log(`[DisplayGeneratedSongs] Debug mode: ${!debugMode ? 'ON' : 'OFF'}`);
+        return;
+      }
+
       // Find the currently playing song
       const playingSong = Object.keys(songStates).find(
         fileName => songStates[fileName]?.isPlaying
@@ -449,7 +592,7 @@ const DisplayGeneratedSongs = ({
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [songStates, togglePlayPause, changeVolume]);
+  }, [songStates, togglePlayPause, changeVolume, debugMode]);
 
   // Format time display
   const formatTime = (seconds: number): string => {
@@ -572,7 +715,8 @@ const DisplayGeneratedSongs = ({
         </div>
       ) : songFiles.length === 0 ? (
         <div className="text-center py-4 text-gray-500">
-          No songs found. The generation process may still be in progress.
+          <p>No songs found. The generation process may still be in progress.</p>
+          <p className="text-xs mt-4 italic">Tip: Press Ctrl+Shift+D to toggle debug mode for troubleshooting</p>
         </div>
       ) : (
         <div className="space-y-6 max-h-[600px] overflow-y-auto">
@@ -640,18 +784,77 @@ const DisplayGeneratedSongs = ({
 
                       {/* Custom Audio Player */}
                       <div className="space-y-2">
+                        {/* Error Display */}
+                        {state.loadError && (
+                          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm mb-2">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <strong>Error:</strong> {state.loadError}
+                                <div className="text-xs mt-1 text-red-600">
+                                  File: {song.fileName}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  console.log(`[DisplayGeneratedSongs] Retrying audio load for: ${song.fileName}`);
+                                  const audio = audioRefs.current[song.fileName];
+                                  if (audio) {
+                                    // Clear error state
+                                    setSongStates(prev => ({
+                                      ...prev,
+                                      [song.fileName]: {
+                                        ...prev[song.fileName],
+                                        loadError: undefined,
+                                        isLoading: true,
+                                      },
+                                    }));
+                                    // Force reload
+                                    audio.load();
+                                  }
+                                }}
+                                className="ml-2 px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                              >
+                                Retry
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Loading Indicator */}
+                        {state.isLoading && (
+                          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded-md text-sm mb-2">
+                            Loading audio...
+                          </div>
+                        )}
+
+                        {/* Debug Info */}
+                        {debugMode && (
+                          <div className="bg-gray-100 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-xs mb-2 font-mono">
+                            <div><strong>Filename:</strong> {song.fileName}</div>
+                            <div><strong>Mapped Path:</strong> {filePathMap.get(song.fileName) || 'Not mapped'}</div>
+                            <div><strong>Audio URL:</strong> {`${API_SONGS_URL}/${encodeURIComponent(filePathMap.get(song.fileName) || song.fileName)}`}</div>
+                            <div><strong>State:</strong> {JSON.stringify({
+                              isPlaying: state.isPlaying,
+                              isLoading: state.isLoading,
+                              hasError: !!state.loadError,
+                            })}</div>
+                          </div>
+                        )}
+
                         {/* Hidden HTML5 Audio Element */}
                         <audio
                           ref={(el) => {
                             audioRefs.current[song.fileName] = el;
                             if (el) {
+                              const audioSrc = `${API_SONGS_URL}/${encodeURIComponent(filePathMap.get(song.fileName) || song.fileName)}`;
+                              console.log(`[DisplayGeneratedSongs] Setting audio source for ${song.fileName}:`, audioSrc);
                               el.volume = state.volume;
                               el.playbackRate = useGlobalSpeed ? globalPlaybackSpeed : state.playbackSpeed;
                               el.loop = state.isLooping;
                               setupAudioListeners(el, song.fileName);
                             }
                           }}
-                          src={`${SONG_DIRECTORY}/${encodeURIComponent(song.fileName)}`}
+                          src={`${API_SONGS_URL}/${encodeURIComponent(filePathMap.get(song.fileName) || song.fileName)}`}
                         >
                           <track kind="captions" srcLang="en" label="English captions" />
                         </audio>
@@ -684,7 +887,12 @@ const DisplayGeneratedSongs = ({
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => togglePlayPause(song.fileName)}
-                              className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                              disabled={!!state.loadError}
+                              className={`p-2 rounded transition-colors ${
+                                state.loadError 
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                  : 'bg-blue-500 text-white hover:bg-blue-600'
+                              }`}
                             >
                               {state.isPlaying ? (
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -755,7 +963,7 @@ const DisplayGeneratedSongs = ({
 
                           {/* Download Link */}
                           <a
-                            href={`${SONG_DIRECTORY}/${encodeURIComponent(song.fileName)}`}
+                            href={`${API_SONGS_URL}/${encodeURIComponent(filePathMap.get(song.fileName) || song.fileName)}`}
                             download={song.fileName}
                             className="text-blue-500 hover:text-blue-700 text-sm hover:underline"
                           >
