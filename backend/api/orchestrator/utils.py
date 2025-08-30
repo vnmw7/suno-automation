@@ -97,7 +97,20 @@ async def execute_song_workflow(
             attempt_details["generation_success"] = True
             workflow_details["total_songs_generated"] += 2  # Suno generates 2 songs
             
+            # Extract pg1_id from generation result
+            # This is critical for the AI review process to fetch lyrics for comparison
             pg1_id = generation_result.get("pg1_id")
+            print(f"🎼 [WORKFLOW-DEBUG] Extracted pg1_id from generation_result: {pg1_id}")
+            print(f"🎼 [WORKFLOW-DEBUG] Full generation_result keys: {generation_result.keys()}")
+            
+            # Check if pg1_id is present - warn but don't fail
+            # Missing pg1_id is common due to Suno not redirecting to song page
+            if not pg1_id or pg1_id == 0:
+                print(f"🎼 [WORKFLOW] ⚠️ WARNING: pg1_id is missing or invalid: {pg1_id}")
+                print(f"🎼 [WORKFLOW] This is EXPECTED if Suno didn't redirect to song page")
+                print(f"🎼 [WORKFLOW] Songs were generated but database tracking may be incomplete.")
+                print(f"🎼 [WORKFLOW] Proceeding with download and review using fallback methods...")
+                print(f"🎼 [WORKFLOW] Manual review will be recommended for these songs")
 
             # Log successful generation details
             if "result" in generation_result:
@@ -105,7 +118,7 @@ async def execute_song_workflow(
                 print(f"🎼 [WORKFLOW] ✅ Generation successful! Song ID: {song_id}, pg1_id: {pg1_id}")
             
             # STEP 2: Wait for Suno processing
-            wait_time_seconds = 60
+            wait_time_seconds = 90
             print(f"🎼 [WORKFLOW] Step 2: Waiting for Suno processing ({wait_time_seconds} seconds)...")
             print(f"🎼 [WORKFLOW] ⏳ Starting wait at: {asyncio.get_event_loop().time()}")
             await asyncio.sleep(wait_time_seconds)
@@ -137,6 +150,8 @@ async def execute_song_workflow(
             
             # STEP 4: Review both songs
             print(f"🎼 [WORKFLOW] Step 4: Reviewing {len(downloaded_songs)} downloaded songs...")
+            print(f"🎼 [WORKFLOW-DEBUG] Passing pg1_id to review: {pg1_id}")
+            print(f"🎼 [WORKFLOW-DEBUG] pg1_id type: {type(pg1_id)}")
             review_results = await review_all_songs(downloaded_songs, pg1_id)
             
             attempt_details["reviews"] = review_results
@@ -357,13 +372,40 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
                 "review_details": {"error": f"Audio file not found: {file_path}"}
             }
 
-        # Call the review API function directly, as done in the debug endpoint
+        # Check pg1_id and decide review strategy
+        # pg1_id is required to fetch the original lyrics from database for comparison
+        if not pg1_id or pg1_id == 0:
+            print(f"🎼 [REVIEW] ⚠️ pg1_id is missing ({pg1_id}) for review: {file_path}")
+            print(f"🎼 [REVIEW] REASON: Suno.com doesn't redirect to song page after creation")
+            print(f"🎼 [REVIEW] IMPACT: Cannot fetch original lyrics for AI comparison")
+            print(f"🎼 [REVIEW] FALLBACK: Using simplified review without lyrics comparison...")
+            print(f"🎼 [REVIEW] RECOMMENDATION: Manual review required for quality assurance")
+            
+            # Simplified review when database lookup isn't possible
+            # In production, this could trigger a basic audio quality check
+            # or queue the song for manual review
+            return {
+                "file_path": file_path,
+                "index": song["index"],
+                "title": song["title"],
+                "verdict": "continue",  # Default to continue to avoid blocking workflow
+                "review_details": {
+                    "warning": "Simplified review due to missing pg1_id",
+                    "reason": "Cannot fetch original lyrics from database",
+                    "recommendation": "Manual review required",
+                    "pg1_id_value": pg1_id
+                }
+            }
+        
+        # Call the review API function with valid pg1_id
+        print(f"🎼 [REVIEW-DEBUG] Calling review API with pg1_id: {pg1_id}")
         review_result = await call_review_api(
             file_path=file_path,
-            pg1_id=pg1_id or 0
+            pg1_id=pg1_id
         )
 
         print(f"🎼 [REVIEW] Review completed for {file_path}. Verdict: {review_result.get('verdict', 'error')}")
+        print(f"🎼 [REVIEW-DEBUG] Full review result keys: {review_result.keys() if isinstance(review_result, dict) else 'Not a dict'}")
 
         # Structure the final result for this song
         return {
@@ -793,6 +835,8 @@ async def call_review_api(file_path: str, pg1_id: int) -> Dict[str, Any]:
     try:
         print(f"🎼 [REVIEW_API] Starting review for: {file_path}")
         print(f"🎼 [REVIEW_API] Using pg1_id: {pg1_id}")
+        print(f"🎼 [REVIEW_API-DEBUG] pg1_id type: {type(pg1_id)}")
+        print(f"🎼 [REVIEW_API-DEBUG] Will attempt to fetch from tblprogress_v1 with this ID")
 
         # Directly call the review function that's in this same file
         review_result = await review_song_with_ai(

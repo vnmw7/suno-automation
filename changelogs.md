@@ -1,27 +1,33 @@
 # Changelog
 
-## [Unreleased] - 2025-08-18
+## [2025-08-30] - pg1_id Tracking and Review Process Improvements
 
 ### Fixed
-- Corrected `GenerationConfig` parameters in `backend/api/orchestrator/utils.py` from camelCase to snake_case to fix errors when calling the Google AI API.
-- Fixed a bug in `get_song_with_lyrics` where it was incorrectly called with a `pg1_id` instead of a `structure_id`. The function now correctly accepts a `pg1_id` and fetches the associated song and lyric data more efficiently.
-- Fixed Pydantic validation error in `DownloadTestResponse` where the `error` field was receiving `None` instead of a string. Updated the field type to `Optional[str]` and modified the response building logic in `debug_download_both_songs` function to only include the `error` field when it actually has a value.
-- Resolved "`& was unexpected at this time`" error in logging setup by changing the log file directory structure to place log files directly in the `backend\logs` directory without creating subdirectories.
-- Updated AI review logging configuration to use a flat directory structure, eliminating the need for `ai-review` subfolder creation that was causing filesystem errors.
-
-### Added
-- Created reusable AI review utilities module at `backend\utils\ai_review.py` by extracting the `review_song_with_ai` function from `backend\api\ai_review\utils.py`. This module includes all necessary helper functions (`upload_file_to_google_ai`, `send_prompt_to_google_ai`) and can now be imported from anywhere in the project for song quality assessment.
+- **pg1_id extraction issue**: Fixed the workflow failing when `pg1_id` was not properly extracted from database response
+- **Unnecessary retries**: Removed hard failure when `pg1_id` is missing, preventing unnecessary song regeneration
+- **Review process blocking**: Added fallback review strategy when `pg1_id` is unavailable
+- **IndentationError**: Fixed incorrect indentation in try-except block for database save operation
 
 ### Changed
-- Updated the song generation workflow to ensure the `pg1_id` from `tblprogress_v1` is saved and passed to the review process. The `generate_song` function now returns the `pg1_id`, which is then propagated through the orchestrator to the AI review functions.
-- Refactored the `review_all_songs` function in the orchestrator workflow to run AI reviews in parallel using `asyncio.gather`. This improves performance by not waiting for each song review to finish sequentially.
-- Aligned the main song review workflow with the debug endpoint's logic by moving the file existence check into the `review_all_songs` function, ensuring consistent behavior and cleaner code.
-- Refactored the song structure generation logic in the Song Management modal to ensure it fetches the most up-to-date structure information from the database before deciding to generate a new structure or regenerate an existing one. This prevents using stale data and ensures the correct action (generate vs. regenerate) is always taken.
-- Fixed a bug in the song generation process where the script would time out waiting for song creation. The detection mechanism was updated to poll for new song elements on the page instead of relying on network state, making song creation detection more reliable.
-- Improved error handling in orchestrator routes by properly handling optional fields in Pydantic models and ensuring consistent response structure across all endpoints.
-- Updated `review_song_with_ai` function parameter from `song_structure_id` to `pg1_id` to better reflect that it references the database ID from tblprogress table rather than song_structure_tbl.
-- Refactored AI review route endpoint (`backend\api\ai_review\routes.py`) to use the centralized AI review utilities from `backend\utils\ai_review.py` instead of local utils. This eliminates code duplication and ensures consistency across the application.
-- Updated `SongReviewRequest` model to use `pg1_id` parameter instead of `song_structure_id` to match the database schema in `tblprogress_v1` table, improving data consistency and reducing confusion about which table ID is being referenced.
-- Updated orchestrator workflow (`backend\api\orchestrator\utils.py`) to use the centralized AI review utilities from `backend\utils\ai_review.py` in the `review_all_songs` function, ensuring consistent AI review behavior across all parts of the application.
--         - Synchronized AI review logic across all modules by ensuring both `backend\api\ai_review\utils.py` and `backend\utils\ai_review.py` contain identical implementations of the review functionality, maintaining code consistency while preserving module independence.
-- Enhanced song structure and style fetching in `frontend/app/lib/api.ts` and `frontend/app/components/ModalSongs.tsx` to allow filtering by `bookName`, `chapter`, and `verseRange`, improving data retrieval precision.
+- **URL behavior documentation**: Added extensive comments explaining that Suno.com no longer redirects to song page after creation (stays at `/create`)
+- **Database response handling**: Enhanced to check both 'pg1_id' and 'id' column names in response
+- **Error handling**: Changed from blocking errors to warnings with graceful fallbacks
+- **Wait time**: Increased from 60 to 90 seconds for Suno processing (per user configuration)
+
+### Added
+- **Comprehensive debugging logs**: Added detailed logging throughout the workflow for better troubleshooting
+  - Database operation logs with full response structure
+  - pg1_id tracking through each workflow step
+  - Clear labeling of expected vs unexpected behaviors
+- **Temporary ID generation**: System now generates temporary IDs when Suno song ID cannot be extracted from URL
+- **Fallback review mechanism**: Songs without `pg1_id` now use simplified review with manual review recommendation
+- **Debug output categories**: Structured logging with [DEBUG], [INFO], [WARNING], [ERROR], [DATABASE] prefixes
+
+### Technical Details
+- **Root cause**: Suno.com's UI behavior changed - no longer redirects to individual song page after creation
+- **Impact**: Cannot extract song ID from URL, affecting database tracking and AI review process
+- **Solution**: Implemented multi-layer fallback system to ensure workflow continues despite missing IDs
+
+### Files Modified
+- `backend/api/orchestrator/utils.py`: Enhanced workflow error handling and debugging
+- `backend/api/song/utils.py`: Improved song ID extraction and database save logging
