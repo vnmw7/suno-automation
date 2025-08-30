@@ -6,9 +6,12 @@ Purpose: Defines the API routes for song-related operations, including generatio
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import traceback
 import os
+import re
+from datetime import datetime
+from pathlib import Path
 from .utils import generate_song_handler, download_song_handler
 
 router = APIRouter(prefix="/song", tags=["song"])
@@ -59,6 +62,30 @@ class SongReviewResponse(BaseModel):
     second_response: Optional[str] = None
     error: Optional[str] = None
     audio_file: Optional[str] = None
+
+
+class ManualReviewRequest(BaseModel):
+    """Request model for manual song review."""
+    
+    bookName: str
+    chapter: int
+    verseRange: str
+
+
+class SongFileInfo(BaseModel):
+    """Information about a parsed song file."""
+    
+    filename: str
+    parsed: Dict[str, Any]
+    path: str
+
+
+class ManualReviewResponse(BaseModel):
+    """Response model for manual song review."""
+    
+    files: List[SongFileInfo]
+    total_songs: int
+    verse_reference: str
 
 
 @router.post("/generate")
@@ -186,6 +213,141 @@ async def download_song_endpoint(request: SongDownloadRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error during song download: {str(e)}",
+        )
+
+
+def slugify_text(text: str) -> str:
+    """
+    Convert text to slug format for filename matching.
+    
+    Args:
+        text: Text to slugify
+        
+    Returns:
+        Slugified text (lowercase, spaces to hyphens, special chars removed)
+    """
+    # Convert to lowercase
+    text = text.lower()
+    # Replace spaces with hyphens
+    text = text.replace(" ", "-")
+    # Remove special characters (keep only alphanumeric and hyphens)
+    text = re.sub(r'[^a-z0-9\-]', '', text)
+    # Remove multiple consecutive hyphens
+    text = re.sub(r'-+', '-', text)
+    # Strip leading/trailing hyphens
+    text = text.strip('-')
+    return text
+
+
+def parse_song_filename(filename: str) -> Optional[Dict]:
+    """
+    Parse a song filename to extract metadata.
+    
+    Expected format: {slug_title}_index_{intIndex}_{timestamp}.mp3
+    Example: amazing-grace-verse-1-5_index_-1_20250830143022.mp3
+    
+    Args:
+        filename: Song filename to parse
+        
+    Returns:
+        Dict with parsed metadata or None if parsing fails
+    """
+    # Remove .mp3 extension if present
+    if filename.endswith('.mp3'):
+        filename = filename[:-4]
+    
+    # Match pattern: {title}_index_{index}_{timestamp}
+    pattern = r'^(.+?)_index_([-]?\d+)_(\d{14})$'
+    match = re.match(pattern, filename)
+    
+    if not match:
+        return None
+    
+    title_slug, index_str, timestamp_str = match.groups()
+    
+    try:
+        # Parse timestamp (YYYYMMDDHHMMSS)
+        timestamp_dt = datetime.strptime(timestamp_str, '%Y%m%d%H%M%S')
+        created_date = timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        created_date = timestamp_str
+    
+    return {
+        'title_slug': title_slug,
+        'index': int(index_str),
+        'timestamp': timestamp_str,
+        'created_date': created_date
+    }
+
+
+@router.post("/manual-review", response_model=ManualReviewResponse)
+async def manual_review_endpoint(request: ManualReviewRequest):
+    """
+    Fetch songs from the final_review directory for manual review.
+    
+    Args:
+        request: ManualReviewRequest containing bookName, chapter, and verseRange
+        
+    Returns:
+        ManualReviewResponse with list of matching songs
+    """
+    try:
+        # Create the search slug from request parameters
+        search_slug = slugify_text(f"{request.bookName}-{request.chapter}-{request.verseRange}")
+        print(f"[manual_review_endpoint] Searching for songs with slug: {search_slug}")
+        
+        # Define the review directory path
+        review_dir = Path("backend/songs/final_review")
+        
+        # Ensure directory exists
+        if not review_dir.exists():
+            print(f"[manual_review_endpoint] Creating directory: {review_dir}")
+            review_dir.mkdir(parents=True, exist_ok=True)
+            return ManualReviewResponse(
+                files=[],
+                total_songs=0,
+                verse_reference=f"{request.bookName} {request.chapter}:{request.verseRange}"
+            )
+        
+        # Find all matching files
+        matching_files = []
+        
+        # List all .mp3 files in the directory
+        for file_path in review_dir.glob("*.mp3"):
+            filename = file_path.name
+            
+            # Parse the filename
+            parsed = parse_song_filename(filename)
+            
+            if parsed and parsed['title_slug'] == search_slug:
+                # Create the accessible path for frontend
+                relative_path = f"/songs/{filename}"
+                
+                matching_files.append(SongFileInfo(
+                    filename=filename,
+                    parsed=parsed,
+                    path=relative_path
+                ))
+                
+                print(f"[manual_review_endpoint] Found matching file: {filename}")
+        
+        # Sort files by index (negative indices first, then positive)
+        matching_files.sort(key=lambda x: (x.parsed['index'] >= 0, abs(x.parsed['index'])))
+        
+        print(f"[manual_review_endpoint] Found {len(matching_files)} matching songs")
+        
+        return ManualReviewResponse(
+            files=matching_files,
+            total_songs=len(matching_files),
+            verse_reference=f"{request.bookName} {request.chapter}:{request.verseRange}"
+        )
+        
+    except Exception as e:
+        print(f"[manual_review_endpoint] Error occurred: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching songs for manual review: {str(e)}"
         )
 
 

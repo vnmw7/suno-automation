@@ -3,11 +3,12 @@ import {
   generateSongStructure as callGenerateSongStructureAPI,
   fetchSongStructures,
   fetchStyles,
-  fetchSongFilesFromPublic,
+  fetchManualReviewSongs,
   orchestratorWorkflow,
   type SongStructure,
   type Style,
   type OrchestratorRequest,
+  type ManualReviewResponse,
 } from "../lib/api";
 import DisplayGeneratedSongs from "./DisplayGeneratedSongs";
 
@@ -47,6 +48,7 @@ const ModalSongs = ({
   });
   const [generatingStyle, setGeneratingStyle] = useState<string | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
+  const [manualReviewData, setManualReviewData] = useState<ManualReviewResponse | null>(null);
   const [songFiles, setSongFiles] = useState<string[]>([]);
   const [isFetchingSongFiles, setIsFetchingSongFiles] = useState(false);
   const [fetchSongFilesError, setFetchSongFilesError] = useState<string | null>(null);
@@ -95,31 +97,34 @@ const ModalSongs = ({
         setIsFetchingStructuresStyles(false);
       }
 
-      // Fetch song files from the public directory
+      // Fetch songs for manual review
       setIsFetchingSongFiles(true);
       setFetchSongFilesError(null);
       try {
-        const songFilesResponse = await fetchSongFilesFromPublic(
+        const manualReviewResponse = await fetchManualReviewSongs(
           bookName,
           chapter,
           range
         );
-        if (songFilesResponse.success && songFilesResponse.result) {
-          setSongFiles(songFilesResponse.result);
+        if (manualReviewResponse.success && manualReviewResponse.data) {
+          setManualReviewData(manualReviewResponse.data);
+          // Extract filenames for backward compatibility with DisplayGeneratedSongs
+          const filenames = manualReviewResponse.data.files.map(file => file.filename);
+          setSongFiles(filenames);
         } else {
           setFetchSongFilesError(
-            songFilesResponse.error || "Failed to load song files."
+            manualReviewResponse.error || "Failed to load songs for review."
           );
           console.error(
-            "Failed to load song files from public:",
-            songFilesResponse.error
+            "Failed to load songs for manual review:",
+            manualReviewResponse.error
           );
         }
       } catch (err) {
         setFetchSongFilesError(
-          "An unexpected error occurred while fetching song files."
+          "An unexpected error occurred while fetching songs for review."
         );
-        console.error("Error fetching song files from public:", err);
+        console.error("Error fetching songs for manual review:", err);
       } finally {
         setIsFetchingSongFiles(false);
       }
@@ -131,6 +136,7 @@ const ModalSongs = ({
       // Clear data on close
       setSongStructures([]);
       setStyles([]);
+      setManualReviewData(null);
       setSongFiles([]);
       setMessage(null);
       setError(null);
@@ -195,10 +201,12 @@ const ModalSongs = ({
         );
       }
 
-      // Refresh the song files list
-      const songFilesResponse = await fetchSongFilesFromPublic(bookName, chapter, range);
-      if (songFilesResponse.success && songFilesResponse.result) {
-        setSongFiles(songFilesResponse.result);
+      // Refresh the songs list for manual review
+      const manualReviewResponse = await fetchManualReviewSongs(bookName, chapter, range);
+      if (manualReviewResponse.success && manualReviewResponse.data) {
+        setManualReviewData(manualReviewResponse.data);
+        const filenames = manualReviewResponse.data.files.map(file => file.filename);
+        setSongFiles(filenames);
       }
 
     } catch (err) {
@@ -636,6 +644,7 @@ const ModalSongs = ({
                 songFiles={songFiles}
                 isFetchingSongFiles={isFetchingSongFiles}
                 fetchSongFilesError={fetchSongFilesError}
+                manualReviewData={manualReviewData}
               />
             </div>
           )}

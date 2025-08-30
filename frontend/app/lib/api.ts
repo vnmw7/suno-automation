@@ -56,6 +56,32 @@ export interface SongReviewResponse {
   audio_file?: string;
 }
 
+// Manual review interfaces
+export interface ManualReviewRequest {
+  bookName: string;
+  chapter: number;
+  verseRange: string;
+}
+
+export interface ParsedSongInfo {
+  title_slug: string;
+  index: number;
+  timestamp: string;
+  created_date: string;
+}
+
+export interface ManualReviewSongFile {
+  filename: string;
+  parsed: ParsedSongInfo;
+  path: string;
+}
+
+export interface ManualReviewResponse {
+  files: ManualReviewSongFile[];
+  total_songs: number;
+  verse_reference: string;
+}
+
 export interface OrchestratorRequest {
   strBookName: string;
   intBookChapter: number;
@@ -485,6 +511,60 @@ export const fetchSongFilesFromPublic = async (
   } catch (error) {
     console.error("Failed to fetch song files from public:", error);
     return { success: false, error: error instanceof Error ? error.message : "An unknown error occurred" };
+  }
+};
+
+// Fetch songs for manual review
+export const fetchManualReviewSongs = async (
+  bookName: string,
+  chapter: number,
+  verseRange: string
+): Promise<{ success: boolean; data?: ManualReviewResponse; error?: string }> => {
+  try {
+    const request: ManualReviewRequest = {
+      bookName,
+      chapter,
+      verseRange
+    };
+
+    console.log("[fetchManualReviewSongs] Fetching songs for manual review:", request);
+
+    const response = await fetch(`${API_BASE_URL}/song/manual-review`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ 
+        detail: `HTTP error! status: ${response.status}` 
+      }));
+      
+      console.error("[fetchManualReviewSongs] Error response:", errorData);
+      
+      return { 
+        success: false, 
+        error: errorData.detail || errorData.error || `Failed to fetch songs (${response.status})` 
+      };
+    }
+
+    const data: ManualReviewResponse = await response.json();
+    
+    console.log(`[fetchManualReviewSongs] Successfully fetched ${data.total_songs} songs for ${data.verse_reference}`);
+    
+    return { 
+      success: true, 
+      data 
+    };
+  } catch (error) {
+    console.error("[fetchManualReviewSongs] Failed to fetch manual review songs:", error);
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "An unknown error occurred while fetching manual review songs" 
+    };
   }
 };
 
