@@ -1,8 +1,3 @@
-"System: backend
-Module: api.orchestrator.utils
-Purpose: Utility functions for the orchestrator workflow including song generation, 
-         download, review, and intelligent retry logic."
-
 import os
 import shutil
 import asyncio
@@ -110,7 +105,7 @@ async def execute_song_workflow(
                 print(f"🎼 [WORKFLOW] ✅ Generation successful! Song ID: {song_id}, pg1_id: {pg1_id}")
             
             # STEP 2: Wait for Suno processing
-            wait_time_seconds = 10  # 10 seconds for testing
+            wait_time_seconds = 60
             print(f"🎼 [WORKFLOW] Step 2: Waiting for Suno processing ({wait_time_seconds} seconds)...")
             print(f"🎼 [WORKFLOW] ⏳ Starting wait at: {asyncio.get_event_loop().time()}")
             await asyncio.sleep(wait_time_seconds)
@@ -885,7 +880,7 @@ async def process_song_verdicts_final_attempt(review_results: List[Dict], final_
     deleted_count = 0
     preserved_count = 0
     
-    print(f"🎼 [VERDICT-FINAL] Processing final attempt verdicts (preserving re-roll songs for fail-safe)")
+    print(f"🎼 [VERDICT-FINAL] Processing final attempt verdicts (preserving re-roll songs for fail-safe")
     
     for result in review_results:
         file_path = result["file_path"]
