@@ -1,5 +1,39 @@
 # Changelog
 
+## [2025-08-31] - Critical MP3 Playback Bug Fix and Security Hardening
+
+### Fixed
+- **NameError in song streaming endpoint**: Fixed undefined `safe_filename` variable causing 500 Internal Server Error when streaming MP3 files
+- **Audio playback failure**: Resolved "Audio format not supported" error that was actually caused by server returning error JSON instead of audio data
+- **CORS security vulnerability**: Replaced wildcard CORS origins with specific allowed origins list
+
+### Security Improvements
+- **Directory traversal protection**: Implemented robust path validation using Python's `pathlib` to prevent unauthorized file access
+- **Path resolution security**: All file paths are now resolved to absolute paths and verified to be within the songs directory sandbox
+- **CORS hardening**: Restricted CORS to specific origins and methods instead of allowing all origins
+
+### Technical Root Cause Analysis
+- **Primary issue**: FastAPI endpoint at `/api/songs/{file_path:path}` was crashing due to `NameError: name 'safe_filename' is not defined`
+- **Browser behavior**: The browser's Opaque Response Blocking (ORB) security feature blocked the error response, causing `NS_BINDING_ABORTED` 
+- **Misleading symptom**: The "Audio format not supported" error was a red herring - the actual issue was the server returning JSON error instead of audio
+
+### Implementation Details
+- **Backend (`backend/routes/songs.py`)**:
+  - Complete rewrite of `stream_song()` endpoint with secure path handling
+  - Replaced inadequate `'..' in filename` check with proper `pathlib` resolution
+  - Fixed the undefined variable by using `full_path.name` for the filename
+  - Added comprehensive error handling and logging
+  
+- **Backend (`backend/main.py`)**:
+  - Updated CORS middleware to use explicit allowed origins list
+  - Restricted allowed methods to GET, POST, OPTIONS only
+
+### Files Modified
+- `backend/routes/songs.py`: Complete security rewrite of song streaming endpoint
+- `backend/main.py`: Hardened CORS configuration
+
+---
+
 ## [2025-08-30] - UI/UX Enhancements for Manual Review Interface
 
 ### Added
