@@ -21,12 +21,20 @@ app.include_router(ai_generation_router)
 app.include_router(orchestrator_router)
 app.include_router(songs_router)
 
+# Define a specific list of allowed origins.
+# This should be managed via environment variables for different deployments.
+allowed_origins = [
+    "http://localhost:5173",  # Remix dev server
+    # Add production URLs here when deploying
+    # e.g., "https://your-production-app.com"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,  # USE THE SPECIFIC LIST
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Be explicit
+    allow_headers=["*"],  # Can be further restricted if needed
 )
 
 

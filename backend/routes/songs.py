@@ -1,91 +1,61 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
-import os
+from fastapi.responses import FileResponse
 from pathlib import Path
 import mimetypes
-from typing import List, Dict, Any
+import os
 
 router = APIRouter(prefix="/api/songs", tags=["songs"])
 
-# Get the songs directory path
-SONGS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'songs')
+# Define the absolute path to the base 'songs' directory.
+# This creates a security "sandbox," preventing any file access outside this directory.
+SONGS_DIR = Path(__file__).resolve().parent.parent / 'songs'
 
-@router.get("/{filename:path}")
-async def stream_song(filename: str):
-    """Stream audio file from songs directory or subdirectories"""
+@router.get("/{file_path:path}")
+async def stream_song(file_path: str):
+    """
+    Securely streams an audio file from within the SONGS_DIR.
+    Prevents directory traversal attacks by ensuring the resolved file path is
+    strictly confined within the SONGS_DIR boundary.
+    """
     try:
-        # Remove leading slash if present
-        if filename.startswith('/'):
-            filename = filename[1:]
-        
-        # Check for absolute paths or directory traversal attempts
-        if os.path.isabs(filename) or '..' in filename:
-            raise HTTPException(status_code=403, detail="Invalid file path")
-        
-        # Try multiple locations
-        possible_paths = [
-            os.path.join(SONGS_DIR, filename),  # Direct path
-            os.path.join(SONGS_DIR, 'final_review', os.path.basename(filename)),  # In final_review
-            os.path.join(SONGS_DIR, 'pending_review', os.path.basename(filename)),  # In pending_review
-        ]
-        
-        file_path = None
-        for path in possible_paths:
-            if os.path.exists(path) and os.path.isfile(path):
-                file_path = path
-                break
-        
-        if not file_path:
-            raise HTTPException(status_code=404, detail=f"Song not found: {filename}")
-        
-        # Verify the file is actually in the songs directory (security check)
-        real_path = os.path.realpath(file_path)
-        real_songs_dir = os.path.realpath(SONGS_DIR)
-        if not real_path.startswith(real_songs_dir):
-            raise HTTPException(status_code=403, detail="Invalid file path")
-        
-        # Determine MIME type
-        mime_type, _ = mimetypes.guess_type(file_path)
+        # 1. Create a secure, absolute path to the base directory.
+        secure_base_dir = SONGS_DIR.resolve()
+
+        # 2. Safely join the requested file_path to the base directory.
+        # The client-provided path is treated as relative to SONGS_DIR.
+        full_path = (secure_base_dir / file_path).resolve()
+
+        # 3. CRITICAL SECURITY CHECK: Verify the resolved path is a child of the base directory.
+        # This is the canonical method to prevent directory traversal attacks.
+        if not str(full_path).startswith(str(secure_base_dir)):
+            raise HTTPException(status_code=403, detail="Forbidden: Access to the requested path is denied.")
+
+        # 4. Check if the path points to an actual file.
+        if not full_path.is_file():
+            raise HTTPException(status_code=404, detail=f"Song not found: {file_path}")
+
+        # 5. Determine the MIME type for the Content-Type header.
+        mime_type, _ = mimetypes.guess_type(full_path)
         if not mime_type:
-            mime_type = 'audio/mpeg'  # Default to MP3
-        
-        # Send file with appropriate headers for streaming
+            mime_type = 'audio/mpeg'  # Default for .mp3 files if guess fails.
+
+        # 6. FIX THE BUG: Use the actual filename from the resolved path.
+        # This sets the 'Content-Disposition' header for downloads.
         return FileResponse(
-            path=file_path,
+            path=str(full_path),
             media_type=mime_type,
-            filename=safe_filename,
+            filename=full_path.name,  # CORRECTED: Resolves the NameError
             headers={
-                "Accept-Ranges": "bytes",  # Enable seeking
+                "Accept-Ranges": "bytes",  # Essential for allowing clients to seek within the audio stream.
                 "Cache-Control": "no-cache",
             }
         )
-        
+
     except HTTPException:
+        # Re-raise FastAPI's own exceptions.
         raise
     except Exception as e:
-        print(f"Error streaming song {filename}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to stream song")
-
-@router.get("")
-async def list_songs() -> Dict[str, List[Dict[str, Any]]]:
-    """List all available songs"""
-    try:
-        if not os.path.exists(SONGS_DIR):
-            os.makedirs(SONGS_DIR, exist_ok=True)
-            return {"songs": []}
-        
-        songs = []
-        for filename in os.listdir(SONGS_DIR):
-            if filename.endswith(('.mp3', '.wav', '.m4a', '.ogg')):
-                file_path = os.path.join(SONGS_DIR, filename)
-                songs.append({
-                    "filename": filename,
-                    "size": os.path.getsize(file_path),
-                    "url": f"/api/songs/{filename}"
-                })
-        
-        return {"songs": songs}
-        
-    except Exception as e:
-        print(f"Error listing songs: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to list songs")
+        # Log unexpected internal errors for debugging.
+        print(f"An unexpected error occurred while streaming song {file_path}: {e}")
+        # Return a generic 500 error to the client.
+        raise HTTPException(status_code=500, detail="Internal server error while streaming the song.")
