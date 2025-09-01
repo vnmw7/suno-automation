@@ -6,7 +6,7 @@ import pandas as pd
 def separate_books():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     csv_file_path = os.path.join(
-        base_dir, "data", "bible_song_styles", "song_variation_map.csv"
+        base_dir, "misc", "data", "bible_song_styles", "song_variation_map.csv"
     )
 
     df_all = pd.read_csv(csv_file_path, header=None, dtype=str).fillna("")

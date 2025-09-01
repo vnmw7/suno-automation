@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # Create logs directory if it doesn't exist
-log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
+log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, f"{datetime.now().strftime('%Y%m%d')}.log")
 
@@ -423,7 +423,7 @@ Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'."""
                 
         elif verdict == "continue":
             try:
-                base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+                base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
                 target_dir = os.path.join(base_dir, "songs", "final_review")
                 os.makedirs(target_dir, exist_ok=True)
                 

@@ -9,14 +9,14 @@ from pydantic import BaseModel
 from typing import Optional
 import traceback
 import os
-from .utils import review_song_with_ai
+from utils.ai_review import review_song_with_ai
 
 router = APIRouter(prefix="/ai_review", tags=["ai_review"])
 
 class SongReviewRequest(BaseModel):
     """Request model for reviewing a song."""
     audio_file_path: str
-    song_structure_id: int
+    pg1_id: int
 
 class SongReviewResponse(BaseModel):
     """Response model for song review operations."""
@@ -35,7 +35,7 @@ async def review_song_endpoint(request: SongReviewRequest):
     Review a song using AI to check for quality issues and lyric accuracy
 
     Args:
-        request: SongReviewRequest containing audio file path and song structure
+        request: SongReviewRequest containing audio file path and pg1_id
 
     Returns:
         SongReviewResponse with review results and verdict
@@ -46,8 +46,8 @@ async def review_song_endpoint(request: SongReviewRequest):
         # Validate input parameters
         if not request.audio_file_path:
             raise HTTPException(status_code=400, detail="Audio file path is required")
-        if not request.song_structure_id:
-            raise HTTPException(status_code=400, detail="Song structure ID is required")
+        if not request.pg1_id:
+            raise HTTPException(status_code=400, detail="pg1_id is required")
         if not os.path.exists(request.audio_file_path):
             raise HTTPException(
                 status_code=404,
@@ -56,10 +56,10 @@ async def review_song_endpoint(request: SongReviewRequest):
 
         print("[AI Review] Parameters validated, starting review process...")
         
-        # Perform AI review
+        # Perform AI review using centralized utils module from backend.utils.ai_review
         review_result = await review_song_with_ai(
             audio_file_path=request.audio_file_path,
-            song_structure_id=request.song_structure_id
+            pg1_id=request.pg1_id
         )
 
         if not review_result["success"]:

@@ -1,4 +1,5 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
+export const API_SONGS_URL = `${API_BASE_URL}/api/songs`;
 import { supabase } from "../lib/supabase";
 
 export interface SongRequest {
@@ -54,6 +55,52 @@ export interface SongReviewResponse {
   second_response?: string;
   error?: string;
   audio_file?: string;
+}
+
+// Manual review interfaces
+export interface ManualReviewRequest {
+  bookName: string;
+  chapter: number;
+  verseRange: string;
+}
+
+export interface ParsedSongInfo {
+  title_slug: string;
+  index: number;
+  timestamp: string;
+  created_date: string;
+}
+
+export interface ManualReviewSongFile {
+  filename: string;
+  parsed: ParsedSongInfo;
+  path: string;
+}
+
+export interface ManualReviewResponse {
+  files: ManualReviewSongFile[];
+  total_songs: number;
+  verse_reference: string;
+}
+
+export interface OrchestratorRequest {
+  strBookName: string;
+  intBookChapter: number;
+  strVerseRange: string;
+  strStyle: string;
+  strTitle: string;
+  song_structure_id?: number;
+}
+
+export interface OrchestratorResponse {
+  success: boolean;
+  message: string;
+  total_attempts: number;
+  final_songs_count: number;
+  good_songs?: number;
+  re_rolled_songs?: number;
+  error?: string;
+  workflow_details?: any;
 }
 
 export interface SongResponse {
@@ -186,10 +233,12 @@ export interface FetchStylesResponse {
 }
 
 export const fetchSongStructures = async (
+  bookName?: string,
+  chapter?: number,
   verseRange?: string
 ): Promise<FetchSongStructuresResponse> => {
   try {
-    console.log("Fetching song structures from Supabase...");
+    console.log(`Fetching song structures of ${bookName} ${chapter}:${verseRange} from Supabase...`);
 
     let query = supabase
       .from("song_structure_tbl")
@@ -198,6 +247,12 @@ export const fetchSongStructures = async (
       .not("song_structure", "eq", "")
       .order("id", { ascending: false });
 
+    if (bookName) {
+      query = query.eq("book_name", bookName);
+    }
+    if (chapter) {
+      query = query.eq("chapter", chapter);
+    }
     if (verseRange) {
       query = query.eq("verse_range", verseRange);
     }
@@ -231,6 +286,8 @@ export const fetchSongStructures = async (
 };
 
 export const fetchStyles = async (
+  bookName?: string,
+  chapter?: number,
   verseRange?: string
 ): Promise<FetchStylesResponse> => {
   try {
@@ -241,6 +298,12 @@ export const fetchStyles = async (
       .select("styles")
       .not("styles", "is", null);
 
+    if (bookName) {
+      query = query.eq("book_name", bookName);
+    }
+    if (chapter) {
+      query = query.eq("chapter", chapter);
+    }
     if (verseRange) {
       query = query.eq("verse_range", verseRange);
     }
@@ -389,6 +452,43 @@ export const reviewSongAPI = async (
   }
 };
 
+export const orchestratorWorkflow = async (
+  request: OrchestratorRequest
+): Promise<OrchestratorResponse> => {
+  try {
+    console.log("🎼 [API] Orchestrator request payload:", request);
+
+    const response = await fetch(`${API_BASE_URL}/orchestrator/workflow`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    console.log("🎼 [API] Orchestrator response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("🎼 [API] Orchestrator error response:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("🎼 [API] Orchestrator response data:", data);
+    return data;
+  } catch (error) {
+    console.error("🎼 [API] Orchestrator error:", error);
+    return {
+      success: false,
+      message: "Failed to execute orchestrator workflow",
+      error: error instanceof Error ? error.message : "Unknown error",
+      total_attempts: 0,
+      final_songs_count: 0,
+    };
+  }
+};
+
 export const fetchSongFilesFromPublic = async (
   bookName: string,
   chapter: number,
@@ -412,6 +512,60 @@ export const fetchSongFilesFromPublic = async (
   } catch (error) {
     console.error("Failed to fetch song files from public:", error);
     return { success: false, error: error instanceof Error ? error.message : "An unknown error occurred" };
+  }
+};
+
+// Fetch songs for manual review
+export const fetchManualReviewSongs = async (
+  bookName: string,
+  chapter: number,
+  verseRange: string
+): Promise<{ success: boolean; data?: ManualReviewResponse; error?: string }> => {
+  try {
+    const request: ManualReviewRequest = {
+      bookName,
+      chapter,
+      verseRange
+    };
+
+    console.log("[fetchManualReviewSongs] Fetching songs for manual review:", request);
+
+    const response = await fetch(`${API_BASE_URL}/song/manual-review`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ 
+        detail: `HTTP error! status: ${response.status}` 
+      }));
+      
+      console.error("[fetchManualReviewSongs] Error response:", errorData);
+      
+      return { 
+        success: false, 
+        error: errorData.detail || errorData.error || `Failed to fetch songs (${response.status})` 
+      };
+    }
+
+    const data: ManualReviewResponse = await response.json();
+    
+    console.log(`[fetchManualReviewSongs] Successfully fetched ${data.total_songs} songs for ${data.verse_reference}`);
+    
+    return { 
+      success: true, 
+      data 
+    };
+  } catch (error) {
+    console.error("[fetchManualReviewSongs] Failed to fetch manual review songs:", error);
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "An unknown error occurred while fetching manual review songs" 
+    };
   }
 };
 

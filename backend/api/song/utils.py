@@ -290,37 +290,129 @@ async def generate_song(
                 if not create_button:
                     raise Exception("Could not find a visible create button.")
 
+                song_play_button_selector = "[aria-label='Play Song']"
+                initial_song_count = await page.locator(song_play_button_selector).count()
+                print(f"Initial song count: {initial_song_count}")
+
                 await create_button.click()
-                await page.wait_for_timeout(5000)
-                await page.wait_for_load_state("networkidle", timeout=3000)
+                print("Create button clicked. Waiting for new songs to appear...")
+
+                expected_song_count = initial_song_count + 2
+                
+                try:
+                    # Wait for the number of songs to increase by 2
+                    expression = f"() => document.querySelectorAll(\"{song_play_button_selector}\").length >= {expected_song_count}"
+                    await page.wait_for_function(expression, timeout=5000)
+                    
+                    new_song_count = await page.locator(song_play_button_selector).count()
+                    print(f"New songs detected. Current song count: {new_song_count}")
+                except Exception as e:
+                    new_song_count = await page.locator(song_play_button_selector).count()
+                    error_message = f"Timeout waiting for new songs. Initial: {initial_song_count}, Current: {new_song_count}. Error: {e}"
+                    print(error_message)
+                    raise Exception(error_message)
+
                 print("Song creation initiated and page loaded.")
 
-                # Get the song ID from the URL
+                # IMPORTANT NOTE: After clicking 'Create', Suno.com does NOT redirect to the song page
+                # The URL remains at /create, so we CANNOT extract the song ID from the URL
+                # The actual song IDs are only visible in the song cards on the page
+                # This is a known limitation of the current Suno.com UI behavior
+                
                 current_url = page.url
+                print(f"[DEBUG] Current URL after song creation: {current_url}")
+                print(f"[DEBUG] Expected pattern: 'suno.com/song/<id>' but URL stays at: {current_url}")
+                
                 suno_song_id = None
+                pg1_id = None  # Initialize pg1_id
+                
+                # Check if URL contains song ID (unlikely due to Suno's behavior)
                 if "suno.com/song/" in current_url:
+                    # This path is rarely taken since Suno doesn't redirect anymore
                     suno_song_id = current_url.split("suno.com/song/")[1].split("/")[0]
-                    print(f"Extracted suno_song_id: {suno_song_id}")
+                    print(f"[RARE] Extracted suno_song_id from URL: {suno_song_id}")
+                else:
+                    # This is the normal case - URL doesn't change after creation
+                    print(f"[EXPECTED] URL doesn't contain song ID (normal Suno behavior)")
+                    print(f"[INFO] Will use temporary ID for database tracking")
+                    
+                    # Generate a temporary ID based on timestamp for database tracking
+                    # This ensures we can still track the song in our database
+                    import time
+                    temp_id = f"pending_{int(time.time())}"
+                    suno_song_id = temp_id
+                    print(f"[DEBUG] Generated temporary ID: {suno_song_id}")
 
-                    # Save to progress_v1_tbl
-                    try:
-                        data = (
-                            supabase.table("tblprogress_v1")
-                            .insert(
-                                {
-                                    "pg1_song_struct_id": song_structure_id,
-                                    "pg1_lyrics": strLyrics,
-                                    "pg1_status": 0,
-                                    "pg1_reviews": 0,
-                                    "pg1_song_id": suno_song_id,
-                                    "pg1_style": strStyle,
-                                }
-                            )
-                            .execute()
+                # Always save to progress_v1_tbl for tracking
+                # This creates a record even without the real Suno song ID
+                print(f"[DATABASE] Attempting to save to tblprogress_v1...")
+                print(f"[DATABASE] Data to save:")
+                print(f"  - pg1_song_struct_id: {song_structure_id}")
+                print(f"  - pg1_song_id: {suno_song_id}")
+                print(f"  - pg1_style: {strStyle}")
+                print(f"  - pg1_lyrics length: {len(strLyrics) if strLyrics else 0} chars")
+                
+                try:
+                    response = (
+                        supabase.table("tblprogress_v1")
+                        .insert(
+                            {
+                                "pg1_song_struct_id": song_structure_id,
+                                "pg1_lyrics": strLyrics,
+                                "pg1_status": 0,
+                                "pg1_reviews": 0,
+                                "pg1_song_id": suno_song_id,
+                                "pg1_style": strStyle,
+                            }
                         )
-                        print(f"Saved to progress_v1_tbl: {data}")
-                    except Exception as db_error:
-                        print(f"Error saving to Supabase: {db_error}")
+                        .execute()
+                    )
+                    
+                    # DEBUG: Log the full response structure
+                    print(f"[DATABASE] Full response from Supabase:")
+                    print(f"  - response.data: {response.data}")
+                    print(f"  - response.data type: {type(response.data)}")
+                    
+                    if response.data:
+                        print(f"[DATABASE] response.data exists, extracting pg1_id...")
+                        print(f"[DATABASE] response.data[0]: {response.data[0]}")
+                        
+                        # Try to get pg1_id from the response
+                        # The column name might be 'pg1_id' or 'id' depending on table schema
+                        pg1_id = response.data[0].get('pg1_id')
+                        if pg1_id is None:
+                            # Try alternative column names
+                            pg1_id = response.data[0].get('id')
+                            if pg1_id:
+                                print(f"[DATABASE] Found pg1_id under 'id' column: {pg1_id}")
+                        else:
+                            print(f"[DATABASE] Successfully extracted pg1_id: {pg1_id}")
+                        
+                        # Log all available keys for debugging
+                        print(f"[DATABASE] Available keys in response: {response.data[0].keys()}")
+                    else:
+                        print(f"[DATABASE] WARNING: response.data is empty or None")
+                        pg1_id = None
+                        
+                except Exception as db_error:
+                    print(f"[DATABASE] ERROR saving to Supabase: {db_error}")
+                    print(f"[DATABASE] Error type: {type(db_error).__name__}")
+                    import traceback
+                    print(f"[DATABASE] Traceback: {traceback.format_exc()}")
+                    # Continue without pg1_id but log the issue
+                    pg1_id = None
+                
+                # Validate pg1_id before returning
+                if not pg1_id:
+                    print(f"[WARNING] pg1_id is missing or invalid (value: {pg1_id})")
+                    print(f"[WARNING] This means:")
+                    print(f"[WARNING]   1. Song was created on Suno.com successfully")
+                    print(f"[WARNING]   2. Database save may have failed OR")
+                    print(f"[WARNING]   3. pg1_id was not returned in the response")
+                    print(f"[WARNING]   4. Review process will use fallback method")
+                else:
+                    print(f"[SUCCESS] pg1_id successfully obtained: {pg1_id}")
+                    print(f"[SUCCESS] Full AI review with lyrics comparison will be available")
 
                 return {
                     "success": True,
@@ -328,6 +420,7 @@ async def generate_song(
                     "lyrics": strLyrics,
                     "style": strStyle,
                     "title": strTitle,
+                    "pg1_id": pg1_id,
                 }
 
             except Exception as e:
@@ -337,7 +430,14 @@ async def generate_song(
     except Exception as e:
         print(f"An error occurred in generate_song: {e}")
         print(traceback.format_exc())
-        return False
+        return {
+            "success": False,
+            "error": f"Song generation failed: {str(e)}",
+            "song_id": None,
+            "lyrics": None,
+            "style": strStyle,
+            "title": strTitle
+        }
 
 async def teleport_click(page: Page, locator: Locator, button: str = "left", delay: int = 50):
     """
@@ -755,13 +855,15 @@ async def download_song_handler(
                     download = await download_info.value
 
                     if download:
-                        # 1. Use slugify for robust, clean title sanitization
+                        # Song Renaming Logic:
+                        # 1. Use slugify for robust, clean title sanitization (removes special chars, spaces->hyphens, lowercase)
                         slug_title = slugify(strTitle)
 
-                        # 2. Generate a compact, numeric timestamp
+                        # 2. Generate a compact, numeric timestamp (YYYYMMDDHHMMSS format)
                         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
-                        # 3. Construct the final filename with timestamp suffix
+                        # 3. Construct the final filename: title_index_timestamp.mp3
+                        # Example: "amazing-grace-verse-1-5_index_-1_20250830143022.mp3"
                         filename = f"{slug_title}_index_{intIndex}_{timestamp}.mp3"
                         final_file_path = os.path.join(download_path, filename)
 
