@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.song.routes import router as song_router
 from api.ai_review.routes import router as ai_review_router
 from api.ai_generation.routes import router as ai_generation_router
+from api.orchestrator.routes import router as orchestrator_router
+from routes.songs import router as songs_router
 
 app = FastAPI()
 
@@ -16,13 +18,23 @@ app = FastAPI()
 app.include_router(song_router)
 app.include_router(ai_review_router)
 app.include_router(ai_generation_router)
+app.include_router(orchestrator_router)
+app.include_router(songs_router)
+
+# Define a specific list of allowed origins.
+# This should be managed via environment variables for different deployments.
+allowed_origins = [
+    "http://localhost:5173",  # Remix dev server
+    # Add production URLs here when deploying
+    # e.g., "https://your-production-app.com"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,  # USE THE SPECIFIC LIST
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Be explicit
+    allow_headers=["*"],  # Can be further restricted if needed
 )
 
 
