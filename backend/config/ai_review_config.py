@@ -8,14 +8,14 @@ including rate limiting and model selection options.
 # Switch between 'gemini-2.5-pro' and 'gemini-2.5-flash' based on your needs
 # Pro: More accurate but only 2 RPM on free tier
 # Flash: Slightly less accurate but 15 RPM on free tier
-USE_FLASH_MODEL = False  # Set to True to use Flash model with higher rate limits
+USE_FLASH_MODEL = True  # Set to True to use Flash model with higher rate limits
 
 # Rate Limiting Configuration
 # These values are for the free tier. Update if you have a paid plan.
 if USE_FLASH_MODEL:
     # Gemini 2.5 Flash limits (free tier)
     REQUESTS_PER_MINUTE = 15
-    DELAY_BETWEEN_API_CALLS = 4  # seconds (60/15) - Used between upload, 1st prompt, 2nd prompt
+    DELAY_BETWEEN_API_CALLS = 5  # seconds (60/15) - Used between upload, 1st prompt, 2nd prompt
     DELAY_BETWEEN_SONGS = 10  # seconds - Used between different song reviews
 else:
     # Gemini 2.5 Pro limits (free tier) 

@@ -2,6 +2,14 @@
 
 ## [Unreleased] - 2025-09-06
 
+### Changed
+- **AI Review Model Switch**: Migrated from Gemini 2.5 Pro to Gemini 2.5 Flash for song reviews
+  - 7.5x faster processing: 15 RPM vs 2 RPM (Pro model)
+  - Reduced API call delays from 31s to 5s between requests
+  - Reduced song-to-song delays from 31s to 10s
+  - Total review time per song reduced from ~93s to ~15s (6x faster)
+  - Trade-off: Slightly less accuracy for significantly improved speed
+
 ### Fixed
 - **Music Player Playback Speed**: Fixed issue where 2x and 3x playback speed controls were not working
   - Added `useEffect` hook to properly update audio element's `playbackRate` property when speed changes
