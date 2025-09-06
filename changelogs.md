@@ -11,6 +11,10 @@
   - Trade-off: Slightly less accuracy for significantly improved speed
 
 ### Fixed
+- **Unicode Encoding Issues**: Fixed corrupted special characters in delete_song.py module
+  - Replaced malformed Unicode characters in print statements with readable text prefixes
+  - Fixed module import errors caused by UTF-8 decoding issues
+
 - **Music Player Playback Speed**: Fixed issue where 2x and 3x playback speed controls were not working
   - Added `useEffect` hook to properly update audio element's `playbackRate` property when speed changes
   - Now correctly syncs React state with actual HTML5 audio playback rate
@@ -26,6 +30,16 @@
     - Countdown display showing remaining wait time
 
 ### Added
+- **Song Deletion API Endpoints**: Complete song management with deletion capabilities
+  - `POST /song/delete` - Delete single song locally and/or from Suno.com
+  - `POST /song/delete/batch` - Batch delete multiple songs with detailed results
+  - `DELETE /song/delete/{song_id}` - RESTful deletion by Suno ID
+  - `GET /song/find-songs` - Find songs in directories for deletion management
+  - Created `backend/utils/delete_song.py` utility module with SongDeleter class
+  - Supports both local file deletion and remote Suno.com deletion via browser automation
+  - Includes automatic empty directory cleanup after file deletion
+  - Comprehensive error handling and batch operation support
+
 - **Granular Playback Speed Options**: Enhanced music player with more precise speed control
   - Added 12 speed options with 0.25x increments: 0.25x, 0.5x, 0.75x, 1x, 1.25x, 1.5x, 1.75x, 2x, 2.25x, 2.5x, 2.75x, 3x
   - Converted speed controls from buttons to dropdown selects for better UI space efficiency

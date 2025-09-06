@@ -13,6 +13,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from .utils import generate_song_handler, download_song_handler
+from utils.delete_song import SongDeleter
 
 router = APIRouter(prefix="/song", tags=["song"])
 
@@ -86,6 +87,43 @@ class ManualReviewResponse(BaseModel):
     files: List[SongFileInfo]
     total_songs: int
     verse_reference: str
+
+
+class DeleteSongRequest(BaseModel):
+    """Request model for deleting a single song."""
+    
+    song_id: Optional[str] = None
+    file_path: Optional[str] = None
+    delete_from_suno: bool = False
+
+
+class DeleteSongResponse(BaseModel):
+    """Response model for single song deletion."""
+    
+    success: bool
+    local_deleted: bool = False
+    suno_deleted: bool = False
+    errors: List[str] = []
+    message: str
+
+
+class BatchDeleteRequest(BaseModel):
+    """Request model for deleting multiple songs."""
+    
+    song_ids: Optional[List[str]] = None
+    file_paths: Optional[List[str]] = None
+    delete_from_suno: bool = False
+
+
+class BatchDeleteResponse(BaseModel):
+    """Response model for batch song deletion."""
+    
+    success: bool
+    total_processed: int
+    deleted_count: int
+    failed_count: int
+    results: List[Dict[str, Any]]
+    errors: List[str] = []
 
 
 @router.post("/generate")
@@ -351,3 +389,259 @@ async def manual_review_endpoint(request: ManualReviewRequest):
         )
 
 
+@router.post("/delete", response_model=DeleteSongResponse)
+async def delete_song_endpoint(request: DeleteSongRequest):
+    """
+    Delete a song locally and/or from Suno.com.
+    
+    Args:
+        request: DeleteSongRequest containing optional song_id, file_path, and delete_from_suno flag
+        
+    Returns:
+        DeleteSongResponse with deletion status and details
+    """
+    try:
+        # Validate that at least one identifier is provided
+        if not request.song_id and not request.file_path:
+            raise HTTPException(
+                status_code=400,
+                detail="Either song_id or file_path must be provided"
+            )
+        
+        print(f"[delete_song_endpoint] Starting deletion - Song ID: {request.song_id}, File: {request.file_path}, From Suno: {request.delete_from_suno}")
+        
+        # Initialize the SongDeleter
+        deleter = SongDeleter()
+        
+        # Perform deletion
+        result = await deleter.delete_song(
+            song_id=request.song_id,
+            file_path=request.file_path,
+            delete_from_suno=request.delete_from_suno
+        )
+        
+        # Prepare response message
+        messages = []
+        if result["local_deleted"]:
+            messages.append("Local file deleted successfully")
+        if result["suno_deleted"]:
+            messages.append("Song deleted from Suno.com successfully")
+        if not result["success"]:
+            messages.append("Deletion failed")
+        
+        return DeleteSongResponse(
+            success=result["success"],
+            local_deleted=result["local_deleted"],
+            suno_deleted=result["suno_deleted"],
+            errors=result.get("errors", []),
+            message=". ".join(messages) if messages else "No operations performed"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[delete_song_endpoint] Error occurred: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error during song deletion: {str(e)}"
+        )
+
+
+@router.post("/delete/batch", response_model=BatchDeleteResponse)
+async def batch_delete_endpoint(request: BatchDeleteRequest):
+    """
+    Delete multiple songs in batch locally and/or from Suno.com.
+    
+    Args:
+        request: BatchDeleteRequest containing optional song_ids, file_paths, and delete_from_suno flag
+        
+    Returns:
+        BatchDeleteResponse with batch deletion results
+    """
+    try:
+        # Validate that at least one list is provided
+        if not request.song_ids and not request.file_paths:
+            raise HTTPException(
+                status_code=400,
+                detail="Either song_ids or file_paths must be provided"
+            )
+        
+        print(f"[batch_delete_endpoint] Starting batch deletion - Songs: {len(request.song_ids or [])}, Files: {len(request.file_paths or [])}")
+        
+        # Initialize the SongDeleter
+        deleter = SongDeleter()
+        
+        results = []
+        deleted_count = 0
+        failed_count = 0
+        all_errors = []
+        
+        # Process file deletions
+        if request.file_paths:
+            for file_path in request.file_paths:
+                try:
+                    result = await deleter.delete_song(
+                        file_path=file_path,
+                        delete_from_suno=False  # Only delete locally for batch file operations
+                    )
+                    
+                    if result["success"]:
+                        deleted_count += 1
+                    else:
+                        failed_count += 1
+                        all_errors.extend(result.get("errors", []))
+                    
+                    results.append({
+                        "file_path": file_path,
+                        "success": result["success"],
+                        "errors": result.get("errors", [])
+                    })
+                    
+                except Exception as e:
+                    failed_count += 1
+                    error_msg = f"Failed to delete {file_path}: {str(e)}"
+                    all_errors.append(error_msg)
+                    results.append({
+                        "file_path": file_path,
+                        "success": False,
+                        "errors": [error_msg]
+                    })
+        
+        # Process Suno deletions
+        if request.song_ids and request.delete_from_suno:
+            for song_id in request.song_ids:
+                try:
+                    result = await deleter.delete_song(
+                        song_id=song_id,
+                        delete_from_suno=True
+                    )
+                    
+                    if result["success"]:
+                        deleted_count += 1
+                    else:
+                        failed_count += 1
+                        all_errors.extend(result.get("errors", []))
+                    
+                    results.append({
+                        "song_id": song_id,
+                        "success": result["success"],
+                        "errors": result.get("errors", [])
+                    })
+                    
+                except Exception as e:
+                    failed_count += 1
+                    error_msg = f"Failed to delete song {song_id}: {str(e)}"
+                    all_errors.append(error_msg)
+                    results.append({
+                        "song_id": song_id,
+                        "success": False,
+                        "errors": [error_msg]
+                    })
+        
+        total_processed = deleted_count + failed_count
+        
+        return BatchDeleteResponse(
+            success=failed_count == 0,
+            total_processed=total_processed,
+            deleted_count=deleted_count,
+            failed_count=failed_count,
+            results=results,
+            errors=all_errors
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[batch_delete_endpoint] Error occurred: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error during batch deletion: {str(e)}"
+        )
+
+
+@router.delete("/delete/{song_id}")
+async def delete_song_by_id(song_id: str, delete_from_suno: bool = False):
+    """
+    Delete a song by its Suno ID using REST conventions.
+    
+    Args:
+        song_id: The Suno song ID
+        delete_from_suno: Query parameter to also delete from Suno.com
+        
+    Returns:
+        DeleteSongResponse with deletion status
+    """
+    try:
+        print(f"[delete_song_by_id] Deleting song {song_id}, from Suno: {delete_from_suno}")
+        
+        # Initialize the SongDeleter
+        deleter = SongDeleter()
+        
+        # Perform deletion
+        result = await deleter.delete_song(
+            song_id=song_id,
+            delete_from_suno=delete_from_suno
+        )
+        
+        # Prepare response message
+        messages = []
+        if result["suno_deleted"]:
+            messages.append(f"Song {song_id} deleted from Suno.com successfully")
+        if not result["success"]:
+            messages.append(f"Failed to delete song {song_id}")
+        
+        return DeleteSongResponse(
+            success=result["success"],
+            local_deleted=result["local_deleted"],
+            suno_deleted=result["suno_deleted"],
+            errors=result.get("errors", []),
+            message=". ".join(messages) if messages else "Operation completed"
+        )
+        
+    except Exception as e:
+        print(f"[delete_song_by_id] Error occurred: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error during song deletion: {str(e)}"
+        )
+
+
+@router.get("/find-songs")
+async def find_songs_endpoint(directory: str = "backend/songs", pattern: str = "*.mp3"):
+    """
+    Find all song files in a directory matching a pattern.
+    
+    Args:
+        directory: Directory to search (default: backend/songs)
+        pattern: File pattern to match (default: *.mp3)
+        
+    Returns:
+        List of file paths found
+    """
+    try:
+        print(f"[find_songs_endpoint] Searching for {pattern} in {directory}")
+        
+        # Initialize the SongDeleter to use its find method
+        deleter = SongDeleter()
+        
+        # Find songs
+        songs = deleter.find_songs_in_directory(directory, pattern)
+        
+        return {
+            "success": True,
+            "directory": directory,
+            "pattern": pattern,
+            "count": len(songs),
+            "files": songs
+        }
+        
+    except Exception as e:
+        print(f"[find_songs_endpoint] Error occurred: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error finding songs: {str(e)}"
+        )
