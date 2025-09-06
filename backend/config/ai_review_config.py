@@ -15,13 +15,19 @@ USE_FLASH_MODEL = False  # Set to True to use Flash model with higher rate limit
 if USE_FLASH_MODEL:
     # Gemini 2.5 Flash limits (free tier)
     REQUESTS_PER_MINUTE = 15
-    DELAY_BETWEEN_API_CALLS = 4  # seconds (60/15)
-    DELAY_BETWEEN_SONGS = 10  # seconds (accounting for 2 API calls per song)
+    DELAY_BETWEEN_API_CALLS = 4  # seconds (60/15) - Used between upload, 1st prompt, 2nd prompt
+    DELAY_BETWEEN_SONGS = 10  # seconds - Used between different song reviews
 else:
     # Gemini 2.5 Pro limits (free tier) 
     REQUESTS_PER_MINUTE = 2
-    DELAY_BETWEEN_API_CALLS = 30  # seconds (60/2)
-    DELAY_BETWEEN_SONGS = 65  # seconds (accounting for 2 API calls per song)
+    DELAY_BETWEEN_API_CALLS = 31  # seconds (60/2) - Used between upload, 1st prompt, 2nd prompt
+    DELAY_BETWEEN_SONGS = 31  # seconds - Used between different song reviews
+    
+# Note: Each song review makes 3 API calls:
+# 1. Upload file to Google AI
+# 2. First prompt (transcription and initial review)
+# 3. Second prompt (lyrics comparison)
+# DELAY_BETWEEN_API_CALLS is applied after each of these to prevent quota errors
 
 # Paid tier limits (if you upgrade)
 # Pro: 360 RPM, Flash: 1000 RPM

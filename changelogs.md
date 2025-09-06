@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - 2025-09-04
+## [Unreleased] - 2025-09-06
 
 ### Fixed
 - **Music Player Playback Speed**: Fixed issue where 2x and 3x playback speed controls were not working
@@ -9,9 +9,13 @@
 
 - **AI Review Rate Limiting**: Resolved Google Gemini API rate limit errors (429 quota exceeded)
   - Changed from parallel to sequential song review processing to respect API limits
-  - Added configurable delays between API calls (30s for Gemini Pro free tier)
-  - Implemented wait times between song reviews (65s to account for 2 API calls per song)
+  - Added configurable delays between API calls (31s for Gemini Pro free tier)
+  - Implemented wait times between song reviews (31s to account for multiple API calls per song)
   - Created configuration system for easy switching between Gemini Pro and Flash models
+  - **Added delays within single song review to prevent quota errors**:
+    - 31-second delay after file upload before first prompt
+    - 31-second delay between first and second prompts
+    - Countdown display showing remaining wait time
 
 ### Added
 - **Granular Playback Speed Options**: Enhanced music player with more precise speed control
