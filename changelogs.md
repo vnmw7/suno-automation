@@ -68,3 +68,25 @@
   - Songs now reviewed one at a time to prevent rate limit violations
   - Added intelligent waiting between reviews based on API tier
   - Improved error handling with specific rate limit detection
+
+### Added
+- **Camoufox Actions Module**: New reusable browser automation utility class
+  - Created `backend/utils/camoufox_actions.py` with CamoufoxActions class
+  - Provides teleport_click and teleport_hover methods that bypass humanization
+  - Uses direct JavaScript execution for instantaneous interactions
+  - Supports left/right click options and configurable delays
+
+### Fixed
+- **Song Deletion Options Button**: Updated selector to target correct HTML element
+  - Fixed `_find_options_button` method in delete_song.py to find div elements with "More Options" aria-label
+  - Added specific selector for the three-dots menu icon structure
+  - Fixed bare except statements to comply with Ruff linting rules (E722)
+  
+- **Song Deletion Delete Button**: Corrected selector for trash/delete menu item
+  - Updated `_find_delete_button` method to find "Move to Trash" text in div[role="menuitem"] elements
+  - Prioritized correct selector matching Suno's actual HTML structure
+  
+- **Song Deletion Confirmation**: Removed unnecessary confirmation dialog handling
+  - Removed `_find_confirm_button` method as Suno doesn't show confirmation dialogs
+  - Simplified deletion flow by removing confirmation step
+  - Changed page load wait from "networkidle" to "domcontentloaded" for faster execution

@@ -149,6 +149,9 @@ class SongDeleter:
         Returns:
             Dict[str, Any]: Result with success status and error if any
         """
+
+        SONG_URL = f"https://suno.com/song/{song_id}"
+
         try:
             async with AsyncCamoufox(
                 headless=False,
@@ -162,11 +165,9 @@ class SongDeleter:
                 page = await browser.new_page()
                 
                 try:
-                    # Navigate to the song page
-                    song_url = f"https://suno.com/song/{song_id}"
-                    print(f"[NAVIGATE] Navigating to song: {song_url}")
-                    await page.goto(song_url)
-                    await page.wait_for_load_state("networkidle", timeout=30000)
+                    print(f"[NAVIGATE] Navigating to song: {SONG_URL}")
+                    await page.goto(SONG_URL)
+                    await page.wait_for_load_state("domcontentloaded", timeout=30000)
                     
                     # Look for the options/menu button (usually three dots)
                     options_button = await self._find_options_button(page)
@@ -188,13 +189,7 @@ class SongDeleter:
                         }
                     
                     await delete_button.click()
-                    await page.wait_for_timeout(1000)
-                    
-                    # Confirm deletion if there's a confirmation dialog
-                    confirm_button = await self._find_confirm_button(page)
-                    if confirm_button:
-                        await confirm_button.click()
-                        await page.wait_for_timeout(2000)
+                    await page.wait_for_timeout(2000)
                     
                     print(f"[DELETE] Successfully deleted song {song_id} from Suno.com")
                     return {"success": True}
@@ -221,9 +216,12 @@ class SongDeleter:
     async def _find_options_button(self, page):
         """Find the options/menu button on the song page."""
         selectors = [
+            'div[aria-label="More Options"]',
+            'div[aria-label*="Options"]',
             'button[aria-label*="options"]',
             'button[aria-label*="menu"]',
             'button[aria-label*="more"]',
+            'div:has(svg path[d*="M10 6q0-.824.588-1.412"])',
             'button:has(svg[class*="dots"])',
             'button:has([data-icon="ellipsis"])',
             '[role="button"]:has(svg)',
@@ -236,20 +234,24 @@ class SongDeleter:
                 button = page.locator(selector).first
                 if await button.is_visible(timeout=2000):
                     return button
-            except:
+            except Exception:
                 continue
         return None
     
     async def _find_delete_button(self, page):
         """Find the delete button in the options menu."""
         selectors = [
+            'div[role="menuitem"]:has-text("Move to Trash")',
+            'div[role="menuitem"]:has-text("Trash")',
+            '[role="menuitem"]:has-text("Move to Trash")',
+            '[role="menuitem"]:has-text("Trash")',
+            '[role="menuitem"]:has-text("Delete")',
+            'div[role="menuitem"] span:has-text("Move to Trash")',
             'button:has-text("Delete")',
             'button:has-text("delete")',
             'button:has-text("Trash")',
             'button:has-text("trash")',
             'button:has-text("Remove")',
-            '[role="menuitem"]:has-text("Delete")',
-            '[role="menuitem"]:has-text("Trash")',
             'div[role="option"]:has-text("Delete")',
             'li:has-text("Delete")'
         ]
@@ -259,31 +261,10 @@ class SongDeleter:
                 button = page.locator(selector).first
                 if await button.is_visible(timeout=2000):
                     return button
-            except:
+            except Exception:
                 continue
         return None
     
-    async def _find_confirm_button(self, page):
-        """Find the confirmation button in a deletion dialog."""
-        selectors = [
-            'button:has-text("Confirm")',
-            'button:has-text("confirm")',
-            'button:has-text("Delete")',
-            'button:has-text("Yes")',
-            'button:has-text("OK")',
-            '[role="button"]:has-text("Delete")',
-            'button[class*="confirm"]',
-            'button[class*="danger"]:has-text("Delete")'
-        ]
-        
-        for selector in selectors:
-            try:
-                button = page.locator(selector).first
-                if await button.is_visible(timeout=2000):
-                    return button
-            except:
-                continue
-        return None
     
     def find_songs_in_directory(self, directory: str, pattern: str = "*.mp3") -> List[str]:
         """
