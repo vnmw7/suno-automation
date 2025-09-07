@@ -119,7 +119,7 @@ async def execute_song_workflow(
                 print(f"🎼 [WORKFLOW] ✅ Generation successful! Song ID: {song_id}, pg1_id: {pg1_id}")
             
             # STEP 2: Wait for Suno processing
-            wait_time_seconds = 90
+            wait_time_seconds = 60
             print(f"🎼 [WORKFLOW] Step 2: Waiting for Suno processing ({wait_time_seconds} seconds)...")
             print(f"🎼 [WORKFLOW] ⏳ Starting wait at: {asyncio.get_event_loop().time()}")
             await asyncio.sleep(wait_time_seconds)

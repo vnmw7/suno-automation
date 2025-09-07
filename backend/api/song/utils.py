@@ -314,34 +314,76 @@ async def generate_song(
 
                 print("Song creation initiated and page loaded.")
 
-                # IMPORTANT NOTE: After clicking 'Create', Suno.com does NOT redirect to the song page
-                # The URL remains at /create, so we CANNOT extract the song ID from the URL
-                # The actual song IDs are only visible in the song cards on the page
-                # This is a known limitation of the current Suno.com UI behavior
+                #  wait additional time to ensure song is fully created
+                await page.wait_for_timeout(3000)
+
+                #  get the song id from the newly generated 2 songs
+                #  NOTE: Suno creates 2 songs per request, we will take the first 2 in the index
+
+                # Extract song IDs from the song list elements
+                # The song IDs are in the data-key attribute of the row elements
+                print("[DEBUG] Attempting to extract song IDs from page elements...")
                 
-                current_url = page.url
-                print(f"[DEBUG] Current URL after song creation: {current_url}")
-                print(f"[DEBUG] Expected pattern: 'suno.com/song/<id>' but URL stays at: {current_url}")
-                
-                suno_song_id = None
-                pg1_id = None  # Initialize pg1_id
-                
-                # Check if URL contains song ID (unlikely due to Suno's behavior)
-                if "suno.com/song/" in current_url:
-                    # This path is rarely taken since Suno doesn't redirect anymore
-                    suno_song_id = current_url.split("suno.com/song/")[1].split("/")[0]
-                    print(f"[RARE] Extracted suno_song_id from URL: {suno_song_id}")
-                else:
-                    # This is the normal case - URL doesn't change after creation
-                    print(f"[EXPECTED] URL doesn't contain song ID (normal Suno behavior)")
-                    print(f"[INFO] Will use temporary ID for database tracking")
+                song_ids = []
+                try:
+                    # Wait for song rows to be visible
+                    await page.wait_for_selector('[data-testid="song-row"]', timeout=10000)
                     
-                    # Generate a temporary ID based on timestamp for database tracking
-                    # This ensures we can still track the song in our database
-                    import time
-                    temp_id = f"pending_{int(time.time())}"
-                    suno_song_id = temp_id
-                    print(f"[DEBUG] Generated temporary ID: {suno_song_id}")
+                    # Try multiple selectors to find song elements
+                    # Method 1: Get elements with data-clip-id attribute
+                    song_elements = await page.query_selector_all('[data-clip-id]')
+                    
+                    # Method 2: If no data-clip-id, try data-key on row elements
+                    if not song_elements:
+                        song_elements = await page.query_selector_all('[role="row"][data-key]')
+                    
+                    if song_elements:
+                        # Get the first 2 song IDs (indices 0 and 1)
+                        for i, element in enumerate(song_elements[:2]):
+                            # Try to get song ID from data-clip-id first
+                            song_id = await element.get_attribute('data-clip-id')
+                            
+                            # If not found, try data-key
+                            if not song_id:
+                                song_id = await element.get_attribute('data-key')
+                            
+                            if song_id:
+                                song_ids.append(song_id)
+                                print(f"[DEBUG] Extracted song ID at index {i}: {song_id}")
+                        
+                        if len(song_ids) >= 1:
+                            suno_song_id = song_ids[0]  # Use the first song ID
+                            print(f"[SUCCESS] Using first song ID: {suno_song_id}")
+                            if len(song_ids) >= 2:
+                                print(f"[INFO] Second song ID available: {song_ids[1]}")
+                        else:
+                            print("[WARNING] No song IDs found in data-clip-id or data-key attributes")
+                    else:
+                        print("[WARNING] No song elements found on page")
+                        
+                except Exception as e:
+                    print(f"[ERROR] Failed to extract song IDs from page: {e}")
+                
+                # Fallback: Check URL (unlikely to work with current Suno behavior)
+                if not song_ids:
+                    current_url = page.url
+                    print(f"[DEBUG] Current URL after song creation: {current_url}")
+                    
+                    if "suno.com/song/" in current_url:
+                        # This path is rarely taken since Suno doesn't redirect anymore
+                        suno_song_id = current_url.split("suno.com/song/")[1].split("/")[0]
+                        print(f"[RARE] Extracted suno_song_id from URL: {suno_song_id}")
+                    else:
+                        # Generate a temporary ID as last resort
+                        print(f"[FALLBACK] Using temporary ID for database tracking")
+                        import time
+                        temp_id = f"pending_{int(time.time())}"
+                        suno_song_id = temp_id
+                        print(f"[DEBUG] Generated temporary ID: {suno_song_id}")
+                else:
+                    suno_song_id = song_ids[0]
+                
+                pg1_id = None  # Initialize pg1_id
 
                 # Always save to progress_v1_tbl for tracking
                 # This creates a record even without the real Suno song ID
