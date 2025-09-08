@@ -38,9 +38,10 @@ class SongRequest(BaseModel):
 class SongDownloadRequest(BaseModel):
     """Request model for downloading a song."""
 
-    strTitle: str
-    intIndex: int
+    strTitle: Optional[str] = None
+    intIndex: Optional[int] = None
     download_path: Optional[str] = "backend/songs/pending_review"
+    song_id: Optional[str] = None
 
 
 class SongDownloadResponse(BaseModel):
@@ -185,18 +186,31 @@ async def download_song_endpoint(request: SongDownloadRequest):
     """
     try:
         print(
-            f"[download_song_endpoint] Starting download for song: '{request.strTitle}' at index {request.intIndex}"
+            f"[download_song_endpoint] Starting download for song: '{request.strTitle}' at index {request.intIndex}, song_id: {request.song_id}"
         )
 
         # Validate input parameters
-        if not request.strTitle.strip():
-            raise HTTPException(status_code=400, detail="Song title cannot be empty")
-
-        if request.intIndex == 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Index cannot be 0. Use positive (1-based) or negative (-1 = last) indexing",
-            )
+        # If song_id is provided, title and index are optional
+        if not request.song_id:
+            # If no song_id, then title is required
+            if not request.strTitle or not request.strTitle.strip():
+                raise HTTPException(status_code=400, detail="Either song_id or strTitle must be provided")
+            
+            # If title is provided without song_id, index is required and cannot be 0
+            if request.intIndex is None:
+                raise HTTPException(status_code=400, detail="intIndex is required when downloading by title")
+            
+            if request.intIndex == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Index cannot be 0. Use positive (1-based) or negative (-1 = last) indexing",
+                )
+        else:
+            # When song_id is provided, set default values if not provided
+            if request.strTitle is None:
+                request.strTitle = "Downloaded Song"  # Default title
+            if request.intIndex is None:
+                request.intIndex = 1  # Default to first song
 
         # Validate download path if provided
         if request.download_path:
@@ -217,6 +231,7 @@ async def download_song_endpoint(request: SongDownloadRequest):
             strTitle=request.strTitle,
             intIndex=request.intIndex,
             download_path=request.download_path,
+            song_id=request.song_id,
         )
 
         if not download_result["success"]:
