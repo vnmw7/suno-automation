@@ -166,3 +166,12 @@ Use constants and macros instead of hard coded literal values. If supported by t
 Constants and macros shall not be defined in more than one textual location in the program, even if the multiple definitions are exactly the same.
 
 The names of constants should be in all uppercase form. Use underscore "_" to separate words.
+
+## File and Module Standards
+
+### Modularization
+- All source code will be grouped into modules having one source code file to contain the implementation of one module.
+- Each module will deal with a single, unique domain. The use of information hiding is mandatory, to the extent allowed by the given language. The code that deals with a given domain shall protect, to the greatest extent possible in the given language, its data, its data structure design, and its internal operations on the data.
+- Emphasize simplicity, clarity, cohesion, and decoupling in decomposing a specific system into constituent modules.
+- Minimize scope of variables whenever allowed by the language. All constants, types, and variables shall be declared only within the scope in which they need to be known.
+- Aim to achieve a low coupling, high cohesion, and clean interfaces final product. It is not easy to attain all at the same time but the modularization of the program will be cleaner and easier to maintain.
