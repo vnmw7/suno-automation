@@ -163,6 +163,9 @@ class SunoDownloader:
             "song_index": intIndex,
         }
 
+        # Initialize extracted_song_id variable for use throughout the function
+        extracted_song_id = None
+
         try:
             # Ensure download directory exists
             os.makedirs(download_path, exist_ok=True)
