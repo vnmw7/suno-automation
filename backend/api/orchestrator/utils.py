@@ -2,6 +2,7 @@ import os
 import shutil
 import asyncio
 import traceback
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 
@@ -118,7 +119,7 @@ async def execute_song_workflow(
                 print(f"🎼 [WORKFLOW] ✅ Generation successful! Song ID: {song_id}, pg1_id: {pg1_id}")
             
             # STEP 2: Wait for Suno processing
-            wait_time_seconds = 90
+            wait_time_seconds = 60
             print(f"🎼 [WORKFLOW] Step 2: Waiting for Suno processing ({wait_time_seconds} seconds)...")
             print(f"🎼 [WORKFLOW] ⏳ Starting wait at: {asyncio.get_event_loop().time()}")
             await asyncio.sleep(wait_time_seconds)
@@ -354,12 +355,23 @@ async def download_both_songs(title: str, temp_dir: str) -> Dict[str, Any]:
 
 
 async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Dict[str, Any]]:
-    """Review all downloaded songs concurrently using AI review system."""
+    """Review all downloaded songs sequentially to respect API rate limits."""
+    
+    print(f"\n{'='*80}")
+    print(f"🎵 [REVIEW-SESSION] Starting review session at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🎵 [REVIEW-SESSION] Total songs to review: {len(downloaded_songs)}")
+    print(f"🎵 [REVIEW-SESSION] Using pg1_id: {pg1_id}")
+    print(f"{'='*80}\n")
 
     async def review_single_song(song: Dict[str, Any]) -> Dict[str, Any]:
         """Helper coroutine to review one song, mirroring the debug endpoint's logic."""
         file_path = song["file_path"]
-        print(f"🎼 [REVIEW] Starting concurrent review for: {file_path}")
+        file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        print(f"\n{'─'*60}")
+        print(f"🎼 [REVIEW] Starting review for: {file_path}")
+        print(f"🎼 [REVIEW] File size: {file_size:,} bytes")
+        print(f"🎼 [REVIEW] Song index: {song.get('index', 'N/A')}")
+        print(f"🎼 [REVIEW] Song title: {song.get('title', 'N/A')}")
 
         # Verify the file exists before attempting review
         if not os.path.exists(file_path):
@@ -398,14 +410,34 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
             }
         
         # Call the review API function with valid pg1_id
-        print(f"🎼 [REVIEW-DEBUG] Calling review API with pg1_id: {pg1_id}")
+        print(f"🎼 [REVIEW-API] Calling review API with pg1_id: {pg1_id}")
+        print(f"🎼 [REVIEW-API] Timestamp: {datetime.now().strftime('%H:%M:%S')}")
+        
         review_result = await call_review_api(
             file_path=file_path,
             pg1_id=pg1_id
         )
 
-        print(f"🎼 [REVIEW] Review completed for {file_path}. Verdict: {review_result.get('verdict', 'error')}")
-        print(f"🎼 [REVIEW-DEBUG] Full review result keys: {review_result.keys() if isinstance(review_result, dict) else 'Not a dict'}")
+        print(f"\n🎼 [REVIEW-RESULT] Review completed for {os.path.basename(file_path)}")
+        print(f"🎼 [REVIEW-RESULT] Verdict: {review_result.get('verdict', 'error')}")
+        print(f"🎼 [REVIEW-RESULT] Success: {review_result.get('success', False)}")
+        
+        if review_result.get('error'):
+            print(f"🎼 [REVIEW-ERROR] Error message: {review_result['error']}")
+        
+        if review_result.get('first_response'):
+            print(f"\n📝 [AI-RESPONSE-1] First AI Response (Transcription):")
+            print(f"{'─'*40}")
+            print(review_result['first_response'][:500] + '...' if len(review_result.get('first_response', '')) > 500 else review_result.get('first_response', ''))
+            print(f"{'─'*40}")
+        
+        if review_result.get('second_response'):
+            print(f"\n📝 [AI-RESPONSE-2] Second AI Response (Comparison):")
+            print(f"{'─'*40}")
+            print(review_result['second_response'][:500] + '...' if len(review_result.get('second_response', '')) > 500 else review_result.get('second_response', ''))
+            print(f"{'─'*40}")
+        
+        print(f"🎼 [REVIEW-DEBUG] Full result keys: {list(review_result.keys()) if isinstance(review_result, dict) else 'Not a dict'}")
 
         # Structure the final result for this song
         return {
@@ -419,21 +451,42 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
     if not downloaded_songs:
         return []
 
-    # Create a list of tasks to run concurrently
-    tasks = [review_single_song(song) for song in downloaded_songs]
-    
-    # Run tasks in parallel
-    print(f"🎼 [REVIEW] Running {len(tasks)} review(s) in parallel...")
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    print("🎼 [REVIEW] All concurrent reviews completed.")
-
-    # Process results, handling any exceptions that may have occurred during the gather
+    # Process reviews sequentially to respect API rate limits
+    print(f"\n🎼 [REVIEW-QUEUE] Starting sequential processing...")
+    print(f"🎼 [REVIEW-QUEUE] Songs in queue: {[os.path.basename(s['file_path']) for s in downloaded_songs]}")
     final_results = []
-    for i, result in enumerate(results):
-        if isinstance(result, Exception):
-            song = downloaded_songs[i]
-            error_msg = f"Exception during review for {song['file_path']}: {result}"
-            print(f"🎼 [REVIEW] ❌ {error_msg}")
+    
+    for i, song in enumerate(downloaded_songs):
+        try:
+            print(f"\n🔄 [REVIEW-PROGRESS] Processing song {i+1}/{len(downloaded_songs)}")
+            print(f"🔄 [REVIEW-PROGRESS] Start time: {datetime.now().strftime('%H:%M:%S')}")
+            
+            result = await review_single_song(song)
+            final_results.append(result)
+            
+            print(f"✅ [REVIEW-PROGRESS] Song {i+1} complete. Verdict: {result.get('verdict', 'unknown')}")
+            
+            # Add delay between reviews if there are more to process
+            # This helps avoid hitting rate limits
+            if i < len(downloaded_songs) - 1:
+                try:
+                    from config.ai_review_config import DELAY_BETWEEN_SONGS
+                    wait_time = DELAY_BETWEEN_SONGS
+                except ImportError:
+                    wait_time = 65  # Fallback: Wait 65 seconds between songs
+                print(f"\n⏳ [RATE-LIMIT] Waiting {wait_time} seconds before next review...")
+                print(f"⏳ [RATE-LIMIT] Reason: Respecting API rate limits (Free tier: 2 RPM for Gemini Pro)")
+                for remaining in range(wait_time, 0, -10):
+                    print(f"⏳ [RATE-LIMIT] Time remaining: {remaining} seconds...")
+                    await asyncio.sleep(min(10, remaining))
+                
+        except Exception as e:
+            error_msg = f"Exception during review for {song['file_path']}: {e}"
+            print(f"\n❌ [REVIEW-ERROR] Critical error occurred!")
+            print(f"❌ [REVIEW-ERROR] Song: {os.path.basename(song['file_path'])}")
+            print(f"❌ [REVIEW-ERROR] Error type: {type(e).__name__}")
+            print(f"❌ [REVIEW-ERROR] Error message: {str(e)}")
+            print(f"❌ [REVIEW-ERROR] Full traceback:")
             print(traceback.format_exc())
             final_results.append({
                 "file_path": song["file_path"],
@@ -442,9 +495,15 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
                 "verdict": "error",
                 "review_details": {"error": error_msg}
             })
-        else:
-            final_results.append(result)
-            
+    
+    print(f"\n{'='*80}")
+    print(f"🎵 [REVIEW-SESSION] Review session completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🎵 [REVIEW-SESSION] Total processed: {len(final_results)}")
+    print(f"🎵 [REVIEW-SESSION] Successful: {sum(1 for r in final_results if r.get('verdict') == 'continue')}")
+    print(f"🎵 [REVIEW-SESSION] Re-rolls needed: {sum(1 for r in final_results if r.get('verdict') == 're-roll')}")
+    print(f"🎵 [REVIEW-SESSION] Errors: {sum(1 for r in final_results if r.get('verdict') == 'error')}")
+    print(f"{'='*80}\n")
+    
     return final_results
 
 
@@ -713,6 +772,19 @@ async def review_song_with_ai(
         mime_type = file_metadata.get("mimeType", "audio/mpeg")
         print(f"File uploaded successfully. URI: {file_uri[:30]}...")  # Truncate for security
         
+        # Add delay after upload to respect API rate limits
+        try:
+            from backend.config.ai_review_config import DELAY_BETWEEN_API_CALLS
+            wait_time = DELAY_BETWEEN_API_CALLS
+        except ImportError:
+            wait_time = 30  # Fallback: 30 seconds for Gemini Pro free tier
+        
+        print(f"⏳ [RATE-LIMIT] Waiting {wait_time} seconds after file upload...")
+        print(f"⏳ [RATE-LIMIT] Reason: Respecting API rate limits between upload and first prompt")
+        for remaining in range(wait_time, 0, -10):
+            print(f"⏳ [RATE-LIMIT] Time remaining: {remaining} seconds...")
+            await asyncio.sleep(min(10, remaining))
+        
         # First prompt - transcription and initial review
         first_prompt = """This is a song generated by AI and we need to check it's quality. The AI has a tendency of making a few common mistakes. Please write out the lyrics that you hear and note what is spoken and what is rapped, and what is sung. If the song is unclear or sounds messy and unmusical, the song needs to be deleted and remade. If it is more than 30% spoken it needs to be deleted and remade. If it cuts off abruptly and doesnt resolve naturally, it needs to be deleted and remade, and if the song feels like it ends, but then it picks back up again, it needs to be deleted and remade. Please write out the lyrics as requested and let me know if any red flags require the song to be deleted and remade. Don't attempt to recognize the lyrics source and infer what they should be, just write what you hear without inference or adjustment. If a word doesn't make sense, just spell it out phonetically. Add final verdict by ending with 'Final Verdict: [re-roll] or [continue]'"""
         
@@ -733,6 +805,19 @@ async def review_song_with_ai(
             }
         
         print("First AI response received successfully")
+        
+        # Add delay between first and second prompt to respect API rate limits
+        try:
+            from backend.config.ai_review_config import DELAY_BETWEEN_API_CALLS
+            wait_time = DELAY_BETWEEN_API_CALLS
+        except ImportError:
+            wait_time = 30  # Fallback: 30 seconds for Gemini Pro free tier
+        
+        print(f"⏳ [RATE-LIMIT] Waiting {wait_time} seconds before second prompt...")
+        print(f"⏳ [RATE-LIMIT] Reason: Respecting API rate limits between first and second prompt")
+        for remaining in range(wait_time, 0, -10):
+            print(f"⏳ [RATE-LIMIT] Time remaining: {remaining} seconds...")
+            await asyncio.sleep(min(10, remaining))
         
         # Prepare conversation history for second prompt
         conversation_history = [

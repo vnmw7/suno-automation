@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { API_SONGS_URL } from '../lib/api';
+import type { ManualReviewResponse } from '../lib/api';
 
 interface Song {
   fileName: string;
@@ -8,8 +9,6 @@ interface Song {
   verseReference?: string;
 }
 
-import type { ManualReviewResponse } from '../lib/api';
-
 interface DisplayGeneratedSongsProps {
   stepCompleted: { song: boolean };
   songFiles: string[];
@@ -17,9 +16,6 @@ interface DisplayGeneratedSongsProps {
   fetchSongFilesError: string | null;
   manualReviewData?: ManualReviewResponse | null;
 }
-
-type ReviewStatus = 'pending' | 'in_review' | 'approved' | 'rejected';
-type PlaybackSpeed = 1 | 2 | 3;
 
 interface SongState {
   isPlaying: boolean;
@@ -35,9 +31,10 @@ interface SongState {
   isLoading?: boolean;
 }
 
-// Using backend API endpoint for song streaming
-const SONG_DIRECTORY = "";
-const PLAYBACK_SPEEDS: PlaybackSpeed[] = [1, 2, 3];
+type ReviewStatus = 'pending' | 'in_review' | 'approved' | 'rejected';
+type PlaybackSpeed = 0.25 | 0.5 | 0.75 | 1 | 1.25 | 1.5 | 1.75 | 2 | 2.25 | 2.5 | 2.75 | 3;
+
+const PLAYBACK_SPEEDS: PlaybackSpeed[] = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3];
 
 const DisplayGeneratedSongs = ({
   stepCompleted,
@@ -61,6 +58,7 @@ const DisplayGeneratedSongs = ({
     }
     return map;
   }, [manualReviewData]);
+  
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
   const progressRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   
@@ -105,7 +103,7 @@ const DisplayGeneratedSongs = ({
     });
 
     // Sort songs within each group by timestamp (newest first)
-    grouped.forEach((songs, key) => {
+    grouped.forEach((songs) => {
       songs.sort((a, b) => {
         if (a.index !== undefined && b.index !== undefined) {
           return b.index - a.index; // Higher index (newer) first
@@ -139,7 +137,7 @@ const DisplayGeneratedSongs = ({
     if (Object.keys(initialStates).length > 0) {
       setSongStates(prev => ({ ...prev, ...initialStates }));
     }
-  }, [songFiles]);
+  }, [songFiles, globalPlaybackSpeed, songStates]);
 
   // Handle play/pause
   const togglePlayPause = useCallback(async (fileName: string) => {
@@ -232,23 +230,26 @@ const DisplayGeneratedSongs = ({
   }, [useGlobalSpeed, changePlaybackSpeed]);
 
   // Handle seek
-  const handleSeek = useCallback((fileName: string, event: React.MouseEvent<HTMLDivElement>) => {
+  const handleSeek = useCallback((fileName: string, event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>) => {
     const audio = audioRefs.current[fileName];
     const progressBar = progressRefs.current[fileName];
     if (!audio || !progressBar) return;
 
-    const rect = progressBar.getBoundingClientRect();
-    const percent = (event.clientX - rect.left) / rect.width;
-    const newTime = percent * audio.duration;
-    
-    audio.currentTime = newTime;
-    setSongStates(prev => ({
-      ...prev,
-      [fileName]: {
-        ...prev[fileName],
-        currentTime: newTime,
-      },
-    }));
+    // Only handle mouse events for actual seeking
+    if ('clientX' in event) {
+      const rect = progressBar.getBoundingClientRect();
+      const percent = (event.clientX - rect.left) / rect.width;
+      const newTime = percent * audio.duration;
+      
+      audio.currentTime = newTime;
+      setSongStates(prev => ({
+        ...prev,
+        [fileName]: {
+          ...prev[fileName],
+          currentTime: newTime,
+        },
+      }));
+    }
   }, []);
 
   // Handle volume change
@@ -281,7 +282,7 @@ const DisplayGeneratedSongs = ({
         isLooping: !prev[fileName]?.isLooping,
       },
     }));
-  }, [songStates]);
+  }, []);
 
   // Handle review status change
   const changeReviewStatus = useCallback((fileName: string, status: ReviewStatus) => {
@@ -382,10 +383,10 @@ const DisplayGeneratedSongs = ({
         if (updated[fileName]) {
           if (typeof reviewData[fileName] === 'string') {
             // Old format compatibility
-            updated[fileName].reviewStatus = reviewData[fileName];
+            updated[fileName].reviewStatus = reviewData[fileName] as ReviewStatus;
           } else {
             // New format with status and notes
-            updated[fileName].reviewStatus = reviewData[fileName].status || 'pending';
+            updated[fileName].reviewStatus = (reviewData[fileName].status || 'pending') as ReviewStatus;
             updated[fileName].reviewNotes = reviewData[fileName].notes || '';
           }
         }
@@ -393,6 +394,21 @@ const DisplayGeneratedSongs = ({
       return updated;
     });
   }, [songFiles]);
+
+  // Update audio playback rate when speed changes
+  useEffect(() => {
+    Object.keys(audioRefs.current).forEach(fileName => {
+      const audio = audioRefs.current[fileName];
+      const state = songStates[fileName];
+      if (audio && state) {
+        const targetSpeed = useGlobalSpeed ? globalPlaybackSpeed : state.playbackSpeed;
+        if (audio.playbackRate !== targetSpeed) {
+          audio.playbackRate = targetSpeed;
+          console.log(`[DisplayGeneratedSongs] Updated playback rate for ${fileName} to ${targetSpeed}x`);
+        }
+      }
+    });
+  }, [songStates, globalPlaybackSpeed, useGlobalSpeed]);
 
   // Setup audio event listeners
   const setupAudioListeners = useCallback((audio: HTMLAudioElement, fileName: string) => {
@@ -640,21 +656,17 @@ const DisplayGeneratedSongs = ({
           </label>
           
           {useGlobalSpeed && (
-            <div className="flex gap-1">
+            <select
+              value={globalPlaybackSpeed}
+              onChange={(e) => changeGlobalSpeed(parseFloat(e.target.value) as PlaybackSpeed)}
+              className="text-sm border rounded px-2 py-1 bg-white"
+            >
               {PLAYBACK_SPEEDS.map(speed => (
-                <button
-                  key={speed}
-                  onClick={() => changeGlobalSpeed(speed)}
-                  className={`px-2 py-1 text-xs rounded ${
-                    globalPlaybackSpeed === speed
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  }`}
-                >
+                <option key={speed} value={speed}>
                   {speed}x
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           )}
         </div>
       </div>
@@ -868,6 +880,18 @@ const DisplayGeneratedSongs = ({
                             ref={(el) => { progressRefs.current[song.fileName] = el; }}
                             className="flex-1 h-2 bg-gray-200 rounded-full cursor-pointer relative"
                             onClick={(e) => handleSeek(song.fileName, e)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                togglePlayPause(song.fileName);
+                              }
+                            }}
+                            role="slider"
+                            tabIndex={0}
+                            aria-label="Seek slider"
+                            aria-valuemin={0}
+                            aria-valuemax={state.duration || 100}
+                            aria-valuenow={state.currentTime}
                           >
                             <div
                               className="h-full bg-blue-500 rounded-full"
@@ -922,24 +946,24 @@ const DisplayGeneratedSongs = ({
                           </div>
 
                           {/* Speed Controls */}
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-600 mr-1">Speed:</span>
-                            {PLAYBACK_SPEEDS.map(speed => (
-                              <button
-                                key={speed}
-                                onClick={() => changePlaybackSpeed(song.fileName, speed)}
-                                disabled={useGlobalSpeed}
-                                className={`px-2 py-1 text-xs rounded transition-colors ${
-                                  (useGlobalSpeed ? globalPlaybackSpeed : state.playbackSpeed) === speed
-                                    ? 'bg-blue-500 text-white'
-                                    : useGlobalSpeed
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    : 'bg-gray-200 hover:bg-gray-300'
-                                }`}
-                              >
-                                {speed}x
-                              </button>
-                            ))}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600">Speed:</span>
+                            <select
+                              value={useGlobalSpeed ? globalPlaybackSpeed : state.playbackSpeed}
+                              onChange={(e) => changePlaybackSpeed(song.fileName, parseFloat(e.target.value) as PlaybackSpeed)}
+                              disabled={useGlobalSpeed}
+                              className={`text-xs border rounded px-2 py-1 ${
+                                useGlobalSpeed 
+                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                  : 'bg-white'
+                              }`}
+                            >
+                              {PLAYBACK_SPEEDS.map(speed => (
+                                <option key={speed} value={speed}>
+                                  {speed}x
+                                </option>
+                              ))}
+                            </select>
                           </div>
 
                           {/* Volume Control */}
@@ -1008,10 +1032,11 @@ const DisplayGeneratedSongs = ({
                           
                           {/* Review Notes */}
                           <div className="mt-3">
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                            <label htmlFor={`review-notes-${song.fileName}`} className="block text-xs font-medium text-gray-700 mb-1">
                               Review Notes (optional)
                             </label>
                             <textarea
+                              id={`review-notes-${song.fileName}`}
                               value={state.reviewNotes}
                               onChange={(e) => changeReviewNotes(song.fileName, e.target.value)}
                               placeholder="Add any notes about this song..."
