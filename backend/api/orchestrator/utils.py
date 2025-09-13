@@ -113,23 +113,24 @@ async def execute_song_workflow(
                 print(f"🎼 [WORKFLOW] Proceeding with download and review using fallback methods...")
                 print(f"🎼 [WORKFLOW] Manual review will be recommended for these songs")
 
-            # Log successful generation details
+            # Log successful generation details and extract song_id
+            song_id = None
             if "result" in generation_result:
                 song_id = generation_result["result"].get("song_id")
                 print(f"🎼 [WORKFLOW] ✅ Generation successful! Song ID: {song_id}, pg1_id: {pg1_id}")
-            
+
             # STEP 2: Wait for Suno processing
             wait_time_seconds = 60
             print(f"🎼 [WORKFLOW] Step 2: Waiting for Suno processing ({wait_time_seconds} seconds)...")
             print(f"🎼 [WORKFLOW] ⏳ Starting wait at: {asyncio.get_event_loop().time()}")
             await asyncio.sleep(wait_time_seconds)
             print(f"🎼 [WORKFLOW] ⏰ Wait completed at: {asyncio.get_event_loop().time()}")
-            
+
             # STEP 3: Download both songs
             print(f"🎼 [WORKFLOW] Step 3: Downloading both generated songs...")
-            print(f"🎼 [WORKFLOW] Download parameters: title='{title}', temp_dir='{temp_dir}'")
-            
-            download_results = await download_both_songs(title, temp_dir)
+            print(f"🎼 [WORKFLOW] Download parameters: title='{title}', temp_dir='{temp_dir}', song_id='{song_id}'")
+
+            download_results = await download_both_songs(title, temp_dir, song_id)
             
             print(f"🎼 [WORKFLOW] Download result: success={download_results.get('success')}, songs_downloaded={len(download_results.get('downloads', []))}")
             
@@ -288,21 +289,30 @@ async def generate_songs(book_name: str, chapter: int, verse_range: str, style: 
         return {"success": False, "error": f"Song generation exception: {str(e)}"}
 
 
-async def download_both_songs(title: str, temp_dir: str) -> Dict[str, Any]:
-    """Download both songs using negative indexing (-1, -2)."""
+async def download_both_songs(title: str, temp_dir: str, song_id: str = None) -> Dict[str, Any]:
+    """Download both songs using negative indexing (-1, -2) with enhanced V2 downloader.
+
+    Args:
+        title: Song title to search for
+        temp_dir: Directory to save downloads
+        song_id: Optional song ID for direct navigation to song page
+    """
     try:
-        from ..song.utils import download_song_handler
-        
+        from utils.download_song_v2 import download_song_v2
+
         downloaded_songs = []
-        
+
         # Download song at index -1 (last/newest song)
-        print(f"🎼 [DOWNLOAD] Downloading song at index -1...")
-        download_1 = await download_song_handler(
+        print(f"🎼 [DOWNLOAD] Downloading song at index -1 using V2 downloader...")
+        if song_id:
+            print(f"🎼 [DOWNLOAD] Using song_id for direct navigation: {song_id}")
+        download_1 = await download_song_v2(
             strTitle=title,
             intIndex=-1,
-            download_path=temp_dir
+            download_path=temp_dir,
+            song_id=song_id  # Pass song_id for direct page navigation
         )
-        
+
         if download_1["success"]:
             downloaded_songs.append({
                 "file_path": download_1["file_path"],
@@ -312,40 +322,41 @@ async def download_both_songs(title: str, temp_dir: str) -> Dict[str, Any]:
             print(f"🎼 [DOWNLOAD] Successfully downloaded song -1: {download_1['file_path']}")
         else:
             print(f"🎼 [DOWNLOAD] Failed to download song -1: {download_1.get('error')}")
-        
+
         # Download song at index -2 (second to last song)
-        print(f"🎼 [DOWNLOAD] Downloading song at index -2...")
-        download_2 = await download_song_handler(
+        print(f"🎼 [DOWNLOAD] Downloading song at index -2 using V2 downloader...")
+        download_2 = await download_song_v2(
             strTitle=title,
             intIndex=-2,
-            download_path=temp_dir
+            download_path=temp_dir,
+            song_id=song_id  # Pass song_id for direct page navigation
         )
-        
+
         if download_2["success"]:
             downloaded_songs.append({
-                "file_path": download_2["file_path"], 
+                "file_path": download_2["file_path"],
                 "index": -2,
                 "title": title
             })
             print(f"🎼 [DOWNLOAD] Successfully downloaded song -2: {download_2['file_path']}")
         else:
             print(f"🎼 [DOWNLOAD] Failed to download song -2: {download_2.get('error')}")
-        
+
         if len(downloaded_songs) == 0:
             return {
-                "success": False, 
+                "success": False,
                 "error": "Failed to download any songs",
                 "downloads": []
             }
         elif len(downloaded_songs) == 1:
             print(f"🎼 [DOWNLOAD] Warning: Only downloaded 1 of 2 songs")
-            
+
         return {
             "success": True,
             "downloads": downloaded_songs,
             "message": f"Downloaded {len(downloaded_songs)} of 2 songs"
         }
-        
+
     except Exception as e:
         return {
             "success": False,
