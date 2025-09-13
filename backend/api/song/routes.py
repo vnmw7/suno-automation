@@ -295,39 +295,43 @@ def slugify_text(text: str) -> str:
 def parse_song_filename(filename: str) -> Optional[Dict]:
     """
     Parse a song filename to extract metadata.
-    
-    Expected format: {slug_title}_index_{intIndex}_{timestamp}.mp3
-    Example: amazing-grace-verse-1-5_index_-1_20250830143022.mp3
-    
+
+    Expected format (per CLAUDE.md):
+    - {slug_title}_{song_id}_{timestamp}.mp3 (UUID format)
+
+    Example:
+    - isaiah-1-1-10_0536dd17-8cfd-4bca-9fd7-831621daac10_20250913152839.mp3
+
     Args:
         filename: Song filename to parse
-        
+
     Returns:
         Dict with parsed metadata or None if parsing fails
     """
     # Remove .mp3 extension if present
     if filename.endswith('.mp3'):
         filename = filename[:-4]
-    
-    # Match pattern: {title}_index_{index}_{timestamp}
-    pattern = r'^(.+?)_index_([-]?\d+)_(\d{14})$'
+
+    # Pattern: {title}_{uuid}_{timestamp}
+    # UUID pattern: 8-4-4-4-12 hexadecimal characters
+    pattern = r'^(.+?)_([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})_(\d{14})$'
     match = re.match(pattern, filename)
-    
+
     if not match:
         return None
-    
-    title_slug, index_str, timestamp_str = match.groups()
-    
+
+    title_slug, song_id, timestamp_str = match.groups()
+
     try:
         # Parse timestamp (YYYYMMDDHHMMSS)
         timestamp_dt = datetime.strptime(timestamp_str, '%Y%m%d%H%M%S')
         created_date = timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')
     except ValueError:
         created_date = timestamp_str
-    
+
     return {
         'title_slug': title_slug,
-        'index': int(index_str),
+        'song_id': song_id,
         'timestamp': timestamp_str,
         'created_date': created_date
     }
@@ -350,7 +354,7 @@ async def manual_review_endpoint(request: ManualReviewRequest):
         print(f"[manual_review_endpoint] Searching for songs with slug: {search_slug}")
         
         # Define the review directory path
-        review_dir = Path("backend/songs/final_review")
+        review_dir = Path("songs/final_review")
         
         # Ensure directory exists
         if not review_dir.exists():
@@ -384,8 +388,8 @@ async def manual_review_endpoint(request: ManualReviewRequest):
                 
                 print(f"[manual_review_endpoint] Found matching file: {filename}")
         
-        # Sort files by index (negative indices first, then positive)
-        matching_files.sort(key=lambda x: (x.parsed['index'] >= 0, abs(x.parsed['index'])))
+        # Sort files by timestamp (most recent first)
+        matching_files.sort(key=lambda x: x.parsed['timestamp'], reverse=True)
         
         print(f"[manual_review_endpoint] Found {len(matching_files)} matching songs")
         

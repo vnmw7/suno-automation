@@ -1,5 +1,12 @@
 # Development Guidelines
 
+## Song File Naming Convention
+When downloading or processing songs, ALWAYS use the song_id format for filenames:
+- **Expected format**: `{slug_title}_{song_id}_{timestamp}.mp3`
+- **Example**: `isaiah-1-1-10_0536dd17-8cfd-4bca-9fd7-831621daac10_20250913152839.mp3`
+- **DO NOT** use index values in filenames (no `_index_` pattern)
+- All song references and fetching should expect this song_id-based naming pattern
+
 ## Feature Implementation Philosophy
 When implementing new features, always follow the **Minimum Viable Approach (MVA)**:
 
@@ -175,3 +182,4 @@ The names of constants should be in all uppercase form. Use underscore "_" to se
 - Emphasize simplicity, clarity, cohesion, and decoupling in decomposing a specific system into constituent modules.
 - Minimize scope of variables whenever allowed by the language. All constants, types, and variables shall be declared only within the scope in which they need to be known.
 - Aim to achieve a low coupling, high cohesion, and clean interfaces final product. It is not easy to attain all at the same time but the modularization of the program will be cleaner and easier to maintain.
+- remember to implement version control in backend apis like {backendurl}/api/v1/
