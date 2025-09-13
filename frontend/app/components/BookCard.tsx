@@ -11,7 +11,13 @@ interface BookCardProps {
   viewMode: "grid" | "list";
 }
 
-export async function get_verse_range(bookAbbr: string, chapter: string) {
+type ApiResponse<T> =
+  | { error: string; data: null }
+  | { error: null; data: T };
+
+type VerseRangeData = string[] | Record<string, unknown>;
+
+export async function get_verse_range(bookAbbr: string, chapter: string): Promise<ApiResponse<VerseRangeData>> {
   if (!bookAbbr) {
     return { error: "Book abbreviation is required", data: null };
   }
@@ -63,7 +69,7 @@ export async function get_verse_range(bookAbbr: string, chapter: string) {
   }
 }
 
-export async function generate_verse_range(bookAbbr: string, chapter: string) {
+export async function generate_verse_range(bookAbbr: string, chapter: string): Promise<ApiResponse<VerseRangeData>> {
   if (!bookAbbr) {
     return { error: "Book abbreviation is required", data: null };
   }
@@ -182,7 +188,7 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
       } else {
         setVerseRanges((prev) => ({
           ...prev,
-          [chapter.toString()]: result.data || [],
+          [chapter.toString()]: Array.isArray(result.data) ? result.data : [],
         }));
       }
     } catch (error) {
@@ -225,12 +231,7 @@ export default function BookCard({ book, viewMode }: BookCardProps) {
       const result = await generate_verse_range(bookAbbr, chapter.toString());
 
       if (result.error) {
-        let errorMessage = "An unexpected error occurred.";
-        if (typeof result.error === "string") {
-          errorMessage = result.error;
-        } else if (typeof result.error === "object" && result.error !== null && 'error' in result.error) {
-          errorMessage = (result.error as any).error;
-        }
+        const errorMessage = result.error;
         
         console.error(
           `[handleGenerateVerseRange] Error generating for ${bookAbbr} chapter ${chapter}:`,
