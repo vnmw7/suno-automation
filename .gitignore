@@ -7,3 +7,6 @@ backend/logs/*.log
 
 
 *.mp3
+dist
+build
+node_modules
