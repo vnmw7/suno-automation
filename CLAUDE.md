@@ -183,3 +183,4 @@ The names of constants should be in all uppercase form. Use underscore "_" to se
 - Minimize scope of variables whenever allowed by the language. All constants, types, and variables shall be declared only within the scope in which they need to be known.
 - Aim to achieve a low coupling, high cohesion, and clean interfaces final product. It is not easy to attain all at the same time but the modularization of the program will be cleaner and easier to maintain.
 - remember to implement version control in backend apis like {backendurl}/api/v1/
+- use virtual environment in @backend\.venv when using python, ex: pip install and server start
