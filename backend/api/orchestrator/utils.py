@@ -4,6 +4,7 @@ import asyncio
 import traceback
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+from utils.delete_song import SongDeleter, delete_song
 
 
 async def execute_song_workflow(
@@ -46,13 +47,16 @@ async def execute_song_workflow(
     # Use verification function to ensure we have the correct final destination
     final_dir = verify_final_destination_folder()
     temp_dir = "backend/songs/pending_review"
-    
+    failsafe_dir = "backend/songs/fail_safe"
+
     # Ensure required directories exist
     os.makedirs(temp_dir, exist_ok=True)
     os.makedirs(final_dir, exist_ok=True)
-    
+    os.makedirs(failsafe_dir, exist_ok=True)
+
     print(f"🎼 [WORKFLOW] ✅ VERIFIED: Final approved songs will be moved to: {final_dir}")
     print(f"🎼 [WORKFLOW] ✅ VERIFIED: Temporary downloads will be stored in: {temp_dir}")
+    print(f"🎼 [WORKFLOW] ✅ VERIFIED: Fail-safe songs will be moved to: {failsafe_dir}")
     
     workflow_details = {
         "attempts": [],
@@ -214,25 +218,47 @@ async def execute_song_workflow(
     # If we reach here, all attempts failed but no exception on last attempt
     # This means all songs were consistently rejected across all attempts
     print(f"🎼 [WORKFLOW] All {max_attempts} attempts completed, no songs met quality standards")
-    
-    # FAIL-SAFE: Move final attempt songs to final_review regardless of verdict
+
+    # FAIL-SAFE: Only activate if absolutely NO songs remain (all were deleted)
+    # This is a true emergency fail-safe, not a quality bypass
     failsafe_songs_moved = 0
-    if final_attempt_songs:
-        print(f"🎼 [WORKFLOW] 🛡️ FAIL-SAFE ACTIVATED: Moving {len(final_attempt_songs)} final attempt songs to final_review")
-        failsafe_result = await handle_failsafe_songs(final_attempt_songs, final_dir)
-        failsafe_songs_moved = failsafe_result["moved_count"]
-        workflow_details["songs_kept"] += failsafe_songs_moved
-        
-        if failsafe_songs_moved > 0:
-            return {
-                "success": True,
-                "message": f"🎼 Max attempts ({max_attempts}) reached. AI rejected all songs, but fail-safe activated: {failsafe_songs_moved} song(s) from final attempt moved to final_review as backup.",
-                "total_attempts": max_attempts,
-                "final_songs_count": failsafe_songs_moved,
-                "good_songs": 0,  # None were AI-approved
-                "re_rolled_songs": workflow_details["songs_deleted"],
-                "workflow_details": workflow_details
-            }
+
+    # Check if any songs were preserved (not deleted) in the final attempt
+    final_preserved = 0
+    if workflow_details["attempts"] and len(workflow_details["attempts"]) >= max_attempts:
+        final_attempt_data = workflow_details["attempts"][-1]
+        if "reviews" in final_attempt_data:
+            for review in final_attempt_data["reviews"]:
+                if review.get("verdict") == "error" or (review.get("verdict") == "re-roll" and os.path.exists(review.get("file_path", ""))):
+                    final_preserved += 1
+
+    # Only activate fail-safe if we have some songs AND no songs made it through
+    if final_attempt_songs and workflow_details["songs_kept"] == 0 and final_preserved > 0:
+        print(f"🎼 [WORKFLOW] 🛡️ EMERGENCY FAIL-SAFE: Found {final_preserved} preserved songs from errors")
+        print(f"🎼 [WORKFLOW] 🛡️ Note: All re-roll songs were deleted as they had critical failures")
+
+        # Only move preserved songs (those with errors, not re-rolls that were deleted)
+        preserved_songs = []
+        for song in final_attempt_songs:
+            if os.path.exists(song["file_path"]):
+                preserved_songs.append(song)
+
+        if preserved_songs:
+            print(f"🎼 [WORKFLOW] 🛡️ Moving {len(preserved_songs)} error/preserved songs to fail_safe directory")
+            failsafe_result = await handle_failsafe_songs(preserved_songs)  # No need to pass final_dir
+            failsafe_songs_moved = failsafe_result["moved_count"]
+            workflow_details["songs_kept"] += failsafe_songs_moved
+
+            if failsafe_songs_moved > 0:
+                return {
+                    "success": True,
+                    "message": f"🎼 Max attempts ({max_attempts}) reached. All songs with critical failures were deleted. Emergency fail-safe activated for {failsafe_songs_moved} song(s) with review errors.",
+                    "total_attempts": max_attempts,
+                    "final_songs_count": failsafe_songs_moved,
+                    "good_songs": 0,  # None were AI-approved
+                    "re_rolled_songs": workflow_details["songs_deleted"],
+                    "workflow_details": workflow_details
+                }
     
     return {
         "success": True,  # Technical success, but no quality songs
@@ -316,8 +342,8 @@ async def download_both_songs(title: str, temp_dir: str, song_id: str = None) ->
         if download_1["success"]:
             downloaded_songs.append({
                 "file_path": download_1["file_path"],
-                "index": -1,
-                "title": title
+                "title": title,
+                "song_id": song_id  # Include song_id for potential remote deletion
             })
             print(f"🎼 [DOWNLOAD] Successfully downloaded song -1: {download_1['file_path']}")
         else:
@@ -335,8 +361,8 @@ async def download_both_songs(title: str, temp_dir: str, song_id: str = None) ->
         if download_2["success"]:
             downloaded_songs.append({
                 "file_path": download_2["file_path"],
-                "index": -2,
-                "title": title
+                "title": title,
+                "song_id": song_id  # Include song_id for potential remote deletion
             })
             print(f"🎼 [DOWNLOAD] Successfully downloaded song -2: {download_2['file_path']}")
         else:
@@ -381,16 +407,16 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
         print(f"\n{'─'*60}")
         print(f"🎼 [REVIEW] Starting review for: {file_path}")
         print(f"🎼 [REVIEW] File size: {file_size:,} bytes")
-        print(f"🎼 [REVIEW] Song index: {song.get('index', 'N/A')}")
         print(f"🎼 [REVIEW] Song title: {song.get('title', 'N/A')}")
+        print(f"🎼 [REVIEW] Song ID: {song.get('song_id', 'N/A')}")
 
         # Verify the file exists before attempting review
         if not os.path.exists(file_path):
             print(f"🎼 [REVIEW] ❌ File not found for review: {file_path}")
             return {
                 "file_path": file_path,
-                "index": song["index"],
                 "title": song["title"],
+                "song_id": song.get("song_id"),
                 "verdict": "error",
                 "review_details": {"error": f"Audio file not found: {file_path}"}
             }
@@ -409,8 +435,8 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
             # or queue the song for manual review
             return {
                 "file_path": file_path,
-                "index": song["index"],
                 "title": song["title"],
+                "song_id": song.get("song_id"),
                 "verdict": "continue",  # Default to continue to avoid blocking workflow
                 "review_details": {
                     "warning": "Simplified review due to missing pg1_id",
@@ -453,8 +479,8 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
         # Structure the final result for this song
         return {
             "file_path": file_path,
-            "index": song["index"],
             "title": song["title"],
+            "song_id": song.get("song_id"),
             "verdict": review_result.get("verdict", "error"),
             "review_details": review_result
         }
@@ -501,8 +527,8 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
             print(traceback.format_exc())
             final_results.append({
                 "file_path": song["file_path"],
-                "index": song["index"],
                 "title": song["title"],
+                "song_id": song.get("song_id"),
                 "verdict": "error",
                 "review_details": {"error": error_msg}
             })
@@ -958,20 +984,21 @@ async def call_review_api(file_path: str, pg1_id: int) -> Dict[str, Any]:
 
 
 async def process_song_verdicts(review_results: List[Dict], final_dir: str) -> Dict[str, int]:
-    """Process review verdicts: move good songs to final_review, delete bad ones."""
+    """Process review verdicts: move good songs to final_review, delete bad ones using centralized deletion."""
     kept_count = 0
     deleted_count = 0
-    
+
     for result in review_results:
         file_path = result["file_path"]
         verdict = result["verdict"]
-        
+        song_id = result.get("song_id")  # Get song_id for potential remote deletion
+
         try:
             if verdict == "continue":
                 # Move to final_review directory - THIS IS THE VERIFIED FINAL DESTINATION
                 filename = os.path.basename(file_path)
                 final_path = os.path.join(final_dir, filename)
-                
+
                 if os.path.exists(file_path):
                     shutil.move(file_path, final_path)
                     kept_count += 1
@@ -979,23 +1006,34 @@ async def process_song_verdicts(review_results: List[Dict], final_dir: str) -> D
                     print(f"🎼 [VERDICT] ✅ CONFIRMED: Song is now in backend/songs/final_review directory")
                 else:
                     print(f"🎼 [VERDICT] ⚠️ File not found for moving: {file_path}")
-                    
+
             elif verdict == "re-roll":
-                # Delete the file
-                if os.path.exists(file_path):
-                    os.remove(file_path)
+                # Use centralized deletion utility with mandatory remote deletion
+                if not song_id:
+                    # Per the migration plan, song_id is REQUIRED for re-roll deletions
+                    error_msg = f"Missing song_id for re-roll deletion of {file_path}"
+                    print(f"🎼 [VERDICT] ❌ {error_msg}")
+                    # As per plan, return error when song_id is missing for re-roll
+                    return {"success": False, "error": error_msg, "kept_count": kept_count, "deleted_count": deleted_count}
+
+                # Perform mandatory remote+local deletion when song_id exists
+                print(f"[VERDICT] Deleting re-roll song (local + remote): {file_path}, song_id: {song_id}")
+                delete_result = await delete_song(song_id=song_id, file_path=file_path, delete_from_suno=True)
+
+                # Consider deletion successful if either local or remote deletion succeeded
+                if delete_result.get("local_deleted") or delete_result.get("suno_deleted") or delete_result.get("success"):
                     deleted_count += 1
-                    print(f"🎼 [VERDICT] ❌ Deleted poor quality song: {file_path}")
+                    print(f"[VERDICT] Deleted poor quality song - Local: {delete_result.get('local_deleted')}, Remote: {delete_result.get('suno_deleted')}")
                 else:
-                    print(f"🎼 [VERDICT] ⚠️ File not found for deletion: {file_path}")
-                    
+                    print(f"[VERDICT] Delete failed: {delete_result.get('errors', delete_result.get('error', 'unknown error'))} for {file_path}")
+
             else:  # verdict == "error" or unknown
                 # Keep file in temp directory but don't count as success
                 print(f"🎼 [VERDICT] ⚠️ Review error, leaving in temp: {file_path}")
-                
+
         except Exception as e:
             print(f"🎼 [VERDICT] Error processing {file_path}: {e}")
-    
+
     return {
         "kept_count": kept_count,
         "deleted_count": deleted_count
@@ -1004,34 +1042,36 @@ async def process_song_verdicts(review_results: List[Dict], final_dir: str) -> D
 
 async def process_song_verdicts_final_attempt(review_results: List[Dict], final_dir: str) -> Dict[str, int]:
     """
-    Process verdicts for the final attempt with special handling to preserve songs for fail-safe.
-    
-    On the final attempt, we only move "continue" songs but don't delete "re-roll" songs.
-    The "re-roll" songs are preserved in temp directory for potential fail-safe recovery.
-    
+    Process verdicts for the final attempt with intelligent deletion and fail-safe.
+
+    On the final attempt, we delete songs with critical errors (re-roll verdict) but
+    track what was deleted. The fail-safe only activates if NO songs remain.
+
     Args:
         review_results (List[Dict]): Review results from AI
         final_dir (str): Final review directory path
-        
+
     Returns:
         Dict[str, int]: Processing results
     """
     kept_count = 0
     deleted_count = 0
     preserved_count = 0
-    
-    print(f"🎼 [VERDICT-FINAL] Processing final attempt verdicts (preserving re-roll songs for fail-safe")
-    
+    critical_failures = 0
+
+    print(f"🎼 [VERDICT-FINAL] Processing final attempt verdicts with intelligent deletion")
+
     for result in review_results:
         file_path = result["file_path"]
         verdict = result["verdict"]
-        
+        song_id = result.get("song_id")
+
         try:
             if verdict == "continue":
                 # Move good songs to final_review as usual - VERIFIED FINAL DESTINATION
                 filename = os.path.basename(file_path)
                 final_path = os.path.join(final_dir, filename)
-                
+
                 if os.path.exists(file_path):
                     shutil.move(file_path, final_path)
                     kept_count += 1
@@ -1039,88 +1079,151 @@ async def process_song_verdicts_final_attempt(review_results: List[Dict], final_
                     print(f"🎼 [VERDICT-FINAL] ✅ CONFIRMED: Song is now in backend/songs/final_review directory")
                 else:
                     print(f"🎼 [VERDICT-FINAL] ⚠️ File not found for moving: {file_path}")
-                    
+
             elif verdict == "re-roll":
-                # SPECIAL: Don't delete re-roll songs on final attempt - preserve for fail-safe
-                if os.path.exists(file_path):
-                    preserved_count += 1
-                    print(f"🎼 [VERDICT-FINAL] 🛡️ Preserved re-roll song for fail-safe: {file_path}")
+                # STRATEGY 1: Delete re-roll songs even on final attempt
+                # Check severity of the issue from review details
+                review_details = result.get("review_details", {})
+                second_response = review_details.get("second_response", "").lower()
+
+                # Detect critical failures that should always be deleted
+                is_critical = any([
+                    "cut off" in second_response or "cuts off" in second_response,
+                    "abrupt" in second_response,
+                    "no audio" in second_response,
+                    "unintelligible" in second_response,
+                    "completely wrong" in second_response,
+                    "harsh digital noise" in second_response
+                ])
+
+                if is_critical:
+                    # Delete critical failures even on final attempt
+                    print(f"🎼 [VERDICT-FINAL] ❌ CRITICAL FAILURE detected: deleting {file_path}")
+
+                    if song_id:
+                        # Use centralized deletion with mandatory remote deletion
+                        delete_result = await delete_song(song_id=song_id, file_path=file_path, delete_from_suno=True)
+                        if delete_result.get("local_deleted") or delete_result.get("suno_deleted") or delete_result.get("success"):
+                            deleted_count += 1
+                            critical_failures += 1
+                            print(f"🎼 [VERDICT-FINAL] Deleted critical failure - Local: {delete_result.get('local_deleted')}, Remote: {delete_result.get('suno_deleted')}")
+                        else:
+                            print(f"🎼 [VERDICT-FINAL] Delete failed: {delete_result.get('errors', delete_result.get('error', 'unknown error'))}")
+                            preserved_count += 1  # Count as preserved if deletion failed
+                    else:
+                        # No song_id, try local deletion only
+                        if os.path.exists(file_path):
+                            try:
+                                os.remove(file_path)
+                                deleted_count += 1
+                                critical_failures += 1
+                                print(f"🎼 [VERDICT-FINAL] Deleted critical failure locally: {file_path}")
+                            except Exception as e:
+                                print(f"🎼 [VERDICT-FINAL] Failed to delete locally: {e}")
+                                preserved_count += 1
+                        else:
+                            print(f"🎼 [VERDICT-FINAL] File already gone: {file_path}")
                 else:
-                    print(f"🎼 [VERDICT-FINAL] ⚠️ Re-roll song file not found: {file_path}")
-                    
+                    # Non-critical re-roll on final attempt - still delete but note it
+                    print(f"🎼 [VERDICT-FINAL] ⚠️ Non-critical re-roll: deleting {file_path}")
+
+                    if song_id:
+                        delete_result = await delete_song(song_id=song_id, file_path=file_path, delete_from_suno=True)
+                        if delete_result.get("success"):
+                            deleted_count += 1
+                            print(f"🎼 [VERDICT-FINAL] Deleted non-critical re-roll song")
+                        else:
+                            preserved_count += 1
+                            print(f"🎼 [VERDICT-FINAL] Failed to delete, preserving: {file_path}")
+                    else:
+                        # Try local deletion
+                        if os.path.exists(file_path):
+                            try:
+                                os.remove(file_path)
+                                deleted_count += 1
+                                print(f"🎼 [VERDICT-FINAL] Deleted non-critical re-roll locally")
+                            except:
+                                preserved_count += 1
+
             else:  # verdict == "error" or unknown
-                # Keep file in temp directory for fail-safe consideration
+                # Keep file in temp directory for potential recovery
                 preserved_count += 1
-                print(f"🎼 [VERDICT-FINAL] ⚠️ Review error, preserving for fail-safe: {file_path}")
-                
+                print(f"🎼 [VERDICT-FINAL] ⚠️ Review error, preserving for potential recovery: {file_path}")
+
         except Exception as e:
             print(f"🎼 [VERDICT-FINAL] Error processing {file_path}: {e}")
-    
-    print(f"🎼 [VERDICT-FINAL] Final attempt results: {kept_count} kept, {preserved_count} preserved for fail-safe")
-    
+            preserved_count += 1
+
+    print(f"🎼 [VERDICT-FINAL] Final attempt results: {kept_count} kept, {deleted_count} deleted ({critical_failures} critical), {preserved_count} preserved")
+
     return {
         "kept_count": kept_count,
-        "deleted_count": deleted_count,  # No deletions on final attempt
-        "preserved_count": preserved_count
+        "deleted_count": deleted_count,
+        "preserved_count": preserved_count,
+        "critical_failures": critical_failures
     }
 
 
 def verify_final_destination_folder() -> str:
     """
     🔍 VERIFICATION: Confirm the final destination folder for approved songs.
-    
+
     This function serves as a single source of truth for the final destination
     and provides verification that we're using the correct folder path.
-    
+
     Returns:
         str: The verified final destination folder path
     """
     final_destination = "backend/songs/final_review"
-    
+
     print(f"🔍 [VERIFY] Final destination folder confirmed: {final_destination}")
-    print(f"🔍 [VERIFY] This is where ALL approved songs will be moved:")
-    print(f"🔍 [VERIFY]   - AI-approved songs (verdict: 'continue')")
-    print(f"🔍 [VERIFY]   - Fail-safe backup songs (marked with '_FAILSAFE')")
-    
+    print(f"🔍 [VERIFY] This is where AI-approved songs (verdict: 'continue') will be moved")
+    print(f"🔍 [VERIFY] Note: Fail-safe songs go to backend/songs/fail_safe directory")
+
     return final_destination
 
 
-async def handle_failsafe_songs(final_attempt_songs: List[Dict], final_dir: str) -> Dict[str, int]:
+async def handle_failsafe_songs(final_attempt_songs: List[Dict], final_dir: str = None) -> Dict[str, int]:
     """
-    🛡️ FAIL-SAFE MECHANISM: Move final attempt songs to final_review regardless of review verdict.
-    
+    🛡️ FAIL-SAFE MECHANISM: Move final attempt songs to fail_safe directory.
+
     This function is called when all 3 attempts fail to produce AI-approved songs.
     It ensures that the work from the final attempt isn't lost by moving downloaded
-    songs to the final_review directory as a backup.
-    
+    songs to a separate fail_safe directory for later review.
+
     Args:
         final_attempt_songs (List[Dict]): Songs downloaded in the final attempt
-        final_dir (str): Path to final_review directory
-        
+        final_dir (str, optional): Ignored, uses fail_safe directory instead
+
     Returns:
         Dict[str, int]: Results with moved_count and error_count
     """
     moved_count = 0
     error_count = 0
-    
+
+    # Use dedicated fail_safe directory instead of final_review
+    failsafe_dir = "backend/songs/fail_safe"
+    os.makedirs(failsafe_dir, exist_ok=True)
+
     print(f"🛡️ [FAIL-SAFE] Processing {len(final_attempt_songs)} songs from final attempt")
-    
+    print(f"🛡️ [FAIL-SAFE] Moving to dedicated fail-safe directory: {failsafe_dir}")
+
     for i, song in enumerate(final_attempt_songs, 1):
         file_path = song["file_path"]
-        
+
         try:
             if os.path.exists(file_path):
                 # Create fail-safe filename with clear labeling
                 original_filename = os.path.basename(file_path)
                 name_part, ext = os.path.splitext(original_filename)
                 failsafe_filename = f"{name_part}_FAILSAFE{ext}"
-                final_path = os.path.join(final_dir, failsafe_filename)
-                
-                # Move the file to VERIFIED FINAL DESTINATION
+                final_path = os.path.join(failsafe_dir, failsafe_filename)
+
+                # Move the file to fail_safe directory
                 shutil.move(file_path, final_path)
                 moved_count += 1
-                print(f"🛡️ [FAIL-SAFE] ✅ BACKUP SONG moved to final destination: {final_path}")
-                print(f"🛡️ [FAIL-SAFE] ✅ CONFIRMED: Backup song {i}/{len(final_attempt_songs)} is now in backend/songs/final_review directory")
+                print(f"🛡️ [FAIL-SAFE] ✅ BACKUP SONG moved to fail-safe directory: {final_path}")
+                print(f"🛡️ [FAIL-SAFE] ✅ CONFIRMED: Backup song {i}/{len(final_attempt_songs)} is now in {failsafe_dir}")
             else:
                 error_count += 1
                 print(f"🛡️ [FAIL-SAFE] ⚠️ File not found: {file_path}")

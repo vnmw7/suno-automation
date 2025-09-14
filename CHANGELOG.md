@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed support for index-based naming pattern
   - All song operations now expect UUID-based filenames
 
+- **Song Deletion Logic for Re-roll Verdicts** - Fixed critical issue where poor-quality songs were not being deleted
+  - Modified `process_song_verdicts_final_attempt()` to delete re-roll songs even on final attempt
+  - Added severity detection to identify critical failures (abrupt endings, harsh noise, etc.)
+  - Re-roll songs with critical failures are now properly deleted instead of preserved
+  - Fail-safe mechanism only activates when NO songs remain after deletion
+
+- **Fail-Safe Directory Structure** - Separated fail-safe songs from approved songs
+  - Changed fail-safe destination from `backend/songs/final_review` to `backend/songs/fail_safe`
+  - AI-approved songs go to `final_review`, emergency backups go to `fail_safe`
+  - Clearer organization for manual review of problematic songs
+
 ### Added
 - **Standalone Executable Distribution** - Backend can now be bundled as a Windows executable using PyInstaller
   - Created `main.spec` configuration for PyInstaller bundling
