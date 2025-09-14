@@ -7,12 +7,15 @@ File: `backend/api/orchestrator/utils.py`
 ## Key functions and behavior
 
 1. `process_song_verdicts(review_results: List[Dict], final_dir: str) -> Dict[str, int]`
-   - Called during normal attempts (not the final attempt).
-   - For each `result` in `review_results`:
-     - If `verdict == "continue"`: the file is moved to `final_dir` using `shutil.move(file_path, final_path)`.
-     - If `verdict == "re-roll"`: the file is deleted with `os.remove(file_path)` and `deleted_count` is incremented.
-     - Else (`verdict == "error"` or unknown): the file is left in the temp directory.
-   - Deletion point: `os.remove(file_path)` in this function.
+    - Called during normal attempts (not the final attempt).
+    - For each `result` in `review_results`:
+       - If `verdict == "continue"`: the file is moved to `final_dir` using `shutil.move(file_path, final_path)`.
+       - If `verdict == "re-roll"`: deletion is handled by the centralized helper `backend.utils.delete_song.delete_song`.
+          - When a `song_id` is present on the `result` (accepted fields: `song_id`, fallback `songId`), the orchestrator will call `await delete_song(song_id=song_id, file_path=file_path, delete_from_suno=True)`.
+          - Remote deletion on Suno is mandatory when `song_id` is available; the helper will attempt both remote and local deletion.
+          - If `song_id` is missing for a `re-roll` verdict, the orchestrator will log a warning and preserve the local file (no early return). This preserves the interface/return shape of the function and continues processing other items.
+       - Else (`verdict == "error"` or unknown): the file is left in the temp directory.
+    - Deletion point: delegated to `backend/utils/delete_song.py` via `delete_song` for non-final attempts.
 
 2. `process_song_verdicts_final_attempt(review_results: List[Dict], final_dir: str) -> Dict[str, int]`
    - Used for the final attempt (the last retry attempt).
@@ -39,6 +42,9 @@ File: `backend/api/orchestrator/utils.py`
 - If you prefer not to permanently delete files, consider moving `re-roll` files to an `archive` or `trash` folder instead of running `os.remove`.
 - Add logging that includes the decision, file paths, and who/when to improve traceability.
 - Add unit tests that simulate review verdicts and verify file moves/deletes for `process_song_verdicts` and `process_song_verdicts_final_attempt`.
+
+## Notes on rollout
+- The orchestrator now performs mandatory remote deletion on Suno for non-final `re-roll` verdicts when `song_id` is available. During an initial rollout you may gate the remote step with an environment flag (e.g. `DELETE_FROM_SUNO_ENABLED`) but the long-term code behavior is to attempt remote deletion whenever `song_id` is present.
 
 ---
 

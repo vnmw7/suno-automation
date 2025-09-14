@@ -15,6 +15,9 @@ When implementing new features, always follow the **Minimum Viable Approach (MVA
 3. **Test Basic Flow**: Ensure the happy path works
 4. **Iterate if Needed**: Add complexity only when requirements demand it
 
+### Planning and Review Requirement
+When creating an implementation plan, always include the exact file path(s) relative to the project root and file name(s) that will be changed, and paste the current code snippet(s) from those files that will be affected. This ensures reviewers can see the precise location and the existing code context during review. Keep snippets minimal (just the relevant function/class/block) and clearly annotate which lines or regions will change.
+
 ### Code Guidelines
 - Prefer simple functions over complex classes
 - Use built-in libraries before adding dependencies
