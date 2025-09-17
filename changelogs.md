@@ -1,3 +1,13 @@
+feat: Centralize and optimize Suno UI selector management
+
+- Created backend/configs/suno_selectors.py as a centralized configuration for all UI selectors
+- Updated lyrics textarea selector to match new Suno UI: textarea[placeholder="Write some lyrics"]
+- Implemented fallback selector strategy for all UI elements to improve resilience
+- Made all selectors, timeouts, and browser configurations easily configurable in one place
+- Added primary and fallback selectors for buttons, inputs, and song elements
+- Improved error handling with detailed logging for selector failures
+- Future UI changes now require updates only in suno_selectors.py
+
 feat: Enhance SunoDownloader with improved error handling and download retries
 
 - Updated download_song_v2.py to include a retry mechanism for downloads, allowing up to 3 attempts on failure.
