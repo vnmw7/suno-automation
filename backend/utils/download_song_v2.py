@@ -1,4 +1,9 @@
-"""Suno Song Download Module V2
+"""
+System: Suno Automation
+Module: Song Download V2
+Purpose: Download songs from Suno with browser automation and return file path and song ID.
+
+Suno Song Download Module V2
 
 This module provides a reusable class for downloading songs from Suno.com
 using automated browser interactions with enhanced error handling and
@@ -6,8 +11,8 @@ teleport techniques for faster, more reliable downloads.
 """
 
 import os
-import datetime
 import traceback
+from datetime import datetime
 from typing import Dict, Any
 from slugify import slugify
 from camoufox import AsyncCamoufox
@@ -161,6 +166,7 @@ class SunoDownloader:
             "error": None,
             "song_title": strTitle,
             "song_index": intIndex,
+            "song_id": None,
         }
 
         # Initialize extracted_song_id variable for use throughout the function
@@ -170,12 +176,17 @@ class SunoDownloader:
             # Ensure download directory exists
             os.makedirs(download_path, exist_ok=True)
 
-            print(
-                f"Starting enhanced download process for: '{strTitle}' at index {intIndex}"
-            )
+            print(f"\n{'='*80}")
+            print("📥 [DOWNLOAD-START] Starting enhanced download process")
+            print(f"📥 [DOWNLOAD-START] Title: '{strTitle}'")
+            print(f"📥 [DOWNLOAD-START] Index: {intIndex}")
+            print(f"📥 [DOWNLOAD-START] Song ID: {song_id if song_id else 'None (will navigate to /me)'}")
+            print(f"📥 [DOWNLOAD-START] Download path: {download_path}")
+            print(f"📥 [DOWNLOAD-START] Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"{'='*80}")
 
             async with AsyncCamoufox(
-                headless=True,
+                headless=False,
                 persistent_context=True,
                 user_data_dir="backend/camoufox_session_data",
                 os=("windows"),
@@ -192,11 +203,14 @@ class SunoDownloader:
 
                     # Navigate to specific song page or user's songs page
                     if song_id:
-                        print(f"Navigating to specific song page: {song_id}")
+                        print("\n📍 [NAVIGATION] Direct song page navigation")
+                        print(f"📍 [NAVIGATION] Target URL: https://suno.com/song/{song_id}")
+                        print("📍 [NAVIGATION] Starting navigation...")
                         await page.goto(
                             f"https://suno.com/song/{song_id}", wait_until="domcontentloaded", timeout=45000
                         )
-                        print(f"Navigation completed. Current URL: {page.url}")
+                        print("📍 [NAVIGATION] ✅ Navigation completed")
+                        print(f"📍 [NAVIGATION] Current URL: {page.url}")
 
 
                         # Look for the options/menu button (usually three dots)
@@ -206,203 +220,291 @@ class SunoDownloader:
                                 "success": False,
                                 "error": "Could not find options button on song page"
                             }
-                        
-                        # Click the options button to open the dropdown menu
-                        print("Clicking options button to open menu...")
-                        await options_button.click()
-                        await page.wait_for_timeout(1000)
 
-                        # Wait for dropdown menu with enhanced detection
-                        print("Waiting for dropdown menu to appear...")
-                        context_menu_selectors = [
-                            "div[data-radix-menu-content]",
-                            "div[role='menu']",
-                            "[data-radix-popper-content-wrapper]",
-                            "div.radix-menu-content",
-                            "[role='menu'][data-state='open']",
-                        ]
-
-                        context_menu = None
-                        for selector in context_menu_selectors:
-                            try:
-                                menu = page.locator(selector).first
-                                await menu.wait_for(state="visible", timeout=10000)
-                                context_menu = menu
-                                print(f"Dropdown menu found with selector: {selector}")
-                                break
-                            except Exception:
-                                continue
-
-                        if not context_menu:
-                            raise Exception("Dropdown menu did not appear after clicking options button")
-
-                        await page.wait_for_timeout(500)
-
-                        # Find and hover download submenu trigger
-                        print("Locating download submenu trigger...")
-                        download_triggers = [
-                            '[data-testid="download-sub-trigger"]',
-                            '*:has-text("Download")',
-                            '[role="menuitem"]:has-text("Download")',
-                        ]
-
-                        download_trigger = None
-                        for trigger_selector in download_triggers:
-                            try:
-                                trigger = context_menu.locator(trigger_selector)
-                                await trigger.wait_for(state="visible", timeout=8000)
-                                download_trigger = trigger
-                                print(f"Found download trigger: {trigger_selector}")
-                                break
-                            except Exception:
-                                continue
-
-                        if not download_trigger:
-                            raise Exception("Download option not found in context menu")
-
-                        # ################################################################## #
-                        # ##                  THE CRITICAL EXCEPTION                      ## #
-                        # ## Here, we use the NORMAL hover to ensure the menu triggers.  ## #
-                        # ################################################################## #
-                        print("Performing REGULAR (humanized) hover on Download trigger...")
-                        await download_trigger.hover()  # Use the standard hover to trigger the sub-menu
-                        # ################################################################## #
-
-                        await page.wait_for_timeout(1000)
-
-                        # Wait for download submenu panel
-                        print("Waiting for download submenu panel...")
-                        download_trigger_id = await download_trigger.get_attribute("id")
-
-                        submenu_selectors = []
-                        if download_trigger_id:
-                            submenu_selectors.append(
-                                f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
-                            )
-                        submenu_selectors.extend(
-                            [
-                                "div[data-radix-menu-content][data-state='open'][role='menu']",
-                                "*[role='menu'][data-state='open']",
-                            ]
-                        )
-
-                        submenu_panel = None
-                        for selector in submenu_selectors:
-                            try:
-                                panel = page.locator(selector).last
-                                await panel.wait_for(state="visible", timeout=8000)
-                                submenu_panel = panel
-                                print(f"Download submenu panel found: {selector}")
-                                break
-                            except Exception:
-                                continue
-
-                        if not submenu_panel:
-                            raise Exception("Download submenu panel did not appear")
-
-                        # Find MP3 Audio option
-                        print("Locating MP3 Audio download option...")
-                        mp3_selectors = [
-                            "div[role='menuitem']:has-text('MP3 Audio')",
-                            "*:has-text('MP3 Audio')",
-                            "[data-testid*='mp3']",
-                        ]
-
-                        mp3_option = None
-                        for selector in mp3_selectors:
-                            try:
-                                option = submenu_panel.locator(selector)
-                                await option.wait_for(state="visible", timeout=8000)
-                                mp3_option = option
-                                print(f"Found MP3 option: {selector}")
-                                break
-                            except Exception:
-                                continue
-
-                        if not mp3_option:
-                            raise Exception("MP3 Audio download option not found")
-                        
-                        # Use the extracted_song_id if available for filename
-                        if 'extracted_song_id' in locals() and extracted_song_id:
-                            song_id_for_filename = extracted_song_id
-                        else:
-                            song_id_for_filename = song_id
-
-                        # Initiate download with enhanced handling
-                        print("Starting download process...")
+                        # Retry mechanism for download process
+                        MAX_DOWNLOAD_RETRIES = 3
+                        download_attempt = 0
                         download_successful = False
                         final_file_path = None
 
-                        try:
-                            async with page.expect_download(timeout=60000) as download_info:
-                                # Hover over MP3 option (INSTANT)
-                                print("Hovering over MP3 download option with teleport hover...")
-                                await self.teleport_hover(page, mp3_option)
+                        while download_attempt < MAX_DOWNLOAD_RETRIES and not download_successful:
+                            download_attempt += 1
+                            print(f"\n🔄 [DOWNLOAD-ATTEMPT] Attempt {download_attempt} of {MAX_DOWNLOAD_RETRIES}")
+                            print(f"🔄 [DOWNLOAD-ATTEMPT] Starting download process for '{strTitle}'...")
+
+                            try:
+                                # Click the options button to open the dropdown menu
+                                print("Clicking options button to open menu...")
+                                await options_button.click()
+                                await page.wait_for_timeout(1000)
+
+                                # Wait for dropdown menu with enhanced detection
+                                print("Waiting for dropdown menu to appear...")
+                                context_menu_selectors = [
+                                    "div[data-radix-menu-content]",
+                                    "div[role='menu']",
+                                    "[data-radix-popper-content-wrapper]",
+                                    "div.radix-menu-content",
+                                    "[role='menu'][data-state='open']",
+                                ]
+
+                                context_menu = None
+                                for selector in context_menu_selectors:
+                                    try:
+                                        menu = page.locator(selector).first
+                                        await menu.wait_for(state="visible", timeout=10000)
+                                        context_menu = menu
+                                        print(f"Dropdown menu found with selector: {selector}")
+                                        break
+                                    except Exception:
+                                        continue
+
+                                if not context_menu:
+                                    raise Exception("Dropdown menu did not appear after clicking options button")
+
                                 await page.wait_for_timeout(500)
-                                
-                                # Click MP3 option (INSTANT)
-                                print("Clicking MP3 download option with teleport click...")
-                                await self.teleport_click(page, mp3_option)
-                                print("Clicked MP3 Audio option.")
 
-                                # Check for "Download Anyway" button (premium content warning)
-                                try:
-                                    download_anyway_selectors = [
-                                        'button:has(span:has-text("Download Anyway"))',
-                                        'button:has-text("Download Anyway")',
-                                        '*:has-text("Download Anyway")',
-                                    ]
+                                # Find and hover download submenu trigger
+                                print("Locating download submenu trigger...")
+                                download_triggers = [
+                                    '[data-testid="download-sub-trigger"]',
+                                    '*:has-text("Download")',
+                                    '[role="menuitem"]:has-text("Download")',
+                                ]
 
-                                    for selector in download_anyway_selectors:
-                                        try:
-                                            anyway_btn = page.locator(selector)
-                                            await anyway_btn.wait_for(
-                                                state="visible", timeout=10000
-                                            )
-                                            await self.teleport_click(page, anyway_btn)
-                                            print("Clicked 'Download Anyway' button with teleport click.")
-                                            break
-                                        except Exception:
-                                            continue
-                                except Exception:
-                                    print(
-                                        "No 'Download Anyway' button needed - proceeding with direct download"
+                                download_trigger = None
+                                for trigger_selector in download_triggers:
+                                    try:
+                                        trigger = context_menu.locator(trigger_selector)
+                                        await trigger.wait_for(state="visible", timeout=8000)
+                                        download_trigger = trigger
+                                        print(f"Found download trigger: {trigger_selector}")
+                                        break
+                                    except Exception:
+                                        continue
+
+                                if not download_trigger:
+                                    raise Exception("Download option not found in context menu")
+
+                                # ################################################################## #
+                                # ##                  THE CRITICAL EXCEPTION                      ## #
+                                # ## Here, we use the NORMAL hover to ensure the menu triggers.  ## #
+                                # ################################################################## #
+                                print("Performing REGULAR (humanized) hover on Download trigger...")
+                                await download_trigger.hover()  # Use the standard hover to trigger the sub-menu
+                                # ################################################################## #
+
+                                await page.wait_for_timeout(1000)
+
+                                # Wait for download submenu panel
+                                print("Waiting for download submenu panel...")
+                                download_trigger_id = await download_trigger.get_attribute("id")
+
+                                submenu_selectors = []
+                                if download_trigger_id:
+                                    submenu_selectors.append(
+                                        f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
                                     )
+                                submenu_selectors.extend(
+                                    [
+                                        "div[data-radix-menu-content][data-state='open'][role='menu']",
+                                        "*[role='menu'][data-state='open']",
+                                    ]
+                                )
 
-                            download = await download_info.value
+                                submenu_panel = None
+                                for selector in submenu_selectors:
+                                    try:
+                                        panel = page.locator(selector).last
+                                        await panel.wait_for(state="visible", timeout=8000)
+                                        submenu_panel = panel
+                                        print(f"Download submenu panel found: {selector}")
+                                        break
+                                    except Exception:
+                                        continue
 
-                            if download:
-                                # Song Renaming Logic:
-                                # 1. Use slugify for robust, clean title sanitization (removes special chars, spaces->hyphens, lowercase)
-                                slug_title = slugify(strTitle)
+                                if not submenu_panel:
+                                    raise Exception("Download submenu panel did not appear")
 
-                                # 2. Generate a compact, numeric timestamp (YYYYMMDDHHMMSS format)
-                                timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                                # Find MP3 Audio option
+                                print("Locating MP3 Audio download option...")
+                                mp3_selectors = [
+                                    "div[role='menuitem']:has-text('MP3 Audio')",
+                                    "*:has-text('MP3 Audio')",
+                                    "[data-testid*='mp3']",
+                                ]
 
-                                # 3. Construct the final filename: title_songId_timestamp.mp3
-                                # Example: "amazing-grace-verse-1-5_abc123def456_20250830143022.mp3"
-                                # Use song_id_for_filename if set (contains extracted_song_id or original song_id)
-                                if 'song_id_for_filename' in locals() and song_id_for_filename:
-                                    filename = f"{slug_title}_{song_id_for_filename}_{timestamp}.mp3"
+                                mp3_option = None
+                                for selector in mp3_selectors:
+                                    try:
+                                        option = submenu_panel.locator(selector)
+                                        await option.wait_for(state="visible", timeout=8000)
+                                        mp3_option = option
+                                        print(f"Found MP3 option: {selector}")
+                                        break
+                                    except Exception:
+                                        continue
+
+                                if not mp3_option:
+                                    raise Exception("MP3 Audio download option not found")
+
+                                # Use the extracted_song_id if available for filename
+                                if 'extracted_song_id' in locals() and extracted_song_id:
+                                    song_id_for_filename = extracted_song_id
                                 else:
-                                    filename = f"{slug_title}_index_{intIndex}_{timestamp}.mp3"
-                                final_file_path = os.path.join(download_path, filename)
+                                    song_id_for_filename = song_id
 
-                                # Save the download
-                                await download.save_as(final_file_path)
-                                download_successful = True
-                                print(f"Download completed successfully: {final_file_path}")
+                                # Initiate download with enhanced handling
+                                print("Starting download process...")
 
-                        except Exception as download_error:
-                            raise Exception(f"Download process failed: {download_error}")
+                                try:
+                                    async with page.expect_download(timeout=60000) as download_info:
+                                        # Hover over MP3 option (INSTANT)
+                                        print("Hovering over MP3 download option with teleport hover...")
+                                        await self.teleport_hover(page, mp3_option)
+                                        await page.wait_for_timeout(500)
+
+                                        # Click MP3 option (INSTANT)
+                                        print("Clicking MP3 download option with teleport click...")
+                                        await self.teleport_click(page, mp3_option)
+                                        print("Clicked MP3 Audio option.")
+
+                                        # Check for "Download Anyway" button (premium content warning)
+                                        try:
+                                            download_anyway_selectors = [
+                                                'button:has(span:has-text("Download Anyway"))',
+                                                'button:has-text("Download Anyway")',
+                                                '*:has-text("Download Anyway")',
+                                            ]
+
+                                            for selector in download_anyway_selectors:
+                                                try:
+                                                    anyway_btn = page.locator(selector)
+                                                    await anyway_btn.wait_for(
+                                                        state="visible", timeout=10000
+                                                    )
+                                                    await self.teleport_click(page, anyway_btn)
+                                                    print("Clicked 'Download Anyway' button with teleport click.")
+                                                    break
+                                                except Exception:
+                                                    continue
+                                        except Exception:
+                                            print(
+                                                "No 'Download Anyway' button needed - proceeding with direct download"
+                                            )
+
+                                    download = await download_info.value
+
+                                    if download:
+                                        # Song Renaming Logic:
+                                        print("\n💾 [SAVE] Processing downloaded file...")
+                                        # 1. Use slugify for robust, clean title sanitization (removes special chars, spaces->hyphens, lowercase)
+                                        slug_title = slugify(strTitle)
+                                        print(f"💾 [SAVE] Slugified title: {slug_title}")
+
+                                        # 2. Generate a compact, numeric timestamp (YYYYMMDDHHMMSS format)
+                                        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                                        print(f"💾 [SAVE] Timestamp: {timestamp}")
+
+                                        # 3. Construct the final filename: title_songId_timestamp.mp3
+                                        # Example: "amazing-grace-verse-1-5_abc123def456_20250830143022.mp3"
+                                        # Use song_id_for_filename if set (contains extracted_song_id or original song_id)
+                                        if 'song_id_for_filename' in locals() and song_id_for_filename:
+                                            filename = f"{slug_title}_{song_id_for_filename}_{timestamp}.mp3"
+                                            print(f"💾 [SAVE] Using song_id for filename: {song_id_for_filename}")
+                                        else:
+                                            filename = f"{slug_title}_index_{intIndex}_{timestamp}.mp3"
+                                            print(f"💾 [SAVE] No song_id available, using index: {intIndex}")
+
+                                        print(f"💾 [SAVE] Final filename: {filename}")
+                                        final_file_path = os.path.join(download_path, filename)
+                                        print(f"💾 [SAVE] Full path: {final_file_path}")
+
+                                        # Save the download
+                                        print("💾 [SAVE] Saving file...")
+                                        await download.save_as(final_file_path)
+                                        download_successful = True
+
+                                        # Verify file was saved
+                                        if os.path.exists(final_file_path):
+                                            file_size = os.path.getsize(final_file_path)
+                                            print("💾 [SAVE] ✅ File saved successfully")
+                                            print(f"💾 [SAVE] File size: {file_size:,} bytes")
+                                            print(f"✅ [DOWNLOAD-ATTEMPT] Attempt {download_attempt} succeeded!")
+                                            break  # Exit the retry loop
+                                        else:
+                                            print("💾 [SAVE] ⚠️ File save reported success but file not found!")
+                                    else:
+                                        raise Exception("Download object was not returned")
+
+                                except Exception as download_error:
+                                    error_msg = str(download_error)
+                                    print(f"❌ [DOWNLOAD-ATTEMPT] Attempt {download_attempt} failed: {error_msg}")
+
+                                    # Check if it's a timeout error and we have retries left
+                                    if "Timeout" in error_msg and download_attempt < MAX_DOWNLOAD_RETRIES:
+                                        print(f"⏳ [RETRY] Timeout detected. Will retry in 3 seconds...")
+                                        await page.wait_for_timeout(3000)
+
+                                        # Refresh the page for next attempt
+                                        print("🔄 [RETRY] Refreshing page for retry...")
+                                        await page.reload(wait_until="domcontentloaded", timeout=30000)
+                                        await page.wait_for_timeout(2000)
+
+                                        # Re-find the options button for the next attempt
+                                        options_button = await self._find_options_button(page)
+                                        if not options_button:
+                                            print("❌ [RETRY] Could not find options button after refresh")
+                                            break
+                                    elif download_attempt == MAX_DOWNLOAD_RETRIES:
+                                        # On last attempt, raise the error
+                                        print(f"❌ [DOWNLOAD-ATTEMPT] All {MAX_DOWNLOAD_RETRIES} attempts failed!")
+                                        raise Exception(f"Download failed after {MAX_DOWNLOAD_RETRIES} attempts: {download_error}")
+                                    else:
+                                        # For non-timeout errors on non-final attempts, still retry
+                                        if download_attempt < MAX_DOWNLOAD_RETRIES:
+                                            print(f"🔄 [RETRY] Will retry after non-timeout error...")
+                                            await page.wait_for_timeout(2000)
+                                            await page.reload(wait_until="domcontentloaded", timeout=30000)
+                                            await page.wait_for_timeout(2000)
+                                            options_button = await self._find_options_button(page)
+                                            if not options_button:
+                                                print("❌ [RETRY] Could not find options button after refresh")
+                                                break
+                                        else:
+                                            raise download_error
+
+                            except Exception as outer_error:
+                                # This catches errors from the menu navigation part
+                                error_msg = str(outer_error)
+                                print(f"❌ [DOWNLOAD-ATTEMPT] Navigation/menu error on attempt {download_attempt}: {error_msg}")
+
+                                if download_attempt < MAX_DOWNLOAD_RETRIES:
+                                    print(f"🔄 [RETRY] Will retry after menu navigation error...")
+                                    await page.wait_for_timeout(2000)
+                                    await page.reload(wait_until="domcontentloaded", timeout=30000)
+                                    await page.wait_for_timeout(2000)
+                                    options_button = await self._find_options_button(page)
+                                    if not options_button:
+                                        print("❌ [RETRY] Could not find options button after refresh")
+                                        break
+                                else:
+                                    raise outer_error
+
+                        # After the retry loop, check final status
 
                         if download_successful and final_file_path:
                             result.update({"success": True, "file_path": final_file_path})
-                            print(
-                                f"Song '{strTitle}' (index {intIndex}) downloaded successfully to: {final_file_path}"
-                            )
+                            print("\n✅ [DOWNLOAD-SUCCESS] ===========")
+                            print("✅ [DOWNLOAD-SUCCESS] Download completed successfully!")
+                            print(f"✅ [DOWNLOAD-SUCCESS] Song: '{strTitle}'")
+                            print(f"✅ [DOWNLOAD-SUCCESS] Index: {intIndex}")
+                            print(f"✅ [DOWNLOAD-SUCCESS] Path: {final_file_path}")
+                            print(f"✅ [DOWNLOAD-SUCCESS] Song ID in result: {extracted_song_id if 'extracted_song_id' in locals() and extracted_song_id else song_id}")
+                            print(f"✅ [DOWNLOAD-SUCCESS] Succeeded on attempt: {download_attempt} of {MAX_DOWNLOAD_RETRIES}")
+                            print("✅ [DOWNLOAD-SUCCESS] ===========")
                         else:
-                            raise Exception("Download completed but file path not set")
+                            raise Exception(f"Download failed after {MAX_DOWNLOAD_RETRIES} attempts: File not saved properly")
                         
                         # Verify we're on the correct song page
                         try:
@@ -411,11 +513,14 @@ class SunoDownloader:
                         except Exception as url_error:
                             raise Exception(f"Failed to reach song page: {url_error}")
                     else:
-                        print("Navigating to Suno user songs page...")
+                        print("\n📍 [NAVIGATION] User songs page navigation")
+                        print("📍 [NAVIGATION] Target URL: https://suno.com/me")
+                        print("📍 [NAVIGATION] Starting navigation...")
                         await page.goto(
                             "https://suno.com/me", wait_until="domcontentloaded", timeout=45000
                         )
-                        print(f"Navigation completed. Current URL: {page.url}")
+                        print("📍 [NAVIGATION] ✅ Navigation completed")
+                        print(f"📍 [NAVIGATION] Current URL: {page.url}")
 
                         # Verify we're on the correct page
                         try:
@@ -546,6 +651,7 @@ class SunoDownloader:
                             )
 
                         # Try to extract song ID from the song element
+                        print("\n🔍 [EXTRACT-ID] Attempting to extract song ID from element...")
                         extracted_song_id = None
                         try:
                             # Try to find a link or element with the song ID in href or data attributes
@@ -553,16 +659,22 @@ class SunoDownloader:
                             song_href = await song_link.get_attribute("href")
                             if song_href and "/song/" in song_href:
                                 extracted_song_id = song_href.split("/song/")[-1].split("?")[0].split("/")[0]
-                                print(f"Extracted song ID from href: {extracted_song_id}")
-                        except Exception:
+                                print(f"🔍 [EXTRACT-ID] ✅ Extracted song ID from href: {extracted_song_id}")
+                            else:
+                                print("🔍 [EXTRACT-ID] No song ID found in href attribute")
+                        except Exception as e:
+                            print(f"🔍 [EXTRACT-ID] Failed to extract from href: {type(e).__name__}")
                             try:
                                 # Alternative: Look for data attributes that might contain song ID
                                 data_id = await target_song.get_attribute("data-song-id")
                                 if data_id:
                                     extracted_song_id = data_id
-                                    print(f"Extracted song ID from data attribute: {extracted_song_id}")
+                                    print(f"🔍 [EXTRACT-ID] ✅ Extracted song ID from data attribute: {extracted_song_id}")
+                                else:
+                                    print("🔍 [EXTRACT-ID] No data-song-id attribute found")
                             except Exception:
-                                print("Could not extract song ID from element, will use index in filename")
+                                print("🔍 [EXTRACT-ID] ⚠️ Could not extract song ID from element")
+                                print("🔍 [EXTRACT-ID] Will use index in filename instead")
                         
                         # Right-click to open context menu (INSTANT)
                         print(f"Right-clicking on song at index {intIndex}...")
@@ -729,34 +841,72 @@ class SunoDownloader:
 
                             if download:
                                 # Song Renaming Logic:
+                                print("\n💾 [SAVE] Processing downloaded file...")
                                 # 1. Use slugify for robust, clean title sanitization (removes special chars, spaces->hyphens, lowercase)
                                 slug_title = slugify(strTitle)
+                                print(f"💾 [SAVE] Slugified title: {slug_title}")
 
                                 # 2. Generate a compact, numeric timestamp (YYYYMMDDHHMMSS format)
-                                timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                                print(f"💾 [SAVE] Timestamp: {timestamp}")
 
                                 # 3. Construct the final filename: title_songId_timestamp.mp3
                                 # Example: "amazing-grace-verse-1-5_abc123def456_20250830143022.mp3"
                                 # Use song_id_for_filename if set (contains extracted_song_id or original song_id)
                                 if 'song_id_for_filename' in locals() and song_id_for_filename:
                                     filename = f"{slug_title}_{song_id_for_filename}_{timestamp}.mp3"
+                                    print(f"💾 [SAVE] Using song_id for filename: {song_id_for_filename}")
                                 else:
                                     filename = f"{slug_title}_index_{intIndex}_{timestamp}.mp3"
+                                    print(f"💾 [SAVE] No song_id available, using index: {intIndex}")
+
+                                print(f"💾 [SAVE] Final filename: {filename}")
                                 final_file_path = os.path.join(download_path, filename)
+                                print(f"💾 [SAVE] Full path: {final_file_path}")
 
                                 # Save the download
+                                print("💾 [SAVE] Saving file...")
                                 await download.save_as(final_file_path)
                                 download_successful = True
-                                print(f"Download completed successfully: {final_file_path}")
+
+                                # Verify file was saved
+                                if os.path.exists(final_file_path):
+                                    file_size = os.path.getsize(final_file_path)
+                                    print("💾 [SAVE] ✅ File saved successfully")
+                                    print(f"💾 [SAVE] File size: {file_size:,} bytes")
+                                else:
+                                    print("💾 [SAVE] ⚠️ File save reported success but file not found!")
 
                         except Exception as download_error:
                             raise Exception(f"Download process failed: {download_error}")
 
                         if download_successful and final_file_path:
-                            result.update({"success": True, "file_path": final_file_path})
-                            print(
-                                f"Song '{strTitle}' (index {intIndex}) downloaded successfully to: {final_file_path}"
-                            )
+                            # Determine best-available song_id to return
+                            returned_song_id = None
+                            try:
+                                if 'extracted_song_id' in locals() and extracted_song_id:
+                                    returned_song_id = extracted_song_id
+                                    print(f"📊 [RESULT] Using extracted song ID: {returned_song_id}")
+                                elif song_id:
+                                    returned_song_id = song_id
+                                    print(f"📊 [RESULT] Using original song ID: {returned_song_id}")
+                                else:
+                                    print("📊 [RESULT] No song ID available for result")
+                            except Exception:
+                                pass
+
+                            result.update({
+                                "success": True,
+                                "file_path": final_file_path,
+                                "song_id": returned_song_id,
+                            })
+                            print("\n✅ [DOWNLOAD-SUCCESS] ===========")
+                            print("✅ [DOWNLOAD-SUCCESS] Download completed successfully!")
+                            print(f"✅ [DOWNLOAD-SUCCESS] Song: '{strTitle}'")
+                            print(f"✅ [DOWNLOAD-SUCCESS] Index: {intIndex}")
+                            print(f"✅ [DOWNLOAD-SUCCESS] Path: {final_file_path}")
+                            print(f"✅ [DOWNLOAD-SUCCESS] Song ID in result: {returned_song_id}")
+                            print("✅ [DOWNLOAD-SUCCESS] ===========")
                         else:
                             raise Exception("Download completed but file path not set")
 
@@ -765,8 +915,15 @@ class SunoDownloader:
 
         except Exception as e:
             error_msg = f"Download failed for '{strTitle}' (index {intIndex}): {str(e)}"
-            print(error_msg)
+            print("\n❌ [DOWNLOAD-ERROR] ===========")
+            print("❌ [DOWNLOAD-ERROR] Download failed!")
+            print(f"❌ [DOWNLOAD-ERROR] Song: '{strTitle}'")
+            print(f"❌ [DOWNLOAD-ERROR] Index: {intIndex}")
+            print(f"❌ [DOWNLOAD-ERROR] Error type: {type(e).__name__}")
+            print(f"❌ [DOWNLOAD-ERROR] Error message: {str(e)}")
+            print("❌ [DOWNLOAD-ERROR] Full traceback:")
             print(traceback.format_exc())
+            print("❌ [DOWNLOAD-ERROR] ===========")
             result.update({"success": False, "error": error_msg})
 
         return result
