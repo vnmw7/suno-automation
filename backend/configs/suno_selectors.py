@@ -57,7 +57,11 @@ class SunoSelectors:
     }
 
     # Song List Selectors
-    SONG_PLAY_BUTTON = '[aria-label="Play Song"]'
+    # Song cards containing the actual song data (these are the song containers, not play buttons)
+    SONG_CARD = 'div[data-testid="clip-row"].clip-row'
+
+    # Legacy name kept for backward compatibility (will be deprecated)
+    SONG_PLAY_BUTTON = 'div[data-testid="clip-row"].clip-row'
 
     SONG_ROW = '[data-testid="song-row"]'
 
@@ -67,6 +71,15 @@ class SunoSelectors:
     }
 
     SONG_ELEMENT_SELECTORS = [
+        # Primary: Most specific selector combining multiple attributes for uniqueness
+        'div.clip-row[data-testid="clip-row"].css-6rcthi.e1qa35zq0',
+        # Secondary: Using data-testid which is most reliable
+        'div[data-testid="clip-row"]',
+        # Tertiary: Class-based fallback with partial class match
+        'div.clip-row.e1qa35zq0',
+        # Alternative: Using just the stable class name
+        'div.clip-row',
+        # Legacy: Old selectors for backward compatibility
         '[data-clip-id]',
         '[role="row"][data-key]'
     ]

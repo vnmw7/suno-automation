@@ -354,8 +354,8 @@ async def generate_song(
                 if not create_button:
                     raise Exception("Could not find a visible create button.")
 
-                song_play_button_selector = SunoSelectors.SONG_PLAY_BUTTON
-                initial_song_count = await page.locator(song_play_button_selector).count()
+                song_card_selector = SunoSelectors.SONG_CARD
+                initial_song_count = await page.locator(song_card_selector).count()
                 print(f"Initial song count: {initial_song_count}")
 
                 await create_button.click()
@@ -365,13 +365,13 @@ async def generate_song(
                 
                 try:
                     # Wait for the number of songs to increase by 2
-                    expression = f"() => document.querySelectorAll(\"{song_play_button_selector}\").length >= {expected_song_count}"
+                    expression = f"() => document.querySelectorAll(\"{song_card_selector}\").length >= {expected_song_count}"
                     await page.wait_for_function(expression, timeout=5000)
-                    
-                    new_song_count = await page.locator(song_play_button_selector).count()
+
+                    new_song_count = await page.locator(song_card_selector).count()
                     print(f"New songs detected. Current song count: {new_song_count}")
                 except Exception as e:
-                    new_song_count = await page.locator(song_play_button_selector).count()
+                    new_song_count = await page.locator(song_card_selector).count()
                     error_message = f"Timeout waiting for new songs. Initial: {initial_song_count}, Current: {new_song_count}. Error: {e}"
                     print(error_message)
                     raise Exception(error_message)
