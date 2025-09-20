@@ -1,21 +1,3 @@
-feat: Update Suno UI selectors to use combined attributes for better stability
-
-- Updated STYLE_INPUT selector to use stable attributes instead of dynamic placeholder text
-  - Primary: textarea[maxlength="200"][class*="resize-none"]
-  - Fallback: textarea[maxlength="200"]
-  - Secondary: Multiple fallback options including old data-testid
-- Updated TITLE_INPUT selector to target the second input element (index 1)
-  - Primary: input[placeholder="Add a song title"]:nth-of-type(2)
-  - Fallback: input[placeholder="Add a song title"] >> nth=1 (Playwright nth selector)
-  - Secondary: input[placeholder="Add a song title"]:last-of-type
-- Updated CREATE_BUTTON selector with combined attributes for accuracy
-  - Primary: button[type="button"]:has-text("Create"):has(svg)
-  - Fallback: button:has(span:has-text("Create"):has(svg))
-  - Secondary: button[class*="rounded-full"]:has-text("Create")
-- Fixed generate_song function in utils.py to use new selector format (primary/fallback/secondary_fallback)
-  instead of old "selectors" array format
-
-
 feat: Refactor and update Suno UI selectors for improved accuracy
 
 - Renamed "tags" input to "style" input to accurately reflect its purpose (musical style, not tags)

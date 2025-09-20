@@ -246,29 +246,42 @@ async def generate_song(
                     print(f"Fallback lyrics selector also failed: {e2}")
                     raise Exception("Could not fill lyrics textarea")
 
-            print("Filling tags...")
+            print("Filling style of music...")
             try:
-                tags_textarea = page.locator(SunoSelectors.TAGS_INPUT["primary"])
-                await tags_textarea.wait_for(state="visible", timeout=SunoSelectors.TAGS_INPUT["timeout"])
-                await tags_textarea.clear()
-                await tags_textarea.type(strStyle)
+                # Try the primary selector first (new UI)
+                style_textarea = page.locator(SunoSelectors.STYLE_INPUT["primary"])
+                await style_textarea.wait_for(state="visible", timeout=SunoSelectors.STYLE_INPUT["timeout"])
+                await style_textarea.clear()
+                await style_textarea.type(strStyle)
                 await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                print(f"Tags filled successfully: {strStyle}")
+                print(f"Style filled successfully: {strStyle}")
             except Exception as e:
-                print(f"Primary tags selector failed: {e}, trying fallback...")
+                print(f"Primary style selector failed: {e}, trying fallback...")
                 try:
-                    tags_textarea = page.locator(SunoSelectors.TAGS_INPUT["fallback"])
-                    await tags_textarea.wait_for(state="visible", timeout=5000)
-                    await tags_textarea.clear()
-                    await tags_textarea.type(strStyle)
+                    # Try fallback selector (old UI with data-testid)
+                    style_textarea = page.locator(SunoSelectors.STYLE_INPUT["fallback"])
+                    await style_textarea.wait_for(state="visible", timeout=5000)
+                    await style_textarea.clear()
+                    await style_textarea.type(strStyle)
                     await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                    print(f"Tags filled successfully using fallback: {strStyle}")
+                    print(f"Style filled successfully using fallback: {strStyle}")
                 except Exception as e2:
-                    print(f"Fallback tags selector also failed: {e2}")
-                    raise Exception("Could not fill tags textarea")
+                    print(f"Fallback style selector failed: {e2}, trying secondary fallback...")
+                    try:
+                        # Try secondary fallback (maxlength attribute)
+                        style_textarea = page.locator(SunoSelectors.STYLE_INPUT["secondary_fallback"])
+                        await style_textarea.wait_for(state="visible", timeout=5000)
+                        await style_textarea.clear()
+                        await style_textarea.type(strStyle)
+                        await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
+                        print(f"Style filled successfully using secondary fallback: {strStyle}")
+                    except Exception as e3:
+                        print(f"All style selectors failed: {e3}")
+                        raise Exception("Could not fill style textarea")
 
             print("Filling title...")
             try:
+                # Try the primary selector first (new UI)
                 title_input = page.locator(SunoSelectors.TITLE_INPUT["primary"])
                 await title_input.wait_for(state="visible", timeout=SunoSelectors.TITLE_INPUT["timeout"])
                 await title_input.clear()
@@ -278,6 +291,7 @@ async def generate_song(
             except Exception as e:
                 print(f"Primary title selector failed: {e}, trying fallback...")
                 try:
+                    # Try fallback selector (old placeholder text)
                     title_input = page.locator(SunoSelectors.TITLE_INPUT["fallback"])
                     await title_input.wait_for(state="visible", timeout=5000)
                     await title_input.clear()
@@ -285,26 +299,51 @@ async def generate_song(
                     await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
                     print(f"Title filled successfully using fallback: {strTitle}")
                 except Exception as e2:
-                    print(f"Fallback title selector also failed: {e2}")
-                    raise Exception("Could not fill title input")
+                    print(f"Fallback title selector failed: {e2}, trying secondary fallback...")
+                    try:
+                        # Try secondary fallback (partial placeholder match)
+                        title_input = page.locator(SunoSelectors.TITLE_INPUT["secondary_fallback"])
+                        await title_input.wait_for(state="visible", timeout=5000)
+                        await title_input.clear()
+                        await title_input.type(strTitle)
+                        await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
+                        print(f"Title filled successfully using secondary fallback: {strTitle}")
+                    except Exception as e3:
+                        print(f"All title selectors failed: {e3}")
+                        raise Exception("Could not fill title input")
 
             print("Creating song...")
             try:
                 create_button = None
-                for selector in SunoSelectors.CREATE_BUTTON["selectors"]:
+                # Try primary selector
+                try:
+                    primary_selector = SunoSelectors.CREATE_BUTTON["primary"]
+                    button = page.locator(primary_selector)
+                    await button.wait_for(state="visible", timeout=SunoSelectors.CREATE_BUTTON["timeout"])
+                    create_button = button
+                    print(f"Found create button with primary selector: {primary_selector}")
+                except Exception as e:
+                    print(f"Primary create button selector failed: {e}")
+
+                    # Try fallback selector
                     try:
-                        button = (
-                            page.locator(selector).nth(1)
-                            if "has-text" in selector
-                            else page.locator(selector)
-                        )
+                        fallback_selector = SunoSelectors.CREATE_BUTTON["fallback"]
+                        button = page.locator(fallback_selector)
                         await button.wait_for(state="visible", timeout=SunoSelectors.CREATE_BUTTON["timeout"])
                         create_button = button
-                        print(f"Found create button with selector: {selector}")
-                        break
-                    except Exception:
-                        print(f"Create button not found with selector: {selector}")
-                        continue
+                        print(f"Found create button with fallback selector: {fallback_selector}")
+                    except Exception as e2:
+                        print(f"Fallback create button selector failed: {e2}")
+
+                        # Try secondary fallback
+                        try:
+                            secondary_selector = SunoSelectors.CREATE_BUTTON["secondary_fallback"]
+                            button = page.locator(secondary_selector)
+                            await button.wait_for(state="visible", timeout=SunoSelectors.CREATE_BUTTON["timeout"])
+                            create_button = button
+                            print(f"Found create button with secondary fallback: {secondary_selector}")
+                        except Exception as e3:
+                            print(f"All create button selectors failed: {e3}")
 
                 if not create_button:
                     raise Exception("Could not find a visible create button.")

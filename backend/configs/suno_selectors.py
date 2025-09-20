@@ -21,10 +21,9 @@ class SunoSelectors:
     }
 
     CREATE_BUTTON = {
-        "selectors": [
-            '[data-testid="create-button"]',
-            'button:has-text("Create")'
-        ],
+        "primary": 'button[type="button"]:has-text("Create"):has(svg)',
+        "fallback": 'button:has(span:has-text("Create"):has(svg))',
+        "secondary_fallback": 'button[class*="rounded-full"]:has-text("Create")',
         "timeout": 5000
     }
 
@@ -37,15 +36,23 @@ class SunoSelectors:
         "timeout": 10000
     }
 
-    TAGS_INPUT = {
-        "primary": 'textarea[data-testid="tag-input-textarea"]',
-        "fallback": 'textarea[placeholder*="style"]',  # Fallback based on placeholder
+    STYLE_INPUT = {
+        # Primary selector combining multiple stable attributes
+        "primary": 'textarea[maxlength="200"][class*="resize-none"]',
+        # Fallback to maxlength only
+        "fallback": 'textarea[maxlength="200"]',
+        # Additional fallback to old data-testid or class pattern
+        "secondary_fallback": 'textarea[data-testid="tag-input-textarea"], textarea.resize-none[class*="outline-none"]',
         "timeout": 10000
     }
 
     TITLE_INPUT = {
-        "primary": 'input[placeholder="Enter song title"]',
-        "fallback": 'input[type="text"][placeholder*="title"]',
+        # Primary selector targeting the second input element (index 1)
+        "primary": 'input[placeholder="Add a song title"]:nth-of-type(2)',
+        # Fallback using nth-match for the second occurrence
+        "fallback": 'input[placeholder="Add a song title"] >> nth=1',
+        # Additional fallback using last-of-type or class combination
+        "secondary_fallback": 'input[placeholder="Add a song title"]:last-of-type',
         "timeout": 10000
     }
 
