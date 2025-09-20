@@ -313,6 +313,12 @@ async def generate_song(
                         raise Exception("Could not fill title input")
 
             print("Creating song...")
+            # Initialize suno_song_id early to avoid UnboundLocalError
+            suno_song_id = None
+            song_ids = []
+            pg1_id = None
+            pg1_ids = []
+
             try:
                 create_button = None
                 # Try primary selector
@@ -440,8 +446,6 @@ async def generate_song(
                         print(f"[DEBUG] Generated temporary ID: {suno_song_id}")
                 else:
                     suno_song_id = song_ids[0]
-                
-                pg1_id = None  # Initialize pg1_id
 
                 # Save both song IDs to progress_v1_tbl for tracking
                 # Suno creates 2 songs per request, we should save both
@@ -563,8 +567,8 @@ async def generate_song(
         return {
             "success": False,
             "error": f"Song generation failed: {str(e)}",
-            "song_id": None,
-            "lyrics": None,
+            "song_id": suno_song_id if 'suno_song_id' in locals() else None,
+            "lyrics": strLyrics if 'strLyrics' in locals() else None,
             "style": strStyle,
             "title": strTitle
         }
