@@ -401,8 +401,8 @@ async def generate_song(
                 
                 song_ids = []
                 try:
-                    # Wait for song rows to be visible
-                    await page.wait_for_selector(SunoSelectors.SONG_ROW, timeout=10000)
+                    # Wait for song cards to be visible (clip-row elements)
+                    await page.wait_for_selector(SunoSelectors.SONG_CARD, timeout=10000)
 
                     # Try multiple selectors to find song elements
                     song_elements = None
@@ -415,24 +415,37 @@ async def generate_song(
                     if song_elements:
                         # Get the first 2 song IDs (indices 0 and 1)
                         for i, element in enumerate(song_elements[:2]):
-                            # Try to get song ID from primary attribute first
-                            song_id = await element.get_attribute(SunoSelectors.SONG_ID_ATTRIBUTES["primary"])
+                            # Extract song ID from the href attribute of the anchor tag
+                            # Format: /song/{song_id}
+                            song_link = await element.query_selector('a[href^="/song/"]')
+                            if song_link:
+                                href = await song_link.get_attribute('href')
+                                if href and href.startswith('/song/'):
+                                    song_id = href.split('/song/')[1].split('/')[0]
+                                    if song_id:
+                                        song_ids.append(song_id)
+                                        print(f"[DEBUG] Extracted song ID at index {i} from href: {song_id}")
 
-                            # If not found, try fallback attribute
-                            if not song_id:
-                                song_id = await element.get_attribute(SunoSelectors.SONG_ID_ATTRIBUTES["fallback"])
-                            
-                            if song_id:
-                                song_ids.append(song_id)
-                                print(f"[DEBUG] Extracted song ID at index {i}: {song_id}")
-                        
+                            # Fallback to old method if href extraction fails
+                            if not song_link or len(song_ids) <= i:
+                                # Try to get song ID from primary attribute first
+                                song_id = await element.get_attribute(SunoSelectors.SONG_ID_ATTRIBUTES["primary"])
+
+                                # If not found, try fallback attribute
+                                if not song_id:
+                                    song_id = await element.get_attribute(SunoSelectors.SONG_ID_ATTRIBUTES["fallback"])
+
+                                if song_id:
+                                    song_ids.append(song_id)
+                                    print(f"[DEBUG] Extracted song ID at index {i} from attribute: {song_id}")
+
                         if len(song_ids) >= 1:
                             suno_song_id = song_ids[0]  # Use the first song ID
                             print(f"[SUCCESS] Using first song ID: {suno_song_id}")
                             if len(song_ids) >= 2:
                                 print(f"[INFO] Second song ID available: {song_ids[1]}")
                         else:
-                            print("[WARNING] No song IDs found in data-clip-id or data-key attributes")
+                            print("[WARNING] No song IDs found in href links or attributes")
                     else:
                         print("[WARNING] No song elements found on page")
                         

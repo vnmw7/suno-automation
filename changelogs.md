@@ -1,3 +1,12 @@
+fix: Update song ID extraction to use href attribute from song links
+
+- Fixed song ID extraction failing due to incorrect selector (was looking for non-existent [data-testid="song-row"])
+- Updated wait selector to use SONG_CARD (div[data-testid="clip-row"].clip-row) instead of SONG_ROW
+- Implemented new extraction method to get song IDs from anchor tag href attributes (format: /song/{song_id})
+- Added robust fallback to legacy attribute-based extraction (data-clip-id, data-key) if href method fails
+- Improved debugging output to clearly identify extraction method used (href vs attribute)
+- Ensures proper song tracking in database with correct Suno song IDs
+
 feat: Update Suno UI selectors to use combined attributes for better stability
 
 - Updated STYLE_INPUT selector to use stable attributes instead of dynamic placeholder text
