@@ -18,6 +18,7 @@ from slugify import slugify
 from camoufox import AsyncCamoufox
 from playwright.async_api import Page, Locator
 from configs.browser_config import config
+from configs.suno_selectors import SunoSelectors
 
 
 class SunoDownloader:
@@ -44,40 +45,27 @@ class SunoDownloader:
     async def _find_options_button(self, page: Page):
         """
         Finds the options/menu button (usually three dots) on the song page.
-        
+
         Args:
             page (Page): Playwright Page instance
-            
+
         Returns:
             Locator: The options button locator if found, None otherwise
         """
         print("Looking for options/menu button...")
-        
-        options_selectors = [
-            'button[aria-label="More Options"]',  # Most specific selector based on actual element
-            'button[aria-label*="More Options"]',
-            'button:has(svg path[d*="M10 6q0-.824.588-1.412"])',  # Match the specific SVG path
-            'button[aria-label*="options"]',
-            'button[aria-label*="menu"]',
-            'button[aria-label*="More"]',
-            'button[data-state="open"]',
-            'button[data-testid*="options"]',
-            'button[data-testid*="menu"]',
-            'button:has(svg[viewBox="0 0 24 24"])',  # More specific viewBox
-            'button:has(svg[data-testid*="dots"])',
-            'button:has(svg[class*="dots"])',
-            '[role="button"]:has(svg)'
-        ]
-        
+
+        options_selectors = SunoSelectors.OPTIONS_BUTTON["selectors"]
+        timeout = SunoSelectors.OPTIONS_BUTTON.get("timeout", 5000)
+
         for selector in options_selectors:
             try:
                 button = page.locator(selector).first
-                await button.wait_for(state="visible", timeout=5000)
+                await button.wait_for(state="visible", timeout=timeout)
                 print(f"Found options button with selector: {selector}")
                 return button
             except Exception:
                 continue
-                
+
         print("Could not find options button with any known selector")
         return None
     
@@ -240,19 +228,14 @@ class SunoDownloader:
 
                                 # Wait for dropdown menu with enhanced detection
                                 print("Waiting for dropdown menu to appear...")
-                                context_menu_selectors = [
-                                    "div[data-radix-menu-content]",
-                                    "div[role='menu']",
-                                    "[data-radix-popper-content-wrapper]",
-                                    "div.radix-menu-content",
-                                    "[role='menu'][data-state='open']",
-                                ]
+                                context_menu_selectors = SunoSelectors.CONTEXT_MENU["selectors"]
 
                                 context_menu = None
+                                context_menu_timeout = SunoSelectors.CONTEXT_MENU.get("timeout", 10000)
                                 for selector in context_menu_selectors:
                                     try:
                                         menu = page.locator(selector).first
-                                        await menu.wait_for(state="visible", timeout=10000)
+                                        await menu.wait_for(state="visible", timeout=context_menu_timeout)
                                         context_menu = menu
                                         print(f"Dropdown menu found with selector: {selector}")
                                         break
@@ -266,17 +249,14 @@ class SunoDownloader:
 
                                 # Find and hover download submenu trigger
                                 print("Locating download submenu trigger...")
-                                download_triggers = [
-                                    '[data-testid="download-sub-trigger"]',
-                                    '*:has-text("Download")',
-                                    '[role="menuitem"]:has-text("Download")',
-                                ]
+                                download_triggers = SunoSelectors.DOWNLOAD_TRIGGER["selectors"]
 
                                 download_trigger = None
+                                download_trigger_timeout = SunoSelectors.DOWNLOAD_TRIGGER.get("timeout", 8000)
                                 for trigger_selector in download_triggers:
                                     try:
                                         trigger = context_menu.locator(trigger_selector)
-                                        await trigger.wait_for(state="visible", timeout=8000)
+                                        await trigger.wait_for(state="visible", timeout=download_trigger_timeout)
                                         download_trigger = trigger
                                         print(f"Found download trigger: {trigger_selector}")
                                         break
@@ -305,18 +285,15 @@ class SunoDownloader:
                                     submenu_selectors.append(
                                         f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
                                     )
-                                submenu_selectors.extend(
-                                    [
-                                        "div[data-radix-menu-content][data-state='open'][role='menu']",
-                                        "*[role='menu'][data-state='open']",
-                                    ]
-                                )
+                                # Add the rest from config
+                                submenu_selectors.extend(SunoSelectors.DOWNLOAD_SUBMENU["selectors"])
 
                                 submenu_panel = None
+                                submenu_timeout = SunoSelectors.DOWNLOAD_SUBMENU.get("timeout", 8000)
                                 for selector in submenu_selectors:
                                     try:
                                         panel = page.locator(selector).last
-                                        await panel.wait_for(state="visible", timeout=8000)
+                                        await panel.wait_for(state="visible", timeout=submenu_timeout)
                                         submenu_panel = panel
                                         print(f"Download submenu panel found: {selector}")
                                         break
@@ -328,17 +305,14 @@ class SunoDownloader:
 
                                 # Find MP3 Audio option
                                 print("Locating MP3 Audio download option...")
-                                mp3_selectors = [
-                                    "div[role='menuitem']:has-text('MP3 Audio')",
-                                    "*:has-text('MP3 Audio')",
-                                    "[data-testid*='mp3']",
-                                ]
+                                mp3_selectors = SunoSelectors.MP3_OPTION["selectors"]
 
                                 mp3_option = None
+                                mp3_timeout = SunoSelectors.MP3_OPTION.get("timeout", 8000)
                                 for selector in mp3_selectors:
                                     try:
                                         option = submenu_panel.locator(selector)
-                                        await option.wait_for(state="visible", timeout=8000)
+                                        await option.wait_for(state="visible", timeout=mp3_timeout)
                                         mp3_option = option
                                         print(f"Found MP3 option: {selector}")
                                         break
@@ -371,17 +345,14 @@ class SunoDownloader:
 
                                         # Check for "Download Anyway" button (premium content warning)
                                         try:
-                                            download_anyway_selectors = [
-                                                'button:has(span:has-text("Download Anyway"))',
-                                                'button:has-text("Download Anyway")',
-                                                '*:has-text("Download Anyway")',
-                                            ]
+                                            download_anyway_selectors = SunoSelectors.DOWNLOAD_ANYWAY_BUTTON["selectors"]
 
+                                            download_anyway_timeout = SunoSelectors.DOWNLOAD_ANYWAY_BUTTON.get("timeout", 10000)
                                             for selector in download_anyway_selectors:
                                                 try:
                                                     anyway_btn = page.locator(selector)
                                                     await anyway_btn.wait_for(
-                                                        state="visible", timeout=10000
+                                                        state="visible", timeout=download_anyway_timeout
                                                     )
                                                     await self.teleport_click(page, anyway_btn)
                                                     print("Clicked 'Download Anyway' button with teleport click.")
@@ -684,17 +655,14 @@ class SunoDownloader:
 
                         # Wait for context menu with enhanced detection
                         print("Waiting for context menu to appear...")
-                        context_menu_selectors = [
-                            "div[data-radix-menu-content][data-state='open']",
-                            "[role='menu'][data-state='open']",
-                            ".context-menu[data-state='open']",
-                        ]
+                        context_menu_selectors = SunoSelectors.CONTEXT_MENU["selectors"]
 
                         context_menu = None
+                        context_menu_timeout = SunoSelectors.CONTEXT_MENU.get("timeout", 10000)
                         for selector in context_menu_selectors:
                             try:
                                 menu = page.locator(selector)
-                                await menu.wait_for(state="visible", timeout=10000)
+                                await menu.wait_for(state="visible", timeout=context_menu_timeout)
                                 context_menu = menu
                                 print(f"Context menu found with selector: {selector}")
                                 break
@@ -708,17 +676,14 @@ class SunoDownloader:
 
                         # Find and hover download submenu trigger
                         print("Locating download submenu trigger...")
-                        download_triggers = [
-                            '[data-testid="download-sub-trigger"]',
-                            '*:has-text("Download")',
-                            '[role="menuitem"]:has-text("Download")',
-                        ]
+                        download_triggers = SunoSelectors.DOWNLOAD_TRIGGER["selectors"]
 
                         download_trigger = None
+                        download_trigger_timeout = SunoSelectors.DOWNLOAD_TRIGGER.get("timeout", 8000)
                         for trigger_selector in download_triggers:
                             try:
                                 trigger = context_menu.locator(trigger_selector)
-                                await trigger.wait_for(state="visible", timeout=8000)
+                                await trigger.wait_for(state="visible", timeout=download_trigger_timeout)
                                 download_trigger = trigger
                                 print(f"Found download trigger: {trigger_selector}")
                                 break
@@ -747,18 +712,15 @@ class SunoDownloader:
                             submenu_selectors.append(
                                 f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
                             )
-                        submenu_selectors.extend(
-                            [
-                                "div[data-radix-menu-content][data-state='open'][role='menu']",
-                                "*[role='menu'][data-state='open']",
-                            ]
-                        )
+                        # Add the rest from config
+                        submenu_selectors.extend(SunoSelectors.DOWNLOAD_SUBMENU["selectors"])
 
                         submenu_panel = None
+                        submenu_timeout = SunoSelectors.DOWNLOAD_SUBMENU.get("timeout", 8000)
                         for selector in submenu_selectors:
                             try:
                                 panel = page.locator(selector).last
-                                await panel.wait_for(state="visible", timeout=8000)
+                                await panel.wait_for(state="visible", timeout=submenu_timeout)
                                 submenu_panel = panel
                                 print(f"Download submenu panel found: {selector}")
                                 break
@@ -770,17 +732,14 @@ class SunoDownloader:
 
                         # Find MP3 Audio option
                         print("Locating MP3 Audio download option...")
-                        mp3_selectors = [
-                            "div[role='menuitem']:has-text('MP3 Audio')",
-                            "*:has-text('MP3 Audio')",
-                            "[data-testid*='mp3']",
-                        ]
+                        mp3_selectors = SunoSelectors.MP3_OPTION["selectors"]
 
                         mp3_option = None
+                        mp3_timeout = SunoSelectors.MP3_OPTION.get("timeout", 8000)
                         for selector in mp3_selectors:
                             try:
                                 option = submenu_panel.locator(selector)
-                                await option.wait_for(state="visible", timeout=8000)
+                                await option.wait_for(state="visible", timeout=mp3_timeout)
                                 mp3_option = option
                                 print(f"Found MP3 option: {selector}")
                                 break
@@ -815,17 +774,14 @@ class SunoDownloader:
 
                                 # Check for "Download Anyway" button (premium content warning)
                                 try:
-                                    download_anyway_selectors = [
-                                        'button:has(span:has-text("Download Anyway"))',
-                                        'button:has-text("Download Anyway")',
-                                        '*:has-text("Download Anyway")',
-                                    ]
+                                    download_anyway_selectors = SunoSelectors.DOWNLOAD_ANYWAY_BUTTON["selectors"]
 
+                                    download_anyway_timeout = SunoSelectors.DOWNLOAD_ANYWAY_BUTTON.get("timeout", 10000)
                                     for selector in download_anyway_selectors:
                                         try:
                                             anyway_btn = page.locator(selector)
                                             await anyway_btn.wait_for(
-                                                state="visible", timeout=10000
+                                                state="visible", timeout=download_anyway_timeout
                                             )
                                             await self.teleport_click(page, anyway_btn)
                                             print("Clicked 'Download Anyway' button with teleport click.")

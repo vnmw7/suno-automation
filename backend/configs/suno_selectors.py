@@ -27,6 +27,80 @@ class SunoSelectors:
         "timeout": 5000
     }
 
+    # Context Menu Selectors
+    OPTIONS_BUTTON = {
+        "selectors": [
+            # New selector based on provided element structure
+            'button.context-menu-button:has(svg path[d*="M6 14q-.824"])',
+            'button[class*="context-menu-button"]:has(svg)',
+            # Original selectors
+            'button[aria-label="More Options"]',
+            'button[aria-label*="More Options"]',
+            'button:has(svg path[d*="M10 6q0-.824.588-1.412"])',
+            'button[aria-label*="options"]',
+            'button[aria-label*="menu"]',
+            'button[aria-label*="More"]',
+            'button[data-state="open"]',
+            'button[data-testid*="options"]',
+            'button[data-testid*="menu"]',
+            'button:has(svg[viewBox="0 0 24 24"])',
+            'button:has(svg[data-testid*="dots"])',
+            'button:has(svg[class*="dots"])',
+            '[role="button"]:has(svg)'
+        ],
+        "timeout": 5000
+    }
+
+    CONTEXT_MENU = {
+        "selectors": [
+            "div[data-radix-menu-content]",
+            "div[role='menu']",
+            "[data-radix-popper-content-wrapper]",
+            "div.radix-menu-content",
+            "[role='menu'][data-state='open']",
+            "div[data-radix-menu-content][data-state='open']",
+            "[role='menu'][data-state='open']",
+            ".context-menu[data-state='open']"
+        ],
+        "timeout": 10000
+    }
+
+    DOWNLOAD_TRIGGER = {
+        "selectors": [
+            '[data-testid="download-sub-trigger"]',
+            '*:has-text("Download")',
+            '[role="menuitem"]:has-text("Download")'
+        ],
+        "timeout": 8000
+    }
+
+    DOWNLOAD_SUBMENU = {
+        "selectors": [
+            # Dynamic selector will be added at runtime based on trigger ID
+            "div[data-radix-menu-content][data-state='open'][role='menu']",
+            "*[role='menu'][data-state='open']"
+        ],
+        "timeout": 8000
+    }
+
+    MP3_OPTION = {
+        "selectors": [
+            "div[role='menuitem']:has-text('MP3 Audio')",
+            "*:has-text('MP3 Audio')",
+            "[data-testid*='mp3']"
+        ],
+        "timeout": 8000
+    }
+
+    DOWNLOAD_ANYWAY_BUTTON = {
+        "selectors": [
+            'button:has(span:has-text("Download Anyway"))',
+            'button:has-text("Download Anyway")',
+            '*:has-text("Download Anyway")'
+        ],
+        "timeout": 10000
+    }
+
     # Input Field Selectors
     LYRICS_INPUT = {
         # Updated selector for new textarea without data-testid
