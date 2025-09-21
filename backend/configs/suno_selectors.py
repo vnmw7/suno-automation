@@ -53,6 +53,14 @@ class SunoSelectors:
 
     CONTEXT_MENU = {
         "selectors": [
+            # New selectors based on provided HTML structure
+            "div[data-context-menu='true']",
+            "div.css-hiwxta.eu96siw0[data-context-menu='true']",
+            "div[data-mouseover-id][data-context-menu='true']",
+            # Fallback to class-based selectors
+            "div.css-hiwxta",
+            "div.eu96siw0",
+            # Original selectors kept as fallback
             "div[data-radix-menu-content]",
             "div[role='menu']",
             "[data-radix-popper-content-wrapper]",
@@ -67,6 +75,11 @@ class SunoSelectors:
 
     DOWNLOAD_TRIGGER = {
         "selectors": [
+            # New selectors based on provided HTML structure
+            'button.context-menu-button:has(span:has-text("MP3 Audio"))',
+            'button.context-menu-button:has(svg path[d*="M9 20a1"])',
+            'button[type="button"].context-menu-button:has(span svg)',
+            # Original selectors as fallback
             '[data-testid="download-sub-trigger"]',
             '*:has-text("Download")',
             '[role="menuitem"]:has-text("Download")'
@@ -76,7 +89,11 @@ class SunoSelectors:
 
     DOWNLOAD_SUBMENU = {
         "selectors": [
-            # Dynamic selector will be added at runtime based on trigger ID
+            # New selectors based on provided HTML structure
+            "div[data-context-menu='true'].css-hiwxta.eu96siw0",
+            "div[data-mouseover-id][data-context-menu='true']",
+            "div.css-1l1uabm.eu96siw2",
+            # Original selectors as fallback
             "div[data-radix-menu-content][data-state='open'][role='menu']",
             "*[role='menu'][data-state='open']"
         ],
@@ -85,6 +102,12 @@ class SunoSelectors:
 
     MP3_OPTION = {
         "selectors": [
+            # New selectors based on provided HTML structure
+            "button.context-menu-button:has(span:has-text('MP3 Audio'))",
+            "button.context-menu-button:has(svg):has-text('MP3 Audio')",
+            "div.context-menu-item button:has-text('MP3 Audio')",
+            "button[type='button']:has(svg path[d*='M9 20a1']):has-text('MP3 Audio')",
+            # Original selectors as fallback
             "div[role='menuitem']:has-text('MP3 Audio')",
             "*:has-text('MP3 Audio')",
             "[data-testid*='mp3']"
@@ -94,6 +117,11 @@ class SunoSelectors:
 
     DOWNLOAD_ANYWAY_BUTTON = {
         "selectors": [
+            # New selectors based on provided HTML structure
+            'button[type="button"].rounded-full:has-text("Download Anyway")',
+            'button.min-w-[200px]:has-text("Download Anyway")',
+            'button.bg-background-tertiary:has-text("Download Anyway")',
+            # Original selectors kept for compatibility
             'button:has(span:has-text("Download Anyway"))',
             'button:has-text("Download Anyway")',
             '*:has-text("Download Anyway")'
