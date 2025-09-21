@@ -13,7 +13,7 @@ from typing import Optional
 from .models import OrchestratorRequest, OrchestratorResponse
 from .utils import execute_song_workflow, download_both_songs
 
-router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
+router = APIRouter(prefix="/api/v1/orchestrator", tags=["orchestrator"])
 
 
 class DownloadTestRequest(BaseModel):

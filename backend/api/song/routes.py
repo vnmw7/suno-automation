@@ -15,7 +15,7 @@ from pathlib import Path
 from .utils import generate_song_handler, download_song_handler
 from utils.delete_song import SongDeleter
 
-router = APIRouter(prefix="/song", tags=["song"])
+router = APIRouter(prefix="/api/v1/song", tags=["song"])
 
 
 class SongReviewRequest(BaseModel):

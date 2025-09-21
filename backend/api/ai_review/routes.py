@@ -11,7 +11,7 @@ import traceback
 import os
 from utils.ai_review import review_song_with_ai
 
-router = APIRouter(prefix="/ai_review", tags=["ai_review"])
+router = APIRouter(prefix="/api/v1/ai_review", tags=["ai_review"])
 
 class SongReviewRequest(BaseModel):
     """Request model for reviewing a song."""

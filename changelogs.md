@@ -1,3 +1,22 @@
+feat: Implement API versioning with /api/v1 prefix for all endpoints
+
+- Updated all API routers to use /api/v1 prefix for better version control
+  - Song Router: /song → /api/v1/song
+  - AI Review Router: /ai_review → /api/v1/ai_review
+  - AI Generation Router: /ai-generation → /api/v1/ai-generation
+  - Orchestrator Router: /orchestrator → /api/v1/orchestrator
+- Download endpoint now available at: POST /api/v1/song/download/
+- Follows REST API best practices for version management
+- Enables future API versioning without breaking existing clients
+
+fix: Update Suno download selectors to correctly identify Download button
+
+- Fixed DOWNLOAD_TRIGGER selectors to target the "Download" button instead of MP3 option
+- Updated selectors to match current Suno UI structure with correct SVG paths
+- Added multiple fallback selectors for Download button with arrow icon
+- Enhanced DOWNLOAD_SUBMENU selectors to better match submenu container structure
+- Improved selector specificity using CSS classes and element attributes
+
 fix: Update song ID extraction to use href attribute from song links
 
 - Fixed song ID extraction failing due to incorrect selector (was looking for non-existent [data-testid="song-row"])

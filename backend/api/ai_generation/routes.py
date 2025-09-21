@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from utils.assign_styles import get_style_by_chapter
 from utils.bible_utils import split_chapter_into_sections
 
-router = APIRouter(prefix="/ai-generation", tags=["ai-generation"])
+router = APIRouter(prefix="/api/v1/ai-generation", tags=["ai-generation"])
 
 
 class VerseRangeRequest(BaseModel):

@@ -75,13 +75,16 @@ class SunoSelectors:
 
     DOWNLOAD_TRIGGER = {
         "selectors": [
-            # New selectors based on provided HTML structure
-            'button.context-menu-button:has(span:has-text("MP3 Audio"))',
-            'button.context-menu-button:has(svg path[d*="M9 20a1"])',
-            'button[type="button"].context-menu-button:has(span svg)',
-            # Original selectors as fallback
-            '[data-testid="download-sub-trigger"]',
-            '*:has-text("Download")',
+            # Primary selector for Download button with arrow icon
+            'button.context-menu-button:has(span:has-text("Download")):has(svg)',
+            'button.context-menu-button:has(svg path[d*="M12 15.575"]):has(span:has-text("Download"))',
+            # More specific selector matching the exact structure
+            'button[type="button"]:has(svg path[d*="M12 15.575q-.2 0-.375"]):has(span.css-s40uml:has-text("Download"))',
+            # Selector with download icon path
+            'button:has(svg path[d*="M6 20q-.824 0-1.412"]):has-text("Download")',
+            # Fallback selectors
+            'button:has-text("Download"):has(svg)',
+            '*:has-text("Download"):has(svg[viewBox="0 0 24 24"])',
             '[role="menuitem"]:has-text("Download")'
         ],
         "timeout": 8000
@@ -89,10 +92,15 @@ class SunoSelectors:
 
     DOWNLOAD_SUBMENU = {
         "selectors": [
-            # New selectors based on provided HTML structure
+            # Primary selector for download submenu container
+            "div.css-1l1uabm.eu96siw2",
+            # Container with MP3 Audio button
+            "div.eu96siw2:has(button:has-text('MP3 Audio'))",
+            # Context menu items container
+            "div:has(> div.context-menu-item button:has-text('MP3 Audio'))",
+            # Alternative selectors
             "div[data-context-menu='true'].css-hiwxta.eu96siw0",
             "div[data-mouseover-id][data-context-menu='true']",
-            "div.css-1l1uabm.eu96siw2",
             # Original selectors as fallback
             "div[data-radix-menu-content][data-state='open'][role='menu']",
             "*[role='menu'][data-state='open']"
