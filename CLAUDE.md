@@ -184,3 +184,84 @@ The names of constants should be in all uppercase form. Use underscore "_" to se
 - Aim to achieve a low coupling, high cohesion, and clean interfaces final product. It is not easy to attain all at the same time but the modularization of the program will be cleaner and easier to maintain.
 - remember to implement version control in backend apis like {backendurl}/api/v1/
 - use virtual environment in @backend\.venv when using python, ex: pip install and server start
+
+## Python Linting Standards (Ruff)
+
+### Import Organization
+- **All imports must be at the top of the file** (before any code execution)
+- Import order should be:
+  1. Standard library imports (`import os, sys, json, re, time, traceback`)
+  2. Third-party imports (`from typing import ...`, `from camoufox import ...`)
+  3. Local application imports (`from configs import ...`, `from utils import ...`)
+- **Never import modules inside functions** unless absolutely necessary for lazy loading
+- If path manipulation is needed for imports, do it immediately after standard library imports
+
+### F-String Usage
+- **F-strings must contain placeholders** - Don't use `f"string"` without variables
+- Correct: `print(f"Value: {variable}")`
+- Wrong: `print(f"Static string")` - use `print("Static string")` instead
+- For complex expressions in logs, use `.format()` method if f-strings become unwieldy
+
+### Common Linting Errors to Avoid
+
+#### F401 - Unused imports
+- Remove any imported modules that aren't used in the code
+- If temporarily keeping for future use, add `# noqa: F401` comment
+
+#### F541 - F-string without placeholders
+```python
+# ❌ Wrong
+print(f"Database operation completed")
+print(f"[INFO] Starting process")
+
+# ✅ Correct
+print("Database operation completed")
+print("[INFO] Starting process")
+print(f"[INFO] Processing {count} items")
+```
+
+#### E402 - Module import not at top
+```python
+# ❌ Wrong
+def some_function():
+    import time  # E402 error
+    return time.time()
+
+# ✅ Correct
+import time  # At top of file
+
+def some_function():
+    return time.time()
+```
+
+### Debugging and Logging Standards
+
+#### Log Message Prefixes
+Use consistent prefixes for different log levels:
+- `[INFO]` - General information
+- `[SUCCESS]` - Successful operations
+- `[WARNING]` - Warnings or fallback operations
+- `[ERROR]` - Errors and exceptions
+- `[DEBUG]` - Detailed debugging information
+- `[ACTION]` - User-facing actions being performed
+- `[DATABASE]` - Database operations
+- `[WORKFLOW]` - Workflow status updates
+
+#### JavaScript in Python Strings
+When building JavaScript expressions for browser automation:
+- **Always escape quotes properly** in selectors
+- Use helper variables for complex escaping:
+```python
+# Escape quotes in selector for JavaScript
+escaped_selector = selector.replace('"', '\\"').replace("'", "\\'")
+expression = f"() => document.querySelectorAll('{escaped_selector}').length"
+```
+
+### Pre-commit Checks
+Before committing, always run:
+```bash
+cd backend
+.venv/Scripts/python.exe -m ruff check .
+```
+
+Fix any issues before proceeding with commits.

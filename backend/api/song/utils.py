@@ -6,14 +6,20 @@ song creation workflow from lyric generation to quality review.
 """
 
 import os
+import sys
 import json
 import re
-import traceback
 import importlib.util
+import traceback
+import time
 from typing import Dict, Any, Union
 from camoufox import AsyncCamoufox
 from configs.browser_config import config
 from configs.suno_selectors import SunoSelectors
+
+# Add path for download module import
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from utils.download_song_v2 import download_song_v2
 
 # TODO: Future Improvements
 # 1. Implement retry logic with exponential backoff for browser automation failures
@@ -195,35 +201,35 @@ async def generate_song(
             i_know_what_im_doing=SunoSelectors.BROWSER_CONFIG["i_know_what_im_doing"],
         ) as browser:
             page = await browser.new_page()
-            print("Navigating to suno.com...")
+            print("[INFO] Navigating to suno.com...")
             await page.goto(SunoSelectors.CREATE_URL)
-            print("Waiting for page to load...")
-            print("Page loaded.")
-            print("Clicking Custom button...")
+            print("[INFO] Waiting for page to load...")
+            print("[SUCCESS] Page loaded.")
+            print("[ACTION] Clicking Custom button...")
 
-            print(f"Current URL before Custom button: {page.url}")
+            print(f"[INFO] Current URL before Custom button: {page.url}")
 
             try:
                 custom_button = page.locator(SunoSelectors.CUSTOM_BUTTON["primary"])
                 await custom_button.wait_for(state="visible", timeout=SunoSelectors.CUSTOM_BUTTON["timeout"])
-                print("Custom button found and visible")
+                print("[INFO] Custom button found and visible")
                 await custom_button.click()
                 await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                print("Custom button clicked successfully")
+                print("[SUCCESS] Custom button clicked successfully")
             except Exception as e:
-                print(f"Error clicking Custom button: {e}")
+                print(f"[WARNING] Error clicking Custom button: {e}")
 
                 try:
                     alt_custom_button = page.locator(SunoSelectors.CUSTOM_BUTTON["fallback"])
                     await alt_custom_button.wait_for(state="visible", timeout=5000)
                     await alt_custom_button.click()
                     await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                    print("Used alternative Custom button selector")
+                    print("[SUCCESS] Used alternative Custom button selector")
                 except Exception as e2:
-                    print(f"Alternative Custom button also failed: {e2}")
+                    print(f"[ERROR] Alternative Custom button also failed: {e2}")
                     raise Exception("Could not find or click Custom button")
 
-            print("Filling strLyrics...")
+            print("[ACTION] Filling strLyrics...")
             try:
                 # Try the primary selector first (new UI)
                 strLyrics_textarea = page.locator(SunoSelectors.LYRICS_INPUT["primary"])
@@ -231,9 +237,9 @@ async def generate_song(
                 await strLyrics_textarea.clear()
                 await strLyrics_textarea.type(strLyrics)
                 await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                print(f"strLyrics filled successfully: {len(strLyrics)} characters")
+                print(f"[SUCCESS] strLyrics filled successfully: {len(strLyrics)} characters")
             except Exception as e:
-                print(f"Primary lyrics selector failed: {e}, trying fallback...")
+                print(f"[WARNING] Primary lyrics selector failed: {e}, trying fallback...")
                 try:
                     # Try fallback selector (old UI)
                     strLyrics_textarea = page.locator(SunoSelectors.LYRICS_INPUT["fallback"])
@@ -241,12 +247,12 @@ async def generate_song(
                     await strLyrics_textarea.clear()
                     await strLyrics_textarea.type(strLyrics)
                     await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                    print(f"strLyrics filled successfully using fallback: {len(strLyrics)} characters")
+                    print(f"[SUCCESS] strLyrics filled successfully using fallback: {len(strLyrics)} characters")
                 except Exception as e2:
-                    print(f"Fallback lyrics selector also failed: {e2}")
+                    print(f"[ERROR] Fallback lyrics selector also failed: {e2}")
                     raise Exception("Could not fill lyrics textarea")
 
-            print("Filling style of music...")
+            print("[ACTION] Filling style of music...")
             try:
                 # Try the primary selector first (new UI)
                 style_textarea = page.locator(SunoSelectors.STYLE_INPUT["primary"])
@@ -254,9 +260,9 @@ async def generate_song(
                 await style_textarea.clear()
                 await style_textarea.type(strStyle)
                 await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                print(f"Style filled successfully: {strStyle}")
+                print(f"[SUCCESS] Style filled successfully: {strStyle}")
             except Exception as e:
-                print(f"Primary style selector failed: {e}, trying fallback...")
+                print(f"[WARNING] Primary style selector failed: {e}, trying fallback...")
                 try:
                     # Try fallback selector (old UI with data-testid)
                     style_textarea = page.locator(SunoSelectors.STYLE_INPUT["fallback"])
@@ -264,9 +270,9 @@ async def generate_song(
                     await style_textarea.clear()
                     await style_textarea.type(strStyle)
                     await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                    print(f"Style filled successfully using fallback: {strStyle}")
+                    print(f"[SUCCESS] Style filled successfully using fallback: {strStyle}")
                 except Exception as e2:
-                    print(f"Fallback style selector failed: {e2}, trying secondary fallback...")
+                    print(f"[WARNING] Fallback style selector failed: {e2}, trying secondary fallback...")
                     try:
                         # Try secondary fallback (maxlength attribute)
                         style_textarea = page.locator(SunoSelectors.STYLE_INPUT["secondary_fallback"])
@@ -274,12 +280,12 @@ async def generate_song(
                         await style_textarea.clear()
                         await style_textarea.type(strStyle)
                         await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                        print(f"Style filled successfully using secondary fallback: {strStyle}")
+                        print(f"[SUCCESS] Style filled successfully using secondary fallback: {strStyle}")
                     except Exception as e3:
-                        print(f"All style selectors failed: {e3}")
+                        print(f"[ERROR] All style selectors failed: {e3}")
                         raise Exception("Could not fill style textarea")
 
-            print("Filling title...")
+            print("[ACTION] Filling title...")
             try:
                 # Try the primary selector first (new UI)
                 title_input = page.locator(SunoSelectors.TITLE_INPUT["primary"])
@@ -287,9 +293,9 @@ async def generate_song(
                 await title_input.clear()
                 await title_input.type(strTitle)
                 await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                print(f"Title filled successfully: {strTitle}")
+                print(f"[SUCCESS] Title filled successfully: {strTitle}")
             except Exception as e:
-                print(f"Primary title selector failed: {e}, trying fallback...")
+                print(f"[WARNING] Primary title selector failed: {e}, trying fallback...")
                 try:
                     # Try fallback selector (old placeholder text)
                     title_input = page.locator(SunoSelectors.TITLE_INPUT["fallback"])
@@ -297,9 +303,9 @@ async def generate_song(
                     await title_input.clear()
                     await title_input.type(strTitle)
                     await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                    print(f"Title filled successfully using fallback: {strTitle}")
+                    print(f"[SUCCESS] Title filled successfully using fallback: {strTitle}")
                 except Exception as e2:
-                    print(f"Fallback title selector failed: {e2}, trying secondary fallback...")
+                    print(f"[WARNING] Fallback title selector failed: {e2}, trying secondary fallback...")
                     try:
                         # Try secondary fallback (partial placeholder match)
                         title_input = page.locator(SunoSelectors.TITLE_INPUT["secondary_fallback"])
@@ -307,12 +313,12 @@ async def generate_song(
                         await title_input.clear()
                         await title_input.type(strTitle)
                         await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
-                        print(f"Title filled successfully using secondary fallback: {strTitle}")
+                        print(f"[SUCCESS] Title filled successfully using secondary fallback: {strTitle}")
                     except Exception as e3:
-                        print(f"All title selectors failed: {e3}")
+                        print(f"[ERROR] All title selectors failed: {e3}")
                         raise Exception("Could not fill title input")
 
-            print("Creating song...")
+            print("[ACTION] Creating song...")
             # Initialize suno_song_id early to avoid UnboundLocalError
             suno_song_id = None
             song_ids = []
@@ -327,9 +333,9 @@ async def generate_song(
                     button = page.locator(primary_selector)
                     await button.wait_for(state="visible", timeout=SunoSelectors.CREATE_BUTTON["timeout"])
                     create_button = button
-                    print(f"Found create button with primary selector: {primary_selector}")
+                    print(f"[INFO] Found create button with primary selector: {primary_selector}")
                 except Exception as e:
-                    print(f"Primary create button selector failed: {e}")
+                    print(f"[WARNING] Primary create button selector failed: {e}")
 
                     # Try fallback selector
                     try:
@@ -337,9 +343,9 @@ async def generate_song(
                         button = page.locator(fallback_selector)
                         await button.wait_for(state="visible", timeout=SunoSelectors.CREATE_BUTTON["timeout"])
                         create_button = button
-                        print(f"Found create button with fallback selector: {fallback_selector}")
+                        print(f"[INFO] Found create button with fallback selector: {fallback_selector}")
                     except Exception as e2:
-                        print(f"Fallback create button selector failed: {e2}")
+                        print(f"[WARNING] Fallback create button selector failed: {e2}")
 
                         # Try secondary fallback
                         try:
@@ -347,36 +353,41 @@ async def generate_song(
                             button = page.locator(secondary_selector)
                             await button.wait_for(state="visible", timeout=SunoSelectors.CREATE_BUTTON["timeout"])
                             create_button = button
-                            print(f"Found create button with secondary fallback: {secondary_selector}")
+                            print(f"[INFO] Found create button with secondary fallback: {secondary_selector}")
                         except Exception as e3:
-                            print(f"All create button selectors failed: {e3}")
+                            print(f"[ERROR] All create button selectors failed: {e3}")
 
                 if not create_button:
                     raise Exception("Could not find a visible create button.")
 
                 song_card_selector = SunoSelectors.SONG_CARD
                 initial_song_count = await page.locator(song_card_selector).count()
-                print(f"Initial song count: {initial_song_count}")
+                print(f"[INFO] Initial song count: {initial_song_count}")
 
                 await create_button.click()
-                print("Create button clicked. Waiting for new songs to appear...")
+                print("[ACTION] Create button clicked. Waiting for new songs to appear...")
 
                 expected_song_count = initial_song_count + 2
                 
                 try:
                     # Wait for the number of songs to increase by 2
-                    expression = f"() => document.querySelectorAll(\"{song_card_selector}\").length >= {expected_song_count}"
+                    # Escape quotes in selector for JavaScript expression
+                    escaped_selector = song_card_selector.replace('"', '\\"').replace("'", "\\'")
+                    expression = f"() => document.querySelectorAll('{escaped_selector}').length >= {expected_song_count}"
+                    print(f"[DEBUG] Waiting for songs with expression: {expression}")
                     await page.wait_for_function(expression, timeout=5000)
 
                     new_song_count = await page.locator(song_card_selector).count()
-                    print(f"New songs detected. Current song count: {new_song_count}")
+                    print(f"[SUCCESS] New songs detected. Current song count: {new_song_count} (Expected: {expected_song_count})")
                 except Exception as e:
                     new_song_count = await page.locator(song_card_selector).count()
                     error_message = f"Timeout waiting for new songs. Initial: {initial_song_count}, Current: {new_song_count}. Error: {e}"
-                    print(error_message)
+                    print(f"[ERROR] {error_message}")
+                    print(f"[DEBUG] Song card selector used: {song_card_selector}")
+                    print(f"[DEBUG] Expression attempted: {expression if 'expression' in locals() else 'Not generated'}")
                     raise Exception(error_message)
 
-                print("Song creation initiated and page loaded.")
+                print("[SUCCESS] Song creation initiated and page loaded.")
 
                 #  wait additional time to ensure song is fully created
                 await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["long"])
@@ -386,7 +397,7 @@ async def generate_song(
 
                 # Extract song IDs from the song list elements
                 # The song IDs are in the data-key attribute of the row elements
-                print("[DEBUG] Attempting to extract song IDs from page elements...")
+                print("[INFO] Attempting to extract song IDs from page elements...")
                 
                 song_ids = []
                 try:
@@ -439,8 +450,7 @@ async def generate_song(
                         print(f"[RARE] Extracted suno_song_id from URL: {suno_song_id}")
                     else:
                         # Generate a temporary ID as last resort
-                        print(f"[FALLBACK] Using temporary ID for database tracking")
-                        import time
+                        print("[FALLBACK] Using temporary ID for database tracking")
                         temp_id = f"pending_{int(time.time())}"
                         suno_song_id = temp_id
                         print(f"[DEBUG] Generated temporary ID: {suno_song_id}")
@@ -449,7 +459,7 @@ async def generate_song(
 
                 # Save both song IDs to progress_v1_tbl for tracking
                 # Suno creates 2 songs per request, we should save both
-                print(f"[DATABASE] Attempting to save both songs to tblprogress_v1...")
+                print("[DATABASE] Attempting to save both songs to tblprogress_v1...")
                 
                 # Prepare data for both songs
                 songs_to_save = []
@@ -489,17 +499,17 @@ async def generate_song(
                     )
                     
                     # DEBUG: Log the full response structure
-                    print(f"[DATABASE] Full response from Supabase:")
-                    print(f"  - response.data: {response.data}")
-                    print(f"  - response.data type: {type(response.data)}")
+                    print("[DATABASE] Full response from Supabase:")
+                    print("  - response.data: {}".format(response.data))
+                    print("  - response.data type: {}".format(type(response.data)))
                     print(f"[DATABASE] Number of records inserted: {len(response.data) if response.data else 0}")
                     
                     # Store all pg1_ids from the response
                     pg1_ids = []
                     if response.data:
-                        print(f"[DATABASE] response.data exists, extracting pg1_ids...")
+                        print("[DATABASE] response.data exists, extracting pg1_ids...")
                         for i, record in enumerate(response.data):
-                            print(f"[DATABASE] Record {i + 1}: {record}")
+                            print("[DATABASE] Record {}: {}".format(i + 1, record))
                             
                             # Try to get pg1_id from the response
                             record_pg1_id = record.get('pg1_id')
@@ -520,30 +530,29 @@ async def generate_song(
                         # Log all available keys for debugging
                         if response.data:
                             print(f"[DATABASE] Available keys in first record: {response.data[0].keys()}")
-                            print(f"[DATABASE] All pg1_ids saved: {pg1_ids}")
+                            print("[DATABASE] All pg1_ids saved: {}".format(pg1_ids))
                     else:
-                        print(f"[DATABASE] WARNING: response.data is empty or None")
+                        print("[DATABASE] WARNING: response.data is empty or None")
                         pg1_id = None
                         
                 except Exception as db_error:
                     print(f"[DATABASE] ERROR saving to Supabase: {db_error}")
                     print(f"[DATABASE] Error type: {type(db_error).__name__}")
-                    import traceback
-                    print(f"[DATABASE] Traceback: {traceback.format_exc()}")
+                    print("[DATABASE] Traceback: {}".format(traceback.format_exc()))
                     # Continue without pg1_id but log the issue
                     pg1_id = None
                 
                 # Validate pg1_id before returning
                 if not pg1_id:
-                    print(f"[WARNING] pg1_id is missing or invalid (value: {pg1_id})")
-                    print(f"[WARNING] This means:")
-                    print(f"[WARNING]   1. Songs were created on Suno.com successfully")
-                    print(f"[WARNING]   2. Database save may have failed OR")
-                    print(f"[WARNING]   3. pg1_id was not returned in the response")
-                    print(f"[WARNING]   4. Review process will use fallback method")
+                    print("[WARNING] pg1_id is missing or invalid (value: {})".format(pg1_id))
+                    print("[WARNING] This means:")
+                    print("[WARNING]   1. Songs were created on Suno.com successfully")
+                    print("[WARNING]   2. Database save may have failed OR")
+                    print("[WARNING]   3. pg1_id was not returned in the response")
+                    print("[WARNING]   4. Review process will use fallback method")
                 else:
-                    print(f"[SUCCESS] pg1_ids successfully obtained: {pg1_ids if 'pg1_ids' in locals() else pg1_id}")
-                    print(f"[SUCCESS] Both songs saved to database for AI review")
+                    print("[SUCCESS] pg1_ids successfully obtained: {}".format(pg1_ids if 'pg1_ids' in locals() else pg1_id))
+                    print("[SUCCESS] Both songs saved to database for AI review")
 
                 # Return both song IDs and all pg1_ids if available
                 return {
@@ -558,11 +567,11 @@ async def generate_song(
                 }
 
             except Exception as e:
-                print(f"Error clicking Create button: {e}")
+                print(f"[ERROR] Error clicking Create button: {e}")
                 raise Exception("Could not click Create button")
 
     except Exception as e:
-        print(f"An error occurred in generate_song: {e}")
+        print(f"[ERROR] An error occurred in generate_song: {e}")
         print(traceback.format_exc())
         return {
             "success": False,
@@ -573,11 +582,7 @@ async def generate_song(
             "title": strTitle
         }
 
-# Import the download module
-import sys
-import os as os_module
-sys.path.insert(0, os_module.path.abspath(os_module.path.join(os_module.path.dirname(__file__), '..', '..')))
-from utils.download_song_v2 import download_song_v2
+# Download module already imported at top of file
 
 # TODO: Implement retry_with_backoff utility function for robust browser operations
 # async def retry_with_backoff(func, max_attempts=3, base_delay=1000):
