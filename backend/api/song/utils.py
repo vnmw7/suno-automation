@@ -234,9 +234,7 @@ async def generate_song(
                 # Try the primary selector first (new UI)
                 strLyrics_textarea = page.locator(SunoSelectors.LYRICS_INPUT["primary"])
                 await strLyrics_textarea.wait_for(state="visible", timeout=SunoSelectors.LYRICS_INPUT["timeout"])
-                await strLyrics_textarea.clear()
-                await strLyrics_textarea.type(strLyrics)
-                await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
+                await strLyrics_textarea.fill(strLyrics)
                 print(f"[SUCCESS] strLyrics filled successfully: {len(strLyrics)} characters")
             except Exception as e:
                 print(f"[WARNING] Primary lyrics selector failed: {e}, trying fallback...")
@@ -244,9 +242,7 @@ async def generate_song(
                     # Try fallback selector (old UI)
                     strLyrics_textarea = page.locator(SunoSelectors.LYRICS_INPUT["fallback"])
                     await strLyrics_textarea.wait_for(state="visible", timeout=5000)
-                    await strLyrics_textarea.clear()
-                    await strLyrics_textarea.type(strLyrics)
-                    await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
+                    await strLyrics_textarea.fill(strLyrics)
                     print(f"[SUCCESS] strLyrics filled successfully using fallback: {len(strLyrics)} characters")
                 except Exception as e2:
                     print(f"[ERROR] Fallback lyrics selector also failed: {e2}")
@@ -259,7 +255,6 @@ async def generate_song(
                 await style_textarea.wait_for(state="visible", timeout=SunoSelectors.STYLE_INPUT["timeout"])
                 await style_textarea.clear()
                 await style_textarea.type(strStyle)
-                await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
                 print(f"[SUCCESS] Style filled successfully: {strStyle}")
             except Exception as e:
                 print(f"[WARNING] Primary style selector failed: {e}, trying fallback...")
@@ -269,7 +264,6 @@ async def generate_song(
                     await style_textarea.wait_for(state="visible", timeout=5000)
                     await style_textarea.clear()
                     await style_textarea.type(strStyle)
-                    await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
                     print(f"[SUCCESS] Style filled successfully using fallback: {strStyle}")
                 except Exception as e2:
                     print(f"[WARNING] Fallback style selector failed: {e2}, trying secondary fallback...")
@@ -279,7 +273,6 @@ async def generate_song(
                         await style_textarea.wait_for(state="visible", timeout=5000)
                         await style_textarea.clear()
                         await style_textarea.type(strStyle)
-                        await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
                         print(f"[SUCCESS] Style filled successfully using secondary fallback: {strStyle}")
                     except Exception as e3:
                         print(f"[ERROR] All style selectors failed: {e3}")
@@ -292,7 +285,6 @@ async def generate_song(
                 await title_input.wait_for(state="visible", timeout=SunoSelectors.TITLE_INPUT["timeout"])
                 await title_input.clear()
                 await title_input.type(strTitle)
-                await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
                 print(f"[SUCCESS] Title filled successfully: {strTitle}")
             except Exception as e:
                 print(f"[WARNING] Primary title selector failed: {e}, trying fallback...")
@@ -302,7 +294,6 @@ async def generate_song(
                     await title_input.wait_for(state="visible", timeout=5000)
                     await title_input.clear()
                     await title_input.type(strTitle)
-                    await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
                     print(f"[SUCCESS] Title filled successfully using fallback: {strTitle}")
                 except Exception as e2:
                     print(f"[WARNING] Fallback title selector failed: {e2}, trying secondary fallback...")
@@ -312,7 +303,6 @@ async def generate_song(
                         await title_input.wait_for(state="visible", timeout=5000)
                         await title_input.clear()
                         await title_input.type(strTitle)
-                        await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["medium"])
                         print(f"[SUCCESS] Title filled successfully using secondary fallback: {strTitle}")
                     except Exception as e3:
                         print(f"[ERROR] All title selectors failed: {e3}")
