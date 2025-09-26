@@ -12,6 +12,8 @@ from typing import Dict, Any, Optional, List
 from pathlib import Path
 from camoufox.async_api import AsyncCamoufox
 from configs.browser_config import config
+from configs.suno_selectors import SunoSelectors
+from configs.suno_selectors import SunoSelectors
 
 
 class SongDeleter:
@@ -215,20 +217,8 @@ class SongDeleter:
     
     async def _find_options_button(self, page):
         """Find the options/menu button on the song page."""
-        selectors = [
-            'div[aria-label="More Options"]',
-            'div[aria-label*="Options"]',
-            'button[aria-label*="options"]',
-            'button[aria-label*="menu"]',
-            'button[aria-label*="more"]',
-            'div:has(svg path[d*="M10 6q0-.824.588-1.412"])',
-            'button:has(svg[class*="dots"])',
-            'button:has([data-icon="ellipsis"])',
-            '[role="button"]:has(svg)',
-            'button[class*="options"]',
-            'button[class*="menu"]'
-        ]
-        
+        selectors = SunoSelectors.OPTIONS_BUTTON.get("selectors", [])
+
         for selector in selectors:
             try:
                 button = page.locator(selector).first
@@ -240,22 +230,8 @@ class SongDeleter:
     
     async def _find_delete_button(self, page):
         """Find the delete button in the options menu."""
-        selectors = [
-            'div[role="menuitem"]:has-text("Move to Trash")',
-            'div[role="menuitem"]:has-text("Trash")',
-            '[role="menuitem"]:has-text("Move to Trash")',
-            '[role="menuitem"]:has-text("Trash")',
-            '[role="menuitem"]:has-text("Delete")',
-            'div[role="menuitem"] span:has-text("Move to Trash")',
-            'button:has-text("Delete")',
-            'button:has-text("delete")',
-            'button:has-text("Trash")',
-            'button:has-text("trash")',
-            'button:has-text("Remove")',
-            'div[role="option"]:has-text("Delete")',
-            'li:has-text("Delete")'
-        ]
-        
+        selectors = SunoSelectors.DELETE_BUTTON.get("selectors", [])
+
         for selector in selectors:
             try:
                 button = page.locator(selector).first

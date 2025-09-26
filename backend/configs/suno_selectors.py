@@ -123,6 +123,32 @@ class SunoSelectors:
         "timeout": 8000
     }
 
+    DELETE_BUTTON = {
+        "selectors": [
+            # Primary selector combining aria-label and context-menu-button class for uniqueness
+            'button[aria-label="Move to Trash"].context-menu-button',
+            # Selector with trash icon SVG path and text
+            'button.context-menu-button:has(svg path[d*="M7.308 20.5a1.74"]):has-text("Move to Trash")',
+            # Type and aria-label combination
+            'button[type="button"][aria-label="Move to Trash"]',
+            # Context menu button with Move to Trash text
+            'button.context-menu-button:has(span:has-text("Move to Trash"))',
+            # Original selectors as fallback
+            'div[role="menuitem"]:has-text("Move to Trash")',
+            'div[role="menuitem"]:has-text("Trash")',
+            '[role="menuitem"]:has-text("Move to Trash")',
+            '[role="menuitem"]:has-text("Trash")',
+            '[role="menuitem"]:has-text("Delete")',
+            'div[role="menuitem"] span:has-text("Move to Trash")',
+            'button:has-text("Delete")',
+            'button:has-text("Trash")',
+            'button:has-text("Remove")',
+            'div[role="option"]:has-text("Delete")',
+            'li:has-text("Delete")'
+        ],
+        "timeout": 5000
+    }
+
     DOWNLOAD_ANYWAY_BUTTON = {
         "selectors": [
             # New selectors based on provided HTML structure
