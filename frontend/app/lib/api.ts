@@ -1,5 +1,5 @@
 const API_BASE_URL = "http://127.0.0.1:8000";
-export const API_SONGS_URL = `${API_BASE_URL}/api/songs`;
+export const API_SONGS_URL = `${API_BASE_URL}/api/v1/songs`;
 import { supabase } from "../lib/supabase";
 
 export interface SongRequest {
@@ -116,7 +116,7 @@ export const generateSong = async (
   try {
     console.log("API request payload:", request);
 
-    const response = await fetch(`${API_BASE_URL}/song/generate`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/song/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -167,7 +167,7 @@ export const generateSongStructure = async (
   try {
     console.log("Song structure API request payload:", request);
 
-    const response = await fetch(`${API_BASE_URL}/ai-generation/song-structure`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/ai-generation/song-structure`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -353,7 +353,7 @@ export const calldownloadSongAPI = async (
   try {
     console.log("API request payload for download-song:", request);
 
-    const response = await fetch(`${API_BASE_URL}/download-song`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/download-song`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -388,7 +388,7 @@ export const downloadSongAPI = async (
   try {
     console.log("API request payload for /song/download:", request);
 
-    const response = await fetch(`${API_BASE_URL}/song/download/`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/song/download/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -458,7 +458,7 @@ export const orchestratorWorkflow = async (
   try {
     console.log("🎼 [API] Orchestrator request payload:", request);
 
-    const response = await fetch(`${API_BASE_URL}/orchestrator/workflow`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/orchestrator/workflow`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -530,7 +530,7 @@ export const fetchManualReviewSongs = async (
 
     console.log("[fetchManualReviewSongs] Fetching songs for manual review:", request);
 
-    const response = await fetch(`${API_BASE_URL}/song/manual-review`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/song/manual-review`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
