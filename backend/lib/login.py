@@ -40,9 +40,10 @@ REQUIRED_ENV_VARS = [
 ]
 missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
 if missing_vars:
-    error_msg = f"ERROR: Missing required environment variables: {', '.join(missing_vars)}. Please set them in your .env file."
-    logger.error(error_msg)
-    sys.exit(1)
+    warning_msg = f"WARNING: Missing environment variables: {', '.join(missing_vars)}. Manual login will be used as fallback."
+    logger.warning(warning_msg)
+    print(f"[WARNING] {warning_msg}")
+    # Don't exit - allow manual fallback
 
 # Global timeout settings (in milliseconds)
 DEFAULT_TIMEOUT = 10000
@@ -109,7 +110,14 @@ async def login_google():
     """
     Logs into a Google account. This robust version handles the redirect to
     myaccount.google.com and uses the URL to determine the login state.
+    Falls back to manual login if credentials are not available.
     """
+    # Check if credentials exist
+    if not GOOGLE_EMAIL or not GOOGLE_PASSWORD:
+        logger.info("No Google credentials found, falling back to manual login")
+        print("[INFO] No Google credentials configured - opening manual login...")
+        return await manual_login_suno()
+
     try:
         async with AsyncCamoufox(
             headless=False,
@@ -193,7 +201,14 @@ async def suno_login_microsoft():
     """
     Logs into Suno using a Microsoft account. This function handles the login process,
     including email verification through Gmail.
+    Falls back to manual login if credentials are not available.
     """
+    # Check if credentials exist
+    if not MICROSOFT_EMAIL or not MICROSOFT_PASSWORD:
+        logger.info("No Microsoft credentials found, falling back to manual login")
+        print("[INFO] No Microsoft credentials configured - opening manual login...")
+        return await manual_login_suno()
+
     try:
         async with AsyncCamoufox(
             headless=False,
@@ -367,6 +382,62 @@ async def suno_login_microsoft():
         else:
             logger.error("Unexpected error during Suno Microsoft login.")
         logger.error(traceback.format_exc())
+        return False
+
+
+async def manual_login_suno():
+    """
+    Opens Suno website and lets user login manually with any provider they choose.
+    System: Suno Automation
+    Module: Manual Login
+    Purpose: Allow users to manually authenticate when automated login fails
+    """
+    try:
+        async with AsyncCamoufox(
+            headless=False,  # Must be visible for manual login
+            persistent_context=True,
+            user_data_dir="backend/camoufox_session_data",
+            os=("windows"),
+            config=config,
+            humanize=True,
+            i_know_what_im_doing=True,
+        ) as browser:
+            page = await browser.new_page()
+
+            logger.info("Opening Suno for manual login...")
+            await page.goto("https://suno.com/home")
+            await page.wait_for_load_state("networkidle", timeout=10000)
+
+            # Click the Sign In button
+            sign_in_selector = 'button:has(span:has-text("Sign In"))'
+
+            if await wait_for_selector(page, sign_in_selector, timeout=5000):
+                await click_button(page, sign_in_selector)
+                logger.info("[ACTION] Please complete login in the browser window...")
+                print("[ACTION] Please complete your login in the browser window...")
+                print("[INFO] You can login with Google, Microsoft, or any other provider")
+                print("[INFO] Waiting for login completion (5 minute timeout)...")
+
+                # Wait for user to complete login (5 minute timeout)
+                # Check for successful login by looking for the Create button
+                create_button_selector = 'button:has(span:has-text("Create"))'
+                try:
+                    await page.wait_for_selector(create_button_selector, timeout=300000)
+                    logger.info("Manual login completed successfully")
+                    print("[SUCCESS] Manual login completed successfully!")
+                    return True
+                except Exception as e:
+                    logger.error(f"Manual login timeout or failed: {str(e)}")
+                    print("[ERROR] Manual login timeout or was cancelled")
+                    return False
+            else:
+                logger.error("Could not find Sign In button")
+                print("[ERROR] Could not find Sign In button on Suno homepage")
+                return False
+
+    except Exception as e:
+        logger.error(f"Error during manual login: {str(e)}")
+        print(f"[ERROR] Error during manual login: {str(e)}")
         return False
 
 

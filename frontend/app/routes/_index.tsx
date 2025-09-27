@@ -131,6 +131,35 @@ export default function Index() {
     }
   };
 
+  const triggerManualLogin = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/manual-login", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const responseData = await response.json();
+      console.log("Manual login response:", responseData);
+
+      if (responseData.success) {
+        console.log("Manual login successful, navigating to /main");
+        navigate("/main");
+      } else {
+        alert("Manual login failed or was cancelled");
+      }
+    } catch (error) {
+      console.error("Manual login failed:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      alert(`Manual login failed. Error: ${errorMessage}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
       <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full mx-4">
@@ -280,6 +309,70 @@ export default function Index() {
                   <path d="M11 11H20V20H11V11Z" fill="#FFB900" />
                 </svg>
                 Login with Microsoft
+              </>
+            )}
+          </button>
+
+          {/* Manual Login Button */}
+          <div className="relative mt-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Or</span>
+            </div>
+          </div>
+
+          <button
+            className={`w-full mt-4 flex items-center justify-center font-bold py-3 px-6 rounded-lg transition-all duration-200 ${
+              isLoading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-gray-600 hover:bg-gray-700 active:bg-gray-800 text-white"
+            }`}
+            onClick={triggerManualLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center">
+                <svg
+                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Connecting...
+              </div>
+            ) : (
+              <>
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                  />
+                </svg>
+                Manual Login (Choose Provider)
               </>
             )}
           </button>
