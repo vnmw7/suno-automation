@@ -165,10 +165,19 @@ class SunoSelectors:
 
     # Input Field Selectors
     LYRICS_INPUT = {
-        # Updated selector for new textarea without data-testid
-        "primary": 'textarea[placeholder="Write some lyrics"]',
-        # Fallback to old selector in case it's still used somewhere
-        "fallback": 'textarea[data-testid="lyrics-input-textarea"]',
+        # Primary: The most robust selector. It finds the "Lyrics" label,
+        # then selects the adjacent container's textarea that also has the unique placeholder.
+        # This is extremely unlikely to fail.
+        "primary": 'div:has(> div div:text-is("Lyrics")) + div textarea[placeholder="Write some lyrics (leave empty for instrumental)"]',
+
+        # Fallback: Per your request, this relies *only* on the structure.
+        # It finds the "Lyrics" label and gets the textarea in the next container,
+        # ignoring the placeholder text completely.
+        "fallback": 'div:has(> div div:text-is("Lyrics")) + div textarea',
+
+        # Secondary Fallback: A simple but effective selector that relies only on the unique placeholder,
+        # in case the structure around the label changes.
+        "secondary_fallback": 'textarea[placeholder="Write some lyrics (leave empty for instrumental)"]',
         "timeout": 10000
     }
 
