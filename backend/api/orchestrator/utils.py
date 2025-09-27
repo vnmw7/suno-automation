@@ -123,11 +123,22 @@ async def execute_song_workflow(
                 print("🎼 [WORKFLOW] Proceeding with download and review using fallback methods...")
                 print("🎼 [WORKFLOW] Manual review will be recommended for these songs")
 
-            # Log successful generation details and extract song_id
+            # Log successful generation details and extract song_ids
             song_id = None
+            song_ids = []  # Array to hold ALL song IDs from generation
             if "result" in generation_result:
-                song_id = generation_result["result"].get("song_id")
-                print(f"🎼 [WORKFLOW] ✅ Generation successful! Song ID: {song_id}, pg1_id: {pg1_id}")
+                result = generation_result["result"]
+                song_id = result.get("song_id")  # Keep for backward compatibility
+                song_ids = result.get("song_ids", [])  # Get ALL song IDs (Suno creates 2)
+
+                # Fallback: if no song_ids array but have single song_id
+                if not song_ids and song_id:
+                    song_ids = [song_id]
+
+                print(f"🎼 [WORKFLOW] ✅ Generation successful!")
+                print(f"🎼 [WORKFLOW] First Song ID: {song_id}")
+                print(f"🎼 [WORKFLOW] All Song IDs: {song_ids}")
+                print(f"🎼 [WORKFLOW] pg1_id: {pg1_id}")
 
             # STEP 2: Wait for Suno processing
             wait_time_seconds = 60
@@ -138,9 +149,10 @@ async def execute_song_workflow(
 
             # STEP 3: Download both songs
             print("🎼 [WORKFLOW] Step 3: Downloading both generated songs...")
-            print(f"🎼 [WORKFLOW] Download parameters: title='{title}', temp_dir='{temp_dir}', song_id='{song_id}'")
+            print(f"🎼 [WORKFLOW] Download parameters: title='{title}', temp_dir='{temp_dir}'")
+            print(f"🎼 [WORKFLOW] Song IDs for downloads: {song_ids if song_ids else 'None available'}")
 
-            download_results = await download_both_songs(title, temp_dir, song_id)
+            download_results = await download_both_songs(title, temp_dir, song_ids)
             
             print(f"🎼 [WORKFLOW] Download result: success={download_results.get('success')}, songs_downloaded={len(download_results.get('downloads', []))}")
             
@@ -321,13 +333,13 @@ async def generate_songs(book_name: str, chapter: int, verse_range: str, style: 
         return {"success": False, "error": f"Song generation exception: {str(e)}"}
 
 
-async def download_both_songs(title: str, temp_dir: str, song_id: str = None) -> Dict[str, Any]:
+async def download_both_songs(title: str, temp_dir: str, song_ids: list = None) -> Dict[str, Any]:
     """Download both songs using negative indexing (-1, -2) with enhanced V2 downloader.
 
     Args:
         title: Song title to search for
         temp_dir: Directory to save downloads
-        song_id: Optional song ID for direct navigation to song page
+        song_ids: Optional list of song IDs for direct navigation to song pages
     """
     try:
         from utils.download_song_v2 import download_song_v2
@@ -339,8 +351,12 @@ async def download_both_songs(title: str, temp_dir: str, song_id: str = None) ->
         print("📥 [DOWNLOAD-1] Starting download for song at index -1 (newest)")
         print(f"📥 [DOWNLOAD-1] Title: '{title}'")
         print(f"📥 [DOWNLOAD-1] Temp directory: '{temp_dir}'")
-        if song_id:
-            print(f"📥 [DOWNLOAD-1] Using song_id for direct navigation: {song_id}")
+
+        # Use first song_id if available
+        first_song_id = song_ids[0] if song_ids and len(song_ids) > 0 else None
+
+        if first_song_id:
+            print(f"📥 [DOWNLOAD-1] Using song_id for direct navigation: {first_song_id}")
         else:
             print("📥 [DOWNLOAD-1] No song_id available, will navigate to /me page")
 
@@ -349,7 +365,7 @@ async def download_both_songs(title: str, temp_dir: str, song_id: str = None) ->
             strTitle=title,
             intIndex=-1,
             download_path=temp_dir,
-            song_id=song_id  # Pass song_id for direct page navigation
+            song_id=first_song_id  # Pass first song_id for direct page navigation
         )
 
         print("📥 [DOWNLOAD-1] Download completed")
@@ -359,11 +375,11 @@ async def download_both_songs(title: str, temp_dir: str, song_id: str = None) ->
             downloaded_songs.append({
                 "file_path": download_1["file_path"],
                 "title": title,
-                "song_id": download_1.get("song_id") or song_id
+                "song_id": download_1.get("song_id") or first_song_id
             })
             print("📥 [DOWNLOAD-1] ✅ Successfully downloaded")
             print(f"📥 [DOWNLOAD-1] File path: {download_1['file_path']}")
-            print(f"📥 [DOWNLOAD-1] Song ID: {download_1.get('song_id') or song_id}")
+            print(f"📥 [DOWNLOAD-1] Song ID: {download_1.get('song_id') or first_song_id}")
             if os.path.exists(download_1['file_path']):
                 file_size = os.path.getsize(download_1['file_path'])
                 print(f"📥 [DOWNLOAD-1] File size: {file_size:,} bytes")
@@ -377,14 +393,21 @@ async def download_both_songs(title: str, temp_dir: str, song_id: str = None) ->
         print("📥 [DOWNLOAD-2] Starting download for song at index -2 (second newest)")
         print(f"📥 [DOWNLOAD-2] Title: '{title}'")
         print(f"📥 [DOWNLOAD-2] Temp directory: '{temp_dir}'")
-        print("📥 [DOWNLOAD-2] No song_id (downloading different variant)")
+
+        # Use second song_id if available
+        second_song_id = song_ids[1] if song_ids and len(song_ids) > 1 else None
+
+        if second_song_id:
+            print(f"📥 [DOWNLOAD-2] Using song_id for direct navigation: {second_song_id}")
+        else:
+            print("📥 [DOWNLOAD-2] No second song_id available, will navigate to /me page")
 
         print("📥 [DOWNLOAD-2] Calling download_song_v2...")
         download_2 = await download_song_v2(
             strTitle=title,
             intIndex=-2,
             download_path=temp_dir,
-            song_id=None
+            song_id=second_song_id  # Pass second song_id for direct page navigation
         )
 
         print("📥 [DOWNLOAD-2] Download completed")

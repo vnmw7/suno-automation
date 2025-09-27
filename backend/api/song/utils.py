@@ -357,21 +357,24 @@ async def generate_song(
                 await create_button.click()
                 print("[ACTION] Create button clicked. Waiting for new songs to appear...")
 
-                expected_song_count = initial_song_count + 2
-                
+                # Wait for at least 2 new songs (Suno may create 2-4 songs)
+                minimum_expected = initial_song_count + 2
+
                 try:
-                    # Wait for the number of songs to increase by 2
+                    # Wait for the number of songs to increase by at least 2
                     # Escape quotes in selector for JavaScript expression
                     escaped_selector = song_card_selector.replace('"', '\\"').replace("'", "\\'")
-                    expression = f"() => document.querySelectorAll('{escaped_selector}').length >= {expected_song_count}"
-                    print(f"[DEBUG] Waiting for songs with expression: {expression}")
+                    expression = f"() => document.querySelectorAll('{escaped_selector}').length >= {minimum_expected}"
+                    print(f"[DEBUG] Waiting for at least 2 new songs with expression: {expression}")
                     await page.wait_for_function(expression, timeout=5000)
 
                     new_song_count = await page.locator(song_card_selector).count()
-                    print(f"[SUCCESS] New songs detected. Current song count: {new_song_count} (Expected: {expected_song_count})")
+                    new_songs_created = new_song_count - initial_song_count
+                    print(f"[SUCCESS] New songs detected. Current total: {new_song_count}, New songs created: {new_songs_created}")
                 except Exception as e:
                     new_song_count = await page.locator(song_card_selector).count()
-                    error_message = f"Timeout waiting for new songs. Initial: {initial_song_count}, Current: {new_song_count}. Error: {e}"
+                    new_songs_created = new_song_count - initial_song_count
+                    error_message = f"Timeout waiting for new songs. Initial: {initial_song_count}, Current: {new_song_count}, New songs: {new_songs_created}. Error: {e}"
                     print(f"[ERROR] {error_message}")
                     print(f"[DEBUG] Song card selector used: {song_card_selector}")
                     print(f"[DEBUG] Expression attempted: {expression if 'expression' in locals() else 'Not generated'}")
@@ -403,8 +406,16 @@ async def generate_song(
                             break
                     
                     if song_elements:
-                        # Get the first 2 song IDs (indices 0 and 1)
-                        for i, element in enumerate(song_elements[:2]):
+                        # Get only the NEW songs (skip initial songs)
+                        new_song_elements = song_elements[initial_song_count:] if len(song_elements) > initial_song_count else song_elements
+                        print(f"[DEBUG] Total songs: {len(song_elements)}, Initial: {initial_song_count}, New songs: {len(new_song_elements)}")
+
+                        # From the NEW songs, take the last 2 (regular songs, not premium previews)
+                        target_songs = new_song_elements[-2:] if len(new_song_elements) >= 2 else new_song_elements
+                        print(f"[DEBUG] Targeting last {len(target_songs)} of {len(new_song_elements)} new songs")
+
+                        # Extract song IDs from the target songs
+                        for i, element in enumerate(target_songs):
                             # Extract song ID from the href attribute of the anchor tag
                             # Format: /song/{song_id}
                             song_link = await element.query_selector('a[href^="/song/"]')
@@ -414,7 +425,7 @@ async def generate_song(
                                     song_id = href.split('/song/')[1].split('/')[0]
                                     if song_id:
                                         song_ids.append(song_id)
-                                        print(f"[DEBUG] Extracted song ID at index {i} from href: {song_id}")
+                                        print(f"[DEBUG] Extracted song ID from new song {i+1} (href): {song_id}")
 
                             # Fallback to old method if href extraction fails
                             if not song_link or len(song_ids) <= i:
@@ -427,7 +438,7 @@ async def generate_song(
 
                                 if song_id:
                                     song_ids.append(song_id)
-                                    print(f"[DEBUG] Extracted song ID at index {i} from attribute: {song_id}")
+                                    print(f"[DEBUG] Extracted song ID from new song {i+1} (attribute): {song_id}")
 
                         if len(song_ids) >= 1:
                             suno_song_id = song_ids[0]  # Use the first song ID
@@ -466,7 +477,7 @@ async def generate_song(
                 
                 # Prepare data for both songs
                 songs_to_save = []
-                for idx, song_id in enumerate(song_ids[:2]):  # Take up to 2 song IDs
+                for idx, song_id in enumerate(song_ids):  # Process all extracted song IDs (should be 2)
                     print(f"[DATABASE] Data to save for song {idx + 1}:")
                     print(f"  - pg1_song_struct_id: {song_structure_id}")
                     print(f"  - pg1_song_id: {song_id}")
