@@ -354,7 +354,7 @@ async def manual_review_endpoint(request: ManualReviewRequest):
         print(f"[manual_review_endpoint] Searching for songs with slug: {search_slug}")
         
         # Define the review directory path
-        review_dir = Path("songs/final_review")
+        review_dir = Path("backend/songs/final_review")
         
         # Ensure directory exists
         if not review_dir.exists():
