@@ -357,6 +357,10 @@ async def generate_song(
                 await create_button.click()
                 print("[ACTION] Create button clicked. Waiting for new songs to appear...")
 
+                # Add 6 second wait to ensure songs are fully created
+                await page.wait_for_timeout(6000)
+                print("[INFO] Waited 6 seconds for songs to be fully rendered")
+
                 # Wait for at least 2 new songs (Suno may create 2-4 songs)
                 minimum_expected = initial_song_count + 2
 
@@ -385,89 +389,107 @@ async def generate_song(
                 #  wait additional time to ensure song is fully created
                 await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["long"])
 
-                #  get the song id from the newly generated 2 songs
-                #  NOTE: Suno creates 2 songs per request, we will take the first 2 in the index
+                #  get the song id from the newly generated songs
+                #  NOTE: Suno creates 2 songs per request, positioned at the TOP of the list
 
-                # Extract song IDs from the song list elements
-                # The song IDs are in the data-key attribute of the row elements
-                print("[INFO] Attempting to extract song IDs from page elements...")
-                
+                # Extract song IDs from the TOP of the song list (newest first)
+                print("[INFO] Extracting song IDs from top of feed (newest first)...")
+
                 song_ids = []
                 try:
-                    # Wait for song cards to be visible (clip-row elements)
+                    # Wait for song cards to be visible
                     await page.wait_for_selector(SunoSelectors.SONG_CARD, timeout=10000)
 
-                    # Try multiple selectors to find song elements
-                    song_elements = None
+                    # Get all song elements (newest are at the top)
+                    all_song_elements = []
                     for selector in SunoSelectors.SONG_ELEMENT_SELECTORS:
-                        song_elements = await page.query_selector_all(selector)
-                        if song_elements:
-                            print(f"Found song elements using selector: {selector}")
+                        all_song_elements = await page.query_selector_all(selector)
+                        if all_song_elements:
+                            print(f"[DEBUG] Found song elements using selector: {selector}")
                             break
-                    
-                    if song_elements:
-                        # Get only the NEW songs (skip initial songs)
-                        new_song_elements = song_elements[initial_song_count:] if len(song_elements) > initial_song_count else song_elements
-                        print(f"[DEBUG] Total songs: {len(song_elements)}, Initial: {initial_song_count}, New songs: {len(new_song_elements)}")
 
-                        # From the NEW songs, take the last 2 (regular songs, not premium previews)
-                        target_songs = new_song_elements[-2:] if len(new_song_elements) >= 2 else new_song_elements
-                        print(f"[DEBUG] Targeting last {len(target_songs)} of {len(new_song_elements)} new songs")
+                    print(f"[DEBUG] Total song elements found: {len(all_song_elements)}")
 
-                        # Extract song IDs from the target songs
-                        for i, element in enumerate(target_songs):
-                            # Extract song ID from the href attribute of the anchor tag
-                            # Format: /song/{song_id}
-                            song_link = await element.query_selector('a[href^="/song/"]')
-                            if song_link:
-                                href = await song_link.get_attribute('href')
-                                if href and href.startswith('/song/'):
-                                    song_id = href.split('/song/')[1].split('/')[0]
-                                    if song_id:
-                                        song_ids.append(song_id)
-                                        print(f"[DEBUG] Extracted song ID from new song {i+1} (href): {song_id}")
+                    # Check the top 4 songs (Suno typically generates 2, but may create up to 4)
+                    # We check extra to ensure we catch all new songs even if some are premium
+                    candidate_elements = all_song_elements[:4] if len(all_song_elements) >= 4 else all_song_elements
+                    print(f"[DEBUG] Examining top {len(candidate_elements)} songs for new non-premium songs")
 
-                            # Fallback to old method if href extraction fails
-                            if not song_link or len(song_ids) <= i:
-                                # Try to get song ID from primary attribute first
-                                song_id = await element.get_attribute(SunoSelectors.SONG_ID_ATTRIBUTES["primary"])
+                    non_premium_songs = []
 
-                                # If not found, try fallback attribute
-                                if not song_id:
-                                    song_id = await element.get_attribute(SunoSelectors.SONG_ID_ATTRIBUTES["fallback"])
+                    for idx, element in enumerate(candidate_elements):
+                        # Check for premium preview indicator
+                        is_premium = False
+                        premium_indicator = await element.query_selector('span.css-1mqmbav.er4jr4i10')
 
+                        if premium_indicator:
+                            text_content = await premium_indicator.text_content()
+                            if text_content and "v5 Preview" in text_content:
+                                print(f"[DEBUG] Song {idx+1} is a premium preview - skipping")
+                                is_premium = True
+
+                        if not is_premium:
+                            non_premium_songs.append(element)
+                            print(f"[DEBUG] Song {idx+1} is a standard song - will extract ID")
+
+                            # Stop after finding 2 non-premium songs
+                            if len(non_premium_songs) >= 2:
+                                break
+
+                    print(f"[INFO] Found {len(non_premium_songs)} non-premium songs from top of list")
+
+                    # Extract song IDs from the non-premium songs
+                    for i, element in enumerate(non_premium_songs):
+                        song_id = None
+
+                        # Method 1: Try extracting from href (most reliable)
+                        song_link = await element.query_selector('a[href^="/song/"]')
+                        if song_link:
+                            href = await song_link.get_attribute('href')
+                            if href and href.startswith('/song/'):
+                                song_id = href.split('/song/')[1].split('/')[0]
                                 if song_id:
                                     song_ids.append(song_id)
-                                    print(f"[DEBUG] Extracted song ID from new song {i+1} (attribute): {song_id}")
+                                    print(f"[SUCCESS] Extracted song ID {i+1} from href: {song_id}")
 
-                        if len(song_ids) >= 1:
-                            suno_song_id = song_ids[0]  # Use the first song ID
-                            print(f"[SUCCESS] Using first song ID: {suno_song_id}")
-                            if len(song_ids) >= 2:
-                                print(f"[INFO] Second song ID available: {song_ids[1]}")
-                        else:
-                            print("[WARNING] No song IDs found in href links or attributes")
+                        # Method 2: Fallback to data-key attribute
+                        if not song_id:
+                            song_id = await element.get_attribute('data-key')
+                            if song_id:
+                                song_ids.append(song_id)
+                                print(f"[SUCCESS] Extracted song ID {i+1} from data-key: {song_id}")
+
+                        # Method 3: Final fallback to other attributes
+                        if not song_id:
+                            song_id = await element.get_attribute(SunoSelectors.SONG_ID_ATTRIBUTES["primary"])
+                            if not song_id:
+                                song_id = await element.get_attribute(SunoSelectors.SONG_ID_ATTRIBUTES["fallback"])
+
+                            if song_id:
+                                song_ids.append(song_id)
+                                print(f"[SUCCESS] Extracted song ID {i+1} from fallback attribute: {song_id}")
+
+                        if not song_id:
+                            print(f"[WARNING] Could not extract song ID from non-premium song {i+1}")
+
+                    if song_ids:
+                        suno_song_id = song_ids[0]
+                        print(f"[SUCCESS] Primary song ID: {suno_song_id}")
+                        if len(song_ids) > 1:
+                            print(f"[SUCCESS] Secondary song ID: {song_ids[1]}")
                     else:
-                        print("[WARNING] No song elements found on page")
-                        
+                        print("[WARNING] No valid song IDs found in top songs")
+
                 except Exception as e:
-                    print(f"[ERROR] Failed to extract song IDs from page: {e}")
-                
-                # Fallback: Check URL (unlikely to work with current Suno behavior)
+                    print(f"[ERROR] Failed to extract song IDs: {e}")
+                    traceback.print_exc()
+
+                # Fallback logic if no IDs were extracted
                 if not song_ids:
-                    current_url = page.url
-                    print(f"[DEBUG] Current URL after song creation: {current_url}")
-                    
-                    if "suno.com/song/" in current_url:
-                        # This path is rarely taken since Suno doesn't redirect anymore
-                        suno_song_id = current_url.split("suno.com/song/")[1].split("/")[0]
-                        print(f"[RARE] Extracted suno_song_id from URL: {suno_song_id}")
-                    else:
-                        # Generate a temporary ID as last resort
-                        print("[FALLBACK] Using temporary ID for database tracking")
-                        temp_id = f"pending_{int(time.time())}"
-                        suno_song_id = temp_id
-                        print(f"[DEBUG] Generated temporary ID: {suno_song_id}")
+                    print("[FALLBACK] Using temporary ID for database tracking")
+                    temp_id = f"pending_{int(time.time())}"
+                    suno_song_id = temp_id
+                    print(f"[DEBUG] Generated temporary ID: {suno_song_id}")
                 else:
                     suno_song_id = song_ids[0]
 
