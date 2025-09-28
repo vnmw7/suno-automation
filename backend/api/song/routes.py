@@ -15,7 +15,7 @@ from pathlib import Path
 from .utils import generate_song_handler, download_song_handler
 from utils.delete_song import SongDeleter
 
-router = APIRouter(prefix="/song", tags=["song"])
+router = APIRouter(prefix="/api/v1/song", tags=["song"])
 
 
 class SongReviewRequest(BaseModel):
@@ -354,7 +354,7 @@ async def manual_review_endpoint(request: ManualReviewRequest):
         print(f"[manual_review_endpoint] Searching for songs with slug: {search_slug}")
         
         # Define the review directory path
-        review_dir = Path("songs/final_review")
+        review_dir = Path("backend/songs/final_review")
         
         # Ensure directory exists
         if not review_dir.exists():

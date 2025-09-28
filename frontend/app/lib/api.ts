@@ -48,6 +48,21 @@ export interface SongReviewRequest {
   song_structure_id: number;
 }
 
+// Delete song interfaces
+export interface DeleteSongRequest {
+  song_id?: string;
+  file_path?: string;
+  delete_from_suno: boolean;
+}
+
+export interface DeleteSongResponse {
+  success: boolean;
+  local_deleted: boolean;
+  suno_deleted: boolean;
+  errors: string[];
+  message: string;
+}
+
 export interface SongReviewResponse {
   success: boolean;
   verdict: string;  // "continue", "re-roll", or "error"
@@ -100,7 +115,7 @@ export interface OrchestratorResponse {
   good_songs?: number;
   re_rolled_songs?: number;
   error?: string;
-  workflow_details?: any;
+  workflow_details?: Record<string, unknown>;
 }
 
 export interface SongResponse {
@@ -116,7 +131,7 @@ export const generateSong = async (
   try {
     console.log("API request payload:", request);
 
-    const response = await fetch(`${API_BASE_URL}/song/generate`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/song/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -167,7 +182,7 @@ export const generateSongStructure = async (
   try {
     console.log("Song structure API request payload:", request);
 
-    const response = await fetch(`${API_BASE_URL}/ai-generation/song-structure`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/ai-generation/song-structure`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -353,7 +368,7 @@ export const calldownloadSongAPI = async (
   try {
     console.log("API request payload for download-song:", request);
 
-    const response = await fetch(`${API_BASE_URL}/download-song`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/download-song`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -388,7 +403,7 @@ export const downloadSongAPI = async (
   try {
     console.log("API request payload for /song/download:", request);
 
-    const response = await fetch(`${API_BASE_URL}/song/download/`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/song/download/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -458,7 +473,7 @@ export const orchestratorWorkflow = async (
   try {
     console.log("🎼 [API] Orchestrator request payload:", request);
 
-    const response = await fetch(`${API_BASE_URL}/orchestrator/workflow`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/orchestrator/workflow`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -530,7 +545,7 @@ export const fetchManualReviewSongs = async (
 
     console.log("[fetchManualReviewSongs] Fetching songs for manual review:", request);
 
-    const response = await fetch(`${API_BASE_URL}/song/manual-review`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/song/manual-review`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -565,6 +580,73 @@ export const fetchManualReviewSongs = async (
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "An unknown error occurred while fetching manual review songs" 
+    };
+  }
+};
+
+// Delete a song locally and from Suno.com
+export const deleteSong = async (
+  songId?: string,
+  filePath?: string
+): Promise<DeleteSongResponse> => {
+  try {
+    // Validate that at least one identifier is provided
+    if (!songId && !filePath) {
+      return {
+        success: false,
+        local_deleted: false,
+        suno_deleted: false,
+        errors: ["Either song_id or file_path must be provided"],
+        message: "Either song_id or file_path must be provided"
+      };
+    }
+
+    const request: DeleteSongRequest = {
+      song_id: songId,
+      file_path: filePath,
+      delete_from_suno: true // Always delete from both local and Suno
+    };
+
+    console.log("[deleteSong] Sending delete request:", request);
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/song/delete`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        detail: `HTTP error! status: ${response.status}`
+      }));
+
+      console.error("[deleteSong] Error response:", errorData);
+
+      return {
+        success: false,
+        local_deleted: false,
+        suno_deleted: false,
+        errors: [errorData.detail || errorData.error || `Failed to delete song (${response.status})`],
+        message: errorData.detail || errorData.error || `Failed to delete song (${response.status})`
+      };
+    }
+
+    const data: DeleteSongResponse = await response.json();
+
+    console.log("[deleteSong] Delete response:", data);
+
+    return data;
+  } catch (error) {
+    console.error("[deleteSong] Failed to delete song:", error);
+
+    return {
+      success: false,
+      local_deleted: false,
+      suno_deleted: false,
+      errors: [error instanceof Error ? error.message : "An unknown error occurred while deleting song"],
+      message: error instanceof Error ? error.message : "An unknown error occurred while deleting song"
     };
   }
 };

@@ -13,6 +13,7 @@ import re
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from configs.browser_config import config
+from utils.camoufox_actions import CamoufoxActions
 
 # Ensure the logs directory exists
 log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
@@ -40,9 +41,10 @@ REQUIRED_ENV_VARS = [
 ]
 missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
 if missing_vars:
-    error_msg = f"ERROR: Missing required environment variables: {', '.join(missing_vars)}. Please set them in your .env file."
-    logger.error(error_msg)
-    sys.exit(1)
+    warning_msg = f"WARNING: Missing environment variables: {', '.join(missing_vars)}. Manual login will be used as fallback."
+    logger.warning(warning_msg)
+    print(f"[WARNING] {warning_msg}")
+    # Don't exit - allow manual fallback
 
 # Global timeout settings (in milliseconds)
 DEFAULT_TIMEOUT = 10000
@@ -53,6 +55,10 @@ GOOGLE_EMAIL = os.getenv("GOOGLE_EMAIL")
 GOOGLE_PASSWORD = os.getenv("GOOGLE_PASSWORD")
 MICROSOFT_EMAIL = os.getenv("MICROSOFT_EMAIL")
 MICROSOFT_PASSWORD = os.getenv("MICROSOFT_PASSWORD")
+
+# Manual login configuration
+MANUAL_LOGIN_TIMEOUT = int(os.getenv("MANUAL_LOGIN_TIMEOUT", "300"))  # 5 minutes default
+KEEP_BROWSER_OPEN = os.getenv("KEEP_BROWSER_OPEN", "false").lower() == "true"
 
 
 async def wait_for_selector(page, selector, timeout=DEFAULT_TIMEOUT, state="visible"):
@@ -65,10 +71,29 @@ async def wait_for_selector(page, selector, timeout=DEFAULT_TIMEOUT, state="visi
         return False
 
 
-async def fill_input(page, selector, value, timeout=DEFAULT_TIMEOUT):
-    """Helper function to fill an input field with a value."""
+async def fill_input(page, selector, value, timeout=DEFAULT_TIMEOUT, use_teleport=False):
+    """Helper function to fill an input field with a value.
+
+    Args:
+        page: Playwright page instance
+        selector: CSS selector for the input field
+        value: Text to fill into the field
+        timeout: Maximum wait time in milliseconds
+        use_teleport: Whether to use teleport fill for instant action
+    """
     try:
         if await wait_for_selector(page, selector, timeout):
+            if use_teleport:
+                # Try teleport fill first for instant response
+                locator = page.locator(selector)
+                success = await CamoufoxActions.teleport_fill(page, locator, value, debug=False)
+                if success:
+                    logger.info(f"Teleport filled input field for selector '{selector}'")
+                    return True
+                else:
+                    logger.warning(f"Teleport fill failed, falling back to regular fill for '{selector}'")
+
+            # Regular fill (either as fallback or primary method)
             await page.locator(selector).fill(value)
             logger.info(f"Filled input field for selector '{selector}'")
             return True
@@ -78,10 +103,28 @@ async def fill_input(page, selector, value, timeout=DEFAULT_TIMEOUT):
         return False
 
 
-async def click_button(page, selector, timeout=DEFAULT_TIMEOUT):
-    """Helper function to click a button on the page."""
+async def click_button(page, selector, timeout=DEFAULT_TIMEOUT, use_teleport=False):
+    """Helper function to click a button on the page.
+
+    Args:
+        page: Playwright page instance
+        selector: CSS selector for the button
+        timeout: Maximum wait time in milliseconds
+        use_teleport: Whether to use teleport click for instant action
+    """
     try:
         if await wait_for_selector(page, selector, timeout):
+            if use_teleport:
+                # Try teleport click first for instant response
+                locator = page.locator(selector)
+                success = await CamoufoxActions.teleport_click(page, locator, debug=False)
+                if success:
+                    logger.info(f"Teleport clicked button with selector '{selector}'")
+                    return True
+                else:
+                    logger.warning(f"Teleport click failed, falling back to regular click for '{selector}'")
+
+            # Regular click (either as fallback or primary method)
             await page.locator(selector).click()
             logger.info(f"Clicked button with selector '{selector}'")
             return True
@@ -104,12 +147,73 @@ async def check_logged_in_state(page, logged_in_selector, timeout=DEFAULT_TIMEOU
         return False
 
 
+async def is_truly_logged_in_suno(page):
+    """
+    Helper function to reliably detect if user is logged into Suno.
+    Uses multiple indicators for robust detection.
+
+    Returns:
+        tuple: (is_logged_in: bool, confidence: str)
+               confidence can be 'high', 'medium', or 'low'
+    """
+    try:
+        # Most reliable: Credits element (only appears when logged in)
+        credits_selector = 'a[href="/account"]:has-text("Credits")'
+        credits_exists = await page.locator(credits_selector).count() > 0
+
+        if credits_exists:
+            return True, 'high'
+
+        # Strong indicator: Profile menu with actual user avatar
+        profile_with_avatar = 'div[data-testid="profile-menu-button"][aria-label="Profile menu button"] img[alt][src*="cdn"]'
+        avatar_exists = await page.locator(profile_with_avatar).count() > 0
+
+        # Check if sign in button is gone
+        sign_in_selectors = [
+            'button:has-text("Sign In")',
+            'button:has-text("Sign in")',
+            'button:has-text("Log in")'
+        ]
+        sign_in_gone = all([await page.locator(sel).count() == 0 for sel in sign_in_selectors])
+
+        # Check for create link
+        create_link = 'a[href="/create"]:has-text("Create")'
+        create_exists = await page.locator(create_link).count() > 0
+
+        # High confidence: avatar + create link + no sign in
+        if avatar_exists and create_exists and sign_in_gone:
+            return True, 'high'
+
+        # Medium confidence: avatar OR create exists AND sign in gone
+        if (avatar_exists or create_exists) and sign_in_gone:
+            return True, 'medium'
+
+        # Low confidence: just checking URL (not reliable alone)
+        if "/create" in page.url or "/home" in page.url:
+            # Only if sign in is also gone
+            if sign_in_gone:
+                return True, 'low'
+
+        return False, 'none'
+
+    except Exception as e:
+        logger.debug(f"Error in login detection: {str(e)}")
+        return False, 'none'
+
+
 # Login to Google (Corrected Version - Uses URL for state detection)
 async def login_google():
     """
     Logs into a Google account. This robust version handles the redirect to
     myaccount.google.com and uses the URL to determine the login state.
+    Falls back to manual login if credentials are not available.
     """
+    # Check if credentials exist
+    if not GOOGLE_EMAIL or not GOOGLE_PASSWORD:
+        logger.info("No Google credentials found, falling back to manual login")
+        print("[INFO] No Google credentials configured - opening manual login...")
+        return await manual_login_suno()
+
     try:
         async with AsyncCamoufox(
             headless=False,
@@ -193,7 +297,14 @@ async def suno_login_microsoft():
     """
     Logs into Suno using a Microsoft account. This function handles the login process,
     including email verification through Gmail.
+    Falls back to manual login if credentials are not available.
     """
+    # Check if credentials exist
+    if not MICROSOFT_EMAIL or not MICROSOFT_PASSWORD:
+        logger.info("No Microsoft credentials found, falling back to manual login")
+        print("[INFO] No Microsoft credentials configured - opening manual login...")
+        return await manual_login_suno()
+
     try:
         async with AsyncCamoufox(
             headless=False,
@@ -368,6 +479,168 @@ async def suno_login_microsoft():
             logger.error("Unexpected error during Suno Microsoft login.")
         logger.error(traceback.format_exc())
         return False
+
+
+async def manual_login_suno():
+    """
+    Opens Suno website and lets user login manually with any provider they choose.
+    System: Suno Automation
+    Module: Manual Login
+    Purpose: Allow users to manually authenticate when automated login fails
+    """
+    browser = None
+    try:
+        # Create browser instance outside of async with to control lifecycle
+        browser = await AsyncCamoufox(
+            headless=False,  # Must be visible for manual login
+            persistent_context=True,
+            user_data_dir="backend/camoufox_session_data",
+            os=("windows"),
+            config=config,
+            humanize=True,
+            i_know_what_im_doing=True,
+        ).start()
+
+        page = await browser.new_page()
+
+        logger.info("Opening Suno for manual login...")
+        await page.goto("https://suno.com/home")
+        await page.wait_for_load_state("networkidle", timeout=10000)
+
+        # Click the Sign In button using teleport for faster response
+        sign_in_selector = 'button:has(span:has-text("Sign In"))'
+
+        if await wait_for_selector(page, sign_in_selector, timeout=5000):
+            # Use teleport click for instant response
+            sign_in_button = page.locator(sign_in_selector)
+            click_success = await CamoufoxActions.teleport_click(page, sign_in_button, debug=False)
+
+            if not click_success:
+                # Fallback to regular click if teleport fails
+                logger.warning("Teleport click failed, using regular click")
+                await click_button(page, sign_in_selector)
+            else:
+                logger.info("Sign In button clicked using teleport click")
+
+            # Add initial delay to allow login modal/options to appear
+            await page.wait_for_timeout(3000)  # 3 seconds for modal to appear
+            logger.info("Waiting for provider selection...")
+
+            logger.info("[ACTION] Please complete login in the browser window...")
+            print("\n" + "="*60)
+            print("[ACTION] Please complete your login in the browser window")
+            print("[INFO] You can login with Google, Microsoft, or any other provider")
+            print(f"[INFO] Waiting for login completion ({MANUAL_LOGIN_TIMEOUT//60} minute timeout)")
+            print("="*60 + "\n")
+
+            # Keep checking for login success with periodic status updates
+            max_wait_seconds = MANUAL_LOGIN_TIMEOUT
+            check_interval = 2  # Check every 2 seconds
+            elapsed_seconds = 0
+            last_message_time = 0
+            oauth_started = False
+            stable_login_checks = 0
+            required_stable_checks = 2  # Need 2 consecutive positive checks
+
+            while elapsed_seconds < max_wait_seconds:
+                try:
+                    current_url = page.url
+
+                    # Track OAuth redirect to external providers
+                    if not oauth_started:
+                        oauth_providers = ['accounts.google.com', 'login.microsoftonline.com', 'discord.com', 'facebook.com', 'apple.com']
+                        if any(provider in current_url for provider in oauth_providers):
+                            oauth_started = True
+                            logger.info(f"OAuth authentication detected: {current_url}")
+                            print("[INFO] External authentication in progress...")
+
+                    # Only check for success after initial delay OR OAuth has started
+                    if elapsed_seconds > 5 or oauth_started:
+                        # Use the helper function for cleaner, more maintainable detection
+                        is_logged_in, confidence = await is_truly_logged_in_suno(page)
+
+                        # Accept high confidence always, medium confidence after OAuth started
+                        if is_logged_in and (confidence == 'high' or (oauth_started and confidence in ['medium', 'low'])):
+                            stable_login_checks += 1
+                            logger.debug(f"Positive login check #{stable_login_checks}")
+
+                            if stable_login_checks >= required_stable_checks:
+                                logger.info(f"Manual login completed successfully (confidence: {confidence}, stable detection)")
+                                print("\n" + "="*60)
+                                print("[SUCCESS] Manual login completed successfully!")
+                                print(f"[INFO] Login confirmed with {confidence} confidence")
+                                print("[INFO] You are now logged in to Suno")
+                                if KEEP_BROWSER_OPEN:
+                                    print("[INFO] Browser will remain open (KEEP_BROWSER_OPEN=true)")
+                                print("="*60 + "\n")
+
+                                # Give a moment for session to stabilize
+                                await page.wait_for_timeout(2000)
+                                return True
+                        else:
+                            stable_login_checks = 0  # Reset if check fails
+
+                    # Check if browser/page is still alive
+                    try:
+                        # Simple check to see if page is still responsive
+                        await page.evaluate("() => document.title")
+                    except Exception:
+                        logger.info("Browser window was closed by user")
+                        print("\n[INFO] Browser window was closed")
+                        return False
+
+                    # Show progress message every 30 seconds
+                    if elapsed_seconds - last_message_time >= 30:
+                        remaining = max_wait_seconds - elapsed_seconds
+                        minutes = remaining // 60
+                        seconds = remaining % 60
+                        print(f"[INFO] Still waiting for login... {minutes}m {seconds}s remaining")
+                        last_message_time = elapsed_seconds
+
+                    await page.wait_for_timeout(check_interval * 1000)
+                    elapsed_seconds += check_interval
+
+                except Exception as check_error:
+                    # Page might have navigated or changed, continue checking
+                    logger.debug(f"Check error (continuing): {str(check_error)}")
+                    await page.wait_for_timeout(check_interval * 1000)
+                    elapsed_seconds += check_interval
+
+            # Timeout reached
+            logger.error("Manual login timeout after 5 minutes")
+            print("\n" + "="*60)
+            print("[ERROR] Manual login timeout after 5 minutes")
+            print("[INFO] Please try again or check your internet connection")
+            print("="*60 + "\n")
+            return False
+
+        else:
+            # Check if already logged in using the helper function
+            is_logged_in, confidence = await is_truly_logged_in_suno(page)
+
+            if is_logged_in and confidence in ['high', 'medium']:
+                logger.info(f"Already logged in to Suno (confidence: {confidence})")
+                print("[SUCCESS] Already logged in to Suno!")
+                return True
+
+            logger.error("Could not find Sign In button")
+            print("[ERROR] Could not find Sign In button on Suno homepage")
+            return False
+
+    except Exception as e:
+        logger.error(f"Error during manual login: {str(e)}")
+        print(f"[ERROR] Error during manual login: {str(e)}")
+        return False
+    finally:
+        # Ensure browser is properly closed (unless configured to keep open)
+        if browser and not KEEP_BROWSER_OPEN:
+            try:
+                await browser.close()
+                logger.info("Browser closed")
+            except Exception:
+                pass  # Browser might already be closed
+        elif browser and KEEP_BROWSER_OPEN:
+            logger.info("Browser kept open as configured (KEEP_BROWSER_OPEN=true)")
 
 
 if __name__ == "__main__":

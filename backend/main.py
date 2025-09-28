@@ -83,6 +83,25 @@ async def login_with_microsoft_endpoint():
     return {"success": is_successful}
 
 
+@app.post("/api/v1/auth/manual-login")
+async def manual_login_endpoint():
+    """
+    System: Suno Automation
+    Module: Manual Login Endpoint
+    Purpose: Triggers manual login flow - opens browser for user to login
+
+    This endpoint opens the Suno website and allows users to manually
+    authenticate with any provider of their choice.
+
+    Returns:
+        dict: A dictionary indicating the success status of the manual login.
+    """
+    from lib.login import manual_login_suno
+
+    is_successful = await manual_login_suno()
+    return {"success": is_successful, "method": "manual"}
+
+
 @app.get("/debug/song-structures")
 def debug_song_structures_endpoint():
     """

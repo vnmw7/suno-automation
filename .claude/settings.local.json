@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(powershell -Command \"Copy-Item -Path ([Environment]::ExpandEnvironmentVariables(''%USERPROFILE%\\.camoufox'')) -Destination ''dist\\suno-automation-backend\\.camoufox'' -Recurse -Force; Write-Host ''Camoufox browser copied successfully''\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path ([Environment]::GetFolderPath(''LocalApplicationData'')) -Filter ''*camoufox*'' -Directory -Recurse -ErrorAction SilentlyContinue | Select-Object -First 5 | ForEach-Object { Write-Host $_FullName }\")",
+      "Bash(powershell:*)",
+      "Bash(dir .venvLibsite-packagescamoufox /s /b)",
+      "Bash(findstr:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

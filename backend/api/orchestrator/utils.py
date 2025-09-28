@@ -1,10 +1,16 @@
+"""
+System: Suno Automation
+Module: Orchestrator Utils
+Purpose: Coordinate generation, download, review, and verdict handling including remote deletion.
+"""
+
 import os
 import shutil
 import asyncio
 import traceback
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from utils.delete_song import SongDeleter, delete_song
+from utils.delete_song import delete_song
 
 
 async def execute_song_workflow(
@@ -82,7 +88,7 @@ async def execute_song_workflow(
         
         try:
             # STEP 1: Generate Song (creates 2 songs on Suno)
-            print(f"🎼 [WORKFLOW] Step 1: Generating songs...")
+            print("🎼 [WORKFLOW] Step 1: Generating songs...")
             print(f"🎼 [WORKFLOW] Parameters: book={book_name}, chapter={chapter}, verse={verse_range}, style={style}, title={title}")
             
             generation_result = await generate_songs(
@@ -112,16 +118,27 @@ async def execute_song_workflow(
             # Missing pg1_id is common due to Suno not redirecting to song page
             if not pg1_id or pg1_id == 0:
                 print(f"🎼 [WORKFLOW] ⚠️ WARNING: pg1_id is missing or invalid: {pg1_id}")
-                print(f"🎼 [WORKFLOW] This is EXPECTED if Suno didn't redirect to song page")
-                print(f"🎼 [WORKFLOW] Songs were generated but database tracking may be incomplete.")
-                print(f"🎼 [WORKFLOW] Proceeding with download and review using fallback methods...")
-                print(f"🎼 [WORKFLOW] Manual review will be recommended for these songs")
+                print("🎼 [WORKFLOW] This is EXPECTED if Suno didn't redirect to song page")
+                print("🎼 [WORKFLOW] Songs were generated but database tracking may be incomplete.")
+                print("🎼 [WORKFLOW] Proceeding with download and review using fallback methods...")
+                print("🎼 [WORKFLOW] Manual review will be recommended for these songs")
 
-            # Log successful generation details and extract song_id
+            # Log successful generation details and extract song_ids
             song_id = None
+            song_ids = []  # Array to hold ALL song IDs from generation
             if "result" in generation_result:
-                song_id = generation_result["result"].get("song_id")
-                print(f"🎼 [WORKFLOW] ✅ Generation successful! Song ID: {song_id}, pg1_id: {pg1_id}")
+                result = generation_result["result"]
+                song_id = result.get("song_id")  # Keep for backward compatibility
+                song_ids = result.get("song_ids", [])  # Get ALL song IDs (Suno creates 2)
+
+                # Fallback: if no song_ids array but have single song_id
+                if not song_ids and song_id:
+                    song_ids = [song_id]
+
+                print("🎼 [WORKFLOW] ✅ Generation successful!")
+                print(f"🎼 [WORKFLOW] First Song ID: {song_id}")
+                print(f"🎼 [WORKFLOW] All Song IDs: {song_ids}")
+                print(f"🎼 [WORKFLOW] pg1_id: {pg1_id}")
 
             # STEP 2: Wait for Suno processing
             wait_time_seconds = 60
@@ -131,10 +148,11 @@ async def execute_song_workflow(
             print(f"🎼 [WORKFLOW] ⏰ Wait completed at: {asyncio.get_event_loop().time()}")
 
             # STEP 3: Download both songs
-            print(f"🎼 [WORKFLOW] Step 3: Downloading both generated songs...")
-            print(f"🎼 [WORKFLOW] Download parameters: title='{title}', temp_dir='{temp_dir}', song_id='{song_id}'")
+            print("🎼 [WORKFLOW] Step 3: Downloading both generated songs...")
+            print(f"🎼 [WORKFLOW] Download parameters: title='{title}', temp_dir='{temp_dir}'")
+            print(f"🎼 [WORKFLOW] Song IDs for downloads: {song_ids if song_ids else 'None available'}")
 
-            download_results = await download_both_songs(title, temp_dir, song_id)
+            download_results = await download_both_songs(title, temp_dir, song_ids)
             
             print(f"🎼 [WORKFLOW] Download result: success={download_results.get('success')}, songs_downloaded={len(download_results.get('downloads', []))}")
             
@@ -164,7 +182,7 @@ async def execute_song_workflow(
             workflow_details["total_songs_reviewed"] += len(review_results)
             
             # STEP 5: Process verdicts and handle files
-            print(f"🎼 [WORKFLOW] Step 5: Processing review verdicts...")
+            print("🎼 [WORKFLOW] Step 5: Processing review verdicts...")
             
             # Special handling for final attempt to preserve songs for fail-safe
             if attempt == max_attempts:
@@ -235,7 +253,7 @@ async def execute_song_workflow(
     # Only activate fail-safe if we have some songs AND no songs made it through
     if final_attempt_songs and workflow_details["songs_kept"] == 0 and final_preserved > 0:
         print(f"🎼 [WORKFLOW] 🛡️ EMERGENCY FAIL-SAFE: Found {final_preserved} preserved songs from errors")
-        print(f"🎼 [WORKFLOW] 🛡️ Note: All re-roll songs were deleted as they had critical failures")
+        print("🎼 [WORKFLOW] 🛡️ Note: All re-roll songs were deleted as they had critical failures")
 
         # Only move preserved songs (those with errors, not re-rolls that were deleted)
         preserved_songs = []
@@ -315,13 +333,13 @@ async def generate_songs(book_name: str, chapter: int, verse_range: str, style: 
         return {"success": False, "error": f"Song generation exception: {str(e)}"}
 
 
-async def download_both_songs(title: str, temp_dir: str, song_id: str = None) -> Dict[str, Any]:
+async def download_both_songs(title: str, temp_dir: str, song_ids: list = None) -> Dict[str, Any]:
     """Download both songs using negative indexing (-1, -2) with enhanced V2 downloader.
 
     Args:
         title: Song title to search for
         temp_dir: Directory to save downloads
-        song_id: Optional song ID for direct navigation to song page
+        song_ids: Optional list of song IDs for direct navigation to song pages
     """
     try:
         from utils.download_song_v2 import download_song_v2
@@ -329,44 +347,88 @@ async def download_both_songs(title: str, temp_dir: str, song_id: str = None) ->
         downloaded_songs = []
 
         # Download song at index -1 (last/newest song)
-        print(f"🎼 [DOWNLOAD] Downloading song at index -1 using V2 downloader...")
-        if song_id:
-            print(f"🎼 [DOWNLOAD] Using song_id for direct navigation: {song_id}")
+        print("\n📥 [DOWNLOAD-1] ===========")
+        print("📥 [DOWNLOAD-1] Starting download for song at index -1 (newest)")
+        print(f"📥 [DOWNLOAD-1] Title: '{title}'")
+        print(f"📥 [DOWNLOAD-1] Temp directory: '{temp_dir}'")
+
+        # Use first song_id if available
+        first_song_id = song_ids[0] if song_ids and len(song_ids) > 0 else None
+
+        if first_song_id:
+            print(f"📥 [DOWNLOAD-1] Using song_id for direct navigation: {first_song_id}")
+        else:
+            print("📥 [DOWNLOAD-1] No song_id available, will navigate to /me page")
+
+        print("📥 [DOWNLOAD-1] Calling download_song_v2...")
         download_1 = await download_song_v2(
             strTitle=title,
             intIndex=-1,
             download_path=temp_dir,
-            song_id=song_id  # Pass song_id for direct page navigation
+            song_id=first_song_id  # Pass first song_id for direct page navigation
         )
+
+        print("📥 [DOWNLOAD-1] Download completed")
+        print(f"📥 [DOWNLOAD-1] Success: {download_1['success']}")
 
         if download_1["success"]:
             downloaded_songs.append({
                 "file_path": download_1["file_path"],
                 "title": title,
-                "song_id": song_id  # Include song_id for potential remote deletion
+                "song_id": download_1.get("song_id") or first_song_id
             })
-            print(f"🎼 [DOWNLOAD] Successfully downloaded song -1: {download_1['file_path']}")
+            print("📥 [DOWNLOAD-1] ✅ Successfully downloaded")
+            print(f"📥 [DOWNLOAD-1] File path: {download_1['file_path']}")
+            print(f"📥 [DOWNLOAD-1] Song ID: {download_1.get('song_id') or first_song_id}")
+            if os.path.exists(download_1['file_path']):
+                file_size = os.path.getsize(download_1['file_path'])
+                print(f"📥 [DOWNLOAD-1] File size: {file_size:,} bytes")
         else:
-            print(f"🎼 [DOWNLOAD] Failed to download song -1: {download_1.get('error')}")
+            print("📥 [DOWNLOAD-1] ❌ Failed to download")
+            print(f"📥 [DOWNLOAD-1] Error: {download_1.get('error')}")
+        print("📥 [DOWNLOAD-1] ===========\n")
 
         # Download song at index -2 (second to last song)
-        print(f"🎼 [DOWNLOAD] Downloading song at index -2 using V2 downloader...")
+        print("\n📥 [DOWNLOAD-2] ===========")
+        print("📥 [DOWNLOAD-2] Starting download for song at index -2 (second newest)")
+        print(f"📥 [DOWNLOAD-2] Title: '{title}'")
+        print(f"📥 [DOWNLOAD-2] Temp directory: '{temp_dir}'")
+
+        # Use second song_id if available
+        second_song_id = song_ids[1] if song_ids and len(song_ids) > 1 else None
+
+        if second_song_id:
+            print(f"📥 [DOWNLOAD-2] Using song_id for direct navigation: {second_song_id}")
+        else:
+            print("📥 [DOWNLOAD-2] No second song_id available, will navigate to /me page")
+
+        print("📥 [DOWNLOAD-2] Calling download_song_v2...")
         download_2 = await download_song_v2(
             strTitle=title,
             intIndex=-2,
             download_path=temp_dir,
-            song_id=song_id  # Pass song_id for direct page navigation
+            song_id=second_song_id  # Pass second song_id for direct page navigation
         )
+
+        print("📥 [DOWNLOAD-2] Download completed")
+        print(f"📥 [DOWNLOAD-2] Success: {download_2['success']}")
 
         if download_2["success"]:
             downloaded_songs.append({
                 "file_path": download_2["file_path"],
                 "title": title,
-                "song_id": song_id  # Include song_id for potential remote deletion
+                "song_id": download_2.get("song_id")
             })
-            print(f"🎼 [DOWNLOAD] Successfully downloaded song -2: {download_2['file_path']}")
+            print("📥 [DOWNLOAD-2] ✅ Successfully downloaded")
+            print(f"📥 [DOWNLOAD-2] File path: {download_2['file_path']}")
+            print(f"📥 [DOWNLOAD-2] Song ID: {download_2.get('song_id', 'Not extracted')}")
+            if os.path.exists(download_2['file_path']):
+                file_size = os.path.getsize(download_2['file_path'])
+                print(f"📥 [DOWNLOAD-2] File size: {file_size:,} bytes")
         else:
-            print(f"🎼 [DOWNLOAD] Failed to download song -2: {download_2.get('error')}")
+            print("📥 [DOWNLOAD-2] ❌ Failed to download")
+            print(f"📥 [DOWNLOAD-2] Error: {download_2.get('error')}")
+        print("📥 [DOWNLOAD-2] ===========\n")
 
         if len(downloaded_songs) == 0:
             return {
@@ -375,7 +437,7 @@ async def download_both_songs(title: str, temp_dir: str, song_id: str = None) ->
                 "downloads": []
             }
         elif len(downloaded_songs) == 1:
-            print(f"🎼 [DOWNLOAD] Warning: Only downloaded 1 of 2 songs")
+            print("🎼 [DOWNLOAD] Warning: Only downloaded 1 of 2 songs")
 
         return {
             "success": True,
@@ -425,10 +487,10 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
         # pg1_id is required to fetch the original lyrics from database for comparison
         if not pg1_id or pg1_id == 0:
             print(f"🎼 [REVIEW] ⚠️ pg1_id is missing ({pg1_id}) for review: {file_path}")
-            print(f"🎼 [REVIEW] REASON: Suno.com doesn't redirect to song page after creation")
-            print(f"🎼 [REVIEW] IMPACT: Cannot fetch original lyrics for AI comparison")
-            print(f"🎼 [REVIEW] FALLBACK: Using simplified review without lyrics comparison...")
-            print(f"🎼 [REVIEW] RECOMMENDATION: Manual review required for quality assurance")
+            print("🎼 [REVIEW] REASON: Suno.com doesn't redirect to song page after creation")
+            print("🎼 [REVIEW] IMPACT: Cannot fetch original lyrics for AI comparison")
+            print("🎼 [REVIEW] FALLBACK: Using simplified review without lyrics comparison...")
+            print("🎼 [REVIEW] RECOMMENDATION: Manual review required for quality assurance")
             
             # Simplified review when database lookup isn't possible
             # In production, this could trigger a basic audio quality check
@@ -463,13 +525,13 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
             print(f"🎼 [REVIEW-ERROR] Error message: {review_result['error']}")
         
         if review_result.get('first_response'):
-            print(f"\n📝 [AI-RESPONSE-1] First AI Response (Transcription):")
+            print("\n📝 [AI-RESPONSE-1] First AI Response (Transcription):")
             print(f"{'─'*40}")
             print(review_result['first_response'][:500] + '...' if len(review_result.get('first_response', '')) > 500 else review_result.get('first_response', ''))
             print(f"{'─'*40}")
         
         if review_result.get('second_response'):
-            print(f"\n📝 [AI-RESPONSE-2] Second AI Response (Comparison):")
+            print("\n📝 [AI-RESPONSE-2] Second AI Response (Comparison):")
             print(f"{'─'*40}")
             print(review_result['second_response'][:500] + '...' if len(review_result.get('second_response', '')) > 500 else review_result.get('second_response', ''))
             print(f"{'─'*40}")
@@ -489,7 +551,7 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
         return []
 
     # Process reviews sequentially to respect API rate limits
-    print(f"\n🎼 [REVIEW-QUEUE] Starting sequential processing...")
+    print("\n🎼 [REVIEW-QUEUE] Starting sequential processing...")
     print(f"🎼 [REVIEW-QUEUE] Songs in queue: {[os.path.basename(s['file_path']) for s in downloaded_songs]}")
     final_results = []
     
@@ -510,20 +572,20 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
                     from config.ai_review_config import DELAY_BETWEEN_SONGS
                     wait_time = DELAY_BETWEEN_SONGS
                 except ImportError:
-                    wait_time = 65  # Fallback: Wait 65 seconds between songs
+                    wait_time = 10  # Fallback: Wait 10 seconds between songs (Gemini Flash)
                 print(f"\n⏳ [RATE-LIMIT] Waiting {wait_time} seconds before next review...")
-                print(f"⏳ [RATE-LIMIT] Reason: Respecting API rate limits (Free tier: 2 RPM for Gemini Pro)")
+                print("⏳ [RATE-LIMIT] Reason: Respecting API rate limits (Free tier: 15 RPM for Gemini Flash)")
                 for remaining in range(wait_time, 0, -10):
                     print(f"⏳ [RATE-LIMIT] Time remaining: {remaining} seconds...")
                     await asyncio.sleep(min(10, remaining))
                 
         except Exception as e:
             error_msg = f"Exception during review for {song['file_path']}: {e}"
-            print(f"\n❌ [REVIEW-ERROR] Critical error occurred!")
+            print("\n❌ [REVIEW-ERROR] Critical error occurred!")
             print(f"❌ [REVIEW-ERROR] Song: {os.path.basename(song['file_path'])}")
             print(f"❌ [REVIEW-ERROR] Error type: {type(e).__name__}")
             print(f"❌ [REVIEW-ERROR] Error message: {str(e)}")
-            print(f"❌ [REVIEW-ERROR] Full traceback:")
+            print("❌ [REVIEW-ERROR] Full traceback:")
             print(traceback.format_exc())
             final_results.append({
                 "file_path": song["file_path"],
@@ -645,7 +707,7 @@ async def send_prompt_to_google_ai(
         Optional[str]: AI-generated text response on success, None on failure
     """
     try:
-        from middleware.gemini import model_pro
+        from middleware.gemini import model_flash
         
         # Build contents array
         contents = []
@@ -677,7 +739,7 @@ async def send_prompt_to_google_ai(
             "max_output_tokens": 8192,
         }
 
-        response = await model_pro.generate_content_async(
+        response = await model_flash.generate_content_async(
             contents, generation_config=generation_config
         )
 
@@ -711,7 +773,6 @@ async def review_song_with_ai(
             - audio_file (str): Path to reviewed audio file
     """
     try:
-        import os
         import json
         import traceback
         from services.supabase_service import SupabaseService
@@ -814,10 +875,10 @@ async def review_song_with_ai(
             from backend.config.ai_review_config import DELAY_BETWEEN_API_CALLS
             wait_time = DELAY_BETWEEN_API_CALLS
         except ImportError:
-            wait_time = 30  # Fallback: 30 seconds for Gemini Pro free tier
+            wait_time = 5  # Fallback: 5 seconds for Gemini Flash free tier
         
         print(f"⏳ [RATE-LIMIT] Waiting {wait_time} seconds after file upload...")
-        print(f"⏳ [RATE-LIMIT] Reason: Respecting API rate limits between upload and first prompt")
+        print("⏳ [RATE-LIMIT] Reason: Respecting API rate limits between upload and first prompt")
         for remaining in range(wait_time, 0, -10):
             print(f"⏳ [RATE-LIMIT] Time remaining: {remaining} seconds...")
             await asyncio.sleep(min(10, remaining))
@@ -848,10 +909,10 @@ async def review_song_with_ai(
             from backend.config.ai_review_config import DELAY_BETWEEN_API_CALLS
             wait_time = DELAY_BETWEEN_API_CALLS
         except ImportError:
-            wait_time = 30  # Fallback: 30 seconds for Gemini Pro free tier
+            wait_time = 5  # Fallback: 5 seconds for Gemini Flash free tier
         
         print(f"⏳ [RATE-LIMIT] Waiting {wait_time} seconds before second prompt...")
-        print(f"⏳ [RATE-LIMIT] Reason: Respecting API rate limits between first and second prompt")
+        print("⏳ [RATE-LIMIT] Reason: Respecting API rate limits between first and second prompt")
         for remaining in range(wait_time, 0, -10):
             print(f"⏳ [RATE-LIMIT] Time remaining: {remaining} seconds...")
             await asyncio.sleep(min(10, remaining))
@@ -958,7 +1019,7 @@ async def call_review_api(file_path: str, pg1_id: int) -> Dict[str, Any]:
         print(f"🎼 [REVIEW_API] Starting review for: {file_path}")
         print(f"🎼 [REVIEW_API] Using pg1_id: {pg1_id}")
         print(f"🎼 [REVIEW_API-DEBUG] pg1_id type: {type(pg1_id)}")
-        print(f"🎼 [REVIEW_API-DEBUG] Will attempt to fetch from tblprogress_v1 with this ID")
+        print("🎼 [REVIEW_API-DEBUG] Will attempt to fetch from tblprogress_v1 with this ID")
 
         # Directly call the review function that's in this same file
         review_result = await review_song_with_ai(
@@ -1003,29 +1064,65 @@ async def process_song_verdicts(review_results: List[Dict], final_dir: str) -> D
                     shutil.move(file_path, final_path)
                     kept_count += 1
                     print(f"🎼 [VERDICT] ✅ APPROVED SONG moved to final destination: {final_path}")
-                    print(f"🎼 [VERDICT] ✅ CONFIRMED: Song is now in backend/songs/final_review directory")
+                    print("🎼 [VERDICT] ✅ CONFIRMED: Song is now in backend/songs/final_review directory")
                 else:
                     print(f"🎼 [VERDICT] ⚠️ File not found for moving: {file_path}")
 
             elif verdict == "re-roll":
+                print("\n🗑️ [DELETE-FLOW] ===========")
+                print("🗑️ [DELETE-FLOW] Starting deletion process for RE-ROLL verdict")
+                print(f"🗑️ [DELETE-FLOW] File: {file_path}")
+                print(f"🗑️ [DELETE-FLOW] Song ID: {song_id if song_id else 'MISSING'}")
+                print(f"🗑️ [DELETE-FLOW] File exists: {os.path.exists(file_path)}")
+
                 # Use centralized deletion utility with mandatory remote deletion
                 if not song_id:
                     # Per the migration plan, song_id is REQUIRED for re-roll deletions
                     error_msg = f"Missing song_id for re-roll deletion of {file_path}"
-                    print(f"🎼 [VERDICT] ❌ {error_msg}")
-                    # As per plan, return error when song_id is missing for re-roll
-                    return {"success": False, "error": error_msg, "kept_count": kept_count, "deleted_count": deleted_count}
+                    print(f"🗑️ [DELETE-FLOW] ❌ {error_msg}")
+                    print("🗑️ [DELETE-FLOW] Attempting fallback: local deletion only")
+                    # Fallback: delete locally and continue processing other songs
+                    try:
+                        if os.path.exists(file_path):
+                            file_size = os.path.getsize(file_path)
+                            print(f"🗑️ [DELETE-FLOW] File size before deletion: {file_size:,} bytes")
+                            os.remove(file_path)
+                            deleted_count += 1
+                            print("🗑️ [DELETE-FLOW] ✅ Successfully deleted local file (no song_id available)")
+                            print(f"🗑️ [DELETE-FLOW] Deleted file was: {file_path}")
+                        else:
+                            print(f"🗑️ [DELETE-FLOW] ⚠️ File already doesn't exist: {file_path}")
+                    except Exception as e:
+                        print(f"🗑️ [DELETE-FLOW] ❌ Failed local delete without song_id: {e}")
+                        print(f"🗑️ [DELETE-FLOW] Error type: {type(e).__name__}")
+                    print("🗑️ [DELETE-FLOW] ===========")
+                    continue
 
                 # Perform mandatory remote+local deletion when song_id exists
-                print(f"[VERDICT] Deleting re-roll song (local + remote): {file_path}, song_id: {song_id}")
+                print("🗑️ [DELETE-FLOW] Starting centralized deletion (local + remote)")
+                print("🗑️ [DELETE-FLOW] Calling delete_song with:")
+                print(f"🗑️ [DELETE-FLOW]   - song_id: {song_id}")
+                print(f"🗑️ [DELETE-FLOW]   - file_path: {file_path}")
+                print("🗑️ [DELETE-FLOW]   - delete_from_suno: True")
+
                 delete_result = await delete_song(song_id=song_id, file_path=file_path, delete_from_suno=True)
+
+                print("🗑️ [DELETE-FLOW] Delete result received:")
+                print(f"🗑️ [DELETE-FLOW]   - Success: {delete_result.get('success')}")
+                print(f"🗑️ [DELETE-FLOW]   - Local deleted: {delete_result.get('local_deleted')}")
+                print(f"🗑️ [DELETE-FLOW]   - Suno deleted: {delete_result.get('suno_deleted')}")
+                print(f"🗑️ [DELETE-FLOW]   - Errors: {delete_result.get('errors', delete_result.get('error', 'None'))}")
 
                 # Consider deletion successful if either local or remote deletion succeeded
                 if delete_result.get("local_deleted") or delete_result.get("suno_deleted") or delete_result.get("success"):
                     deleted_count += 1
-                    print(f"[VERDICT] Deleted poor quality song - Local: {delete_result.get('local_deleted')}, Remote: {delete_result.get('suno_deleted')}")
+                    print("🗑️ [DELETE-FLOW] ✅ Deletion SUCCESSFUL")
+                    print(f"🗑️ [DELETE-FLOW] Deleted poor quality song - Local: {delete_result.get('local_deleted')}, Remote: {delete_result.get('suno_deleted')}")
                 else:
-                    print(f"[VERDICT] Delete failed: {delete_result.get('errors', delete_result.get('error', 'unknown error'))} for {file_path}")
+                    print("🗑️ [DELETE-FLOW] ❌ Deletion FAILED")
+                    print(f"🗑️ [DELETE-FLOW] Error details: {delete_result.get('errors', delete_result.get('error', 'unknown error'))} for {file_path}")
+
+                print("🗑️ [DELETE-FLOW] ===========\n")
 
             else:  # verdict == "error" or unknown
                 # Keep file in temp directory but don't count as success
@@ -1059,7 +1156,7 @@ async def process_song_verdicts_final_attempt(review_results: List[Dict], final_
     preserved_count = 0
     critical_failures = 0
 
-    print(f"🎼 [VERDICT-FINAL] Processing final attempt verdicts with intelligent deletion")
+    print("🎼 [VERDICT-FINAL] Processing final attempt verdicts with intelligent deletion")
 
     for result in review_results:
         file_path = result["file_path"]
@@ -1076,7 +1173,7 @@ async def process_song_verdicts_final_attempt(review_results: List[Dict], final_
                     shutil.move(file_path, final_path)
                     kept_count += 1
                     print(f"🎼 [VERDICT-FINAL] ✅ APPROVED SONG moved to final destination: {final_path}")
-                    print(f"🎼 [VERDICT-FINAL] ✅ CONFIRMED: Song is now in backend/songs/final_review directory")
+                    print("🎼 [VERDICT-FINAL] ✅ CONFIRMED: Song is now in backend/songs/final_review directory")
                 else:
                     print(f"🎼 [VERDICT-FINAL] ⚠️ File not found for moving: {file_path}")
 
@@ -1098,18 +1195,30 @@ async def process_song_verdicts_final_attempt(review_results: List[Dict], final_
 
                 if is_critical:
                     # Delete critical failures even on final attempt
-                    print(f"🎼 [VERDICT-FINAL] ❌ CRITICAL FAILURE detected: deleting {file_path}")
+                    print("\n🗑️ [DELETE-CRITICAL] ===========")
+                    print("🗑️ [DELETE-CRITICAL] ❌ CRITICAL FAILURE detected")
+                    print(f"🗑️ [DELETE-CRITICAL] File: {file_path}")
+                    print(f"🗑️ [DELETE-CRITICAL] Song ID: {song_id if song_id else 'MISSING'}")
+                    print("🗑️ [DELETE-CRITICAL] Failure keywords found in review")
 
                     if song_id:
                         # Use centralized deletion with mandatory remote deletion
+                        print("🗑️ [DELETE-CRITICAL] Starting centralized deletion")
                         delete_result = await delete_song(song_id=song_id, file_path=file_path, delete_from_suno=True)
+
+                        print("🗑️ [DELETE-CRITICAL] Delete result:")
+                        print(f"🗑️ [DELETE-CRITICAL]   - Local: {delete_result.get('local_deleted')}")
+                        print(f"🗑️ [DELETE-CRITICAL]   - Remote: {delete_result.get('suno_deleted')}")
+                        print(f"🗑️ [DELETE-CRITICAL]   - Success: {delete_result.get('success')}")
+
                         if delete_result.get("local_deleted") or delete_result.get("suno_deleted") or delete_result.get("success"):
                             deleted_count += 1
                             critical_failures += 1
-                            print(f"🎼 [VERDICT-FINAL] Deleted critical failure - Local: {delete_result.get('local_deleted')}, Remote: {delete_result.get('suno_deleted')}")
+                            print("🗑️ [DELETE-CRITICAL] ✅ Successfully deleted critical failure")
                         else:
-                            print(f"🎼 [VERDICT-FINAL] Delete failed: {delete_result.get('errors', delete_result.get('error', 'unknown error'))}")
+                            print(f"🗑️ [DELETE-CRITICAL] ❌ Delete failed: {delete_result.get('errors', delete_result.get('error', 'unknown error'))}")
                             preserved_count += 1  # Count as preserved if deletion failed
+                        print("🗑️ [DELETE-CRITICAL] ===========\n")
                     else:
                         # No song_id, try local deletion only
                         if os.path.exists(file_path):
@@ -1131,7 +1240,7 @@ async def process_song_verdicts_final_attempt(review_results: List[Dict], final_
                         delete_result = await delete_song(song_id=song_id, file_path=file_path, delete_from_suno=True)
                         if delete_result.get("success"):
                             deleted_count += 1
-                            print(f"🎼 [VERDICT-FINAL] Deleted non-critical re-roll song")
+                            print("🎼 [VERDICT-FINAL] Deleted non-critical re-roll song")
                         else:
                             preserved_count += 1
                             print(f"🎼 [VERDICT-FINAL] Failed to delete, preserving: {file_path}")
@@ -1141,8 +1250,8 @@ async def process_song_verdicts_final_attempt(review_results: List[Dict], final_
                             try:
                                 os.remove(file_path)
                                 deleted_count += 1
-                                print(f"🎼 [VERDICT-FINAL] Deleted non-critical re-roll locally")
-                            except:
+                                print("🎼 [VERDICT-FINAL] Deleted non-critical re-roll locally")
+                            except Exception:
                                 preserved_count += 1
 
             else:  # verdict == "error" or unknown
@@ -1177,8 +1286,8 @@ def verify_final_destination_folder() -> str:
     final_destination = "backend/songs/final_review"
 
     print(f"🔍 [VERIFY] Final destination folder confirmed: {final_destination}")
-    print(f"🔍 [VERIFY] This is where AI-approved songs (verdict: 'continue') will be moved")
-    print(f"🔍 [VERIFY] Note: Fail-safe songs go to backend/songs/fail_safe directory")
+    print("🔍 [VERIFY] This is where AI-approved songs (verdict: 'continue') will be moved")
+    print("🔍 [VERIFY] Note: Fail-safe songs go to backend/songs/fail_safe directory")
 
     return final_destination
 
