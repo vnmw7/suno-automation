@@ -150,7 +150,7 @@ async def download_song_handler_v2(
             print(f"[V2] No ID provided, will use title-based naming")
 
         async with AsyncCamoufox(
-            headless=False,
+            headless=True,
             persistent_context=True,
             user_data_dir="backend/camoufox_session_data",
             os=("windows"),

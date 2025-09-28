@@ -479,7 +479,7 @@ class SunoDownloader:
             print(f"{'='*80}")
 
             async with AsyncCamoufox(
-                headless=False,
+                headless=True,
                 persistent_context=True,
                 user_data_dir="backend/camoufox_session_data",
                 os=("windows"),

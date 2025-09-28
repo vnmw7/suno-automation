@@ -64,7 +64,7 @@ config = {
 
 async def login_suno():
     async with AsyncCamoufox(
-        headless=False,
+        headless=True,
         persistent_context=True,
         user_data_dir="backend/camoufox_session_data",
         os=("windows"),

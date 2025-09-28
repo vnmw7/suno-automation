@@ -247,7 +247,7 @@ class SunoSelectors:
 
     # Browser Configuration
     BROWSER_CONFIG = {
-        "headless": False,
+        "headless": True,
         "persistent_context": True,
         "user_data_dir": "backend/camoufox_session_data",
         "os": "windows",
