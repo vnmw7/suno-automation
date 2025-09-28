@@ -229,6 +229,11 @@ async def generate_song(
                     print(f"[ERROR] Alternative Custom button also failed: {e2}")
                     raise Exception("Could not find or click Custom button")
 
+            # Count initial songs right after Custom button is clicked, before filling any forms
+            song_card_selector = SunoSelectors.SONG_CARD
+            initial_song_count = await page.locator(song_card_selector).count()
+            print(f"[INFO] Initial song count (before form filling): {initial_song_count}")
+
             print("[ACTION] Filling strLyrics...")
             try:
                 # Try the primary selector first (new UI)
@@ -350,38 +355,52 @@ async def generate_song(
                 if not create_button:
                     raise Exception("Could not find a visible create button.")
 
-                song_card_selector = SunoSelectors.SONG_CARD
-                initial_song_count = await page.locator(song_card_selector).count()
-                print(f"[INFO] Initial song count: {initial_song_count}")
+                # initial_song_count was already captured after Custom button click
+                print(f"[INFO] Using initial song count from before form filling: {initial_song_count}")
 
                 await create_button.click()
                 print("[ACTION] Create button clicked. Waiting for new songs to appear...")
 
-                # Add 6 second wait to ensure songs are fully created
-                await page.wait_for_timeout(6000)
-                print("[INFO] Waited 6 seconds for songs to be fully rendered")
+                # Progressive checking: First wait for initial processing
+                await page.wait_for_timeout(3000)
+                print("[INFO] Waited 3 seconds for initial song processing")
 
-                # Wait for at least 2 new songs (Suno may create 2-4 songs)
-                minimum_expected = initial_song_count + 2
+                # Step 1: Wait for at least 1 new song
+                minimum_expected = initial_song_count + 1
 
                 try:
-                    # Wait for the number of songs to increase by at least 2
-                    # Escape quotes in selector for JavaScript expression
+                    # Wait for the first song to appear
                     escaped_selector = song_card_selector.replace('"', '\\"').replace("'", "\\'")
                     expression = f"() => document.querySelectorAll('{escaped_selector}').length >= {minimum_expected}"
-                    print(f"[DEBUG] Waiting for at least 2 new songs with expression: {expression}")
-                    await page.wait_for_function(expression, timeout=5000)
+                    print(f"[DEBUG] Waiting for at least 1 new song with expression: {expression}")
+                    await page.wait_for_function(expression, timeout=8000)
 
-                    new_song_count = await page.locator(song_card_selector).count()
-                    new_songs_created = new_song_count - initial_song_count
-                    print(f"[SUCCESS] New songs detected. Current total: {new_song_count}, New songs created: {new_songs_created}")
-                except Exception as e:
-                    new_song_count = await page.locator(song_card_selector).count()
-                    new_songs_created = new_song_count - initial_song_count
-                    error_message = f"Timeout waiting for new songs. Initial: {initial_song_count}, Current: {new_song_count}, New songs: {new_songs_created}. Error: {e}"
+                    first_count = await page.locator(song_card_selector).count()
+                    first_new_songs = first_count - initial_song_count
+                    print(f"[SUCCESS] First song(s) detected. Current total: {first_count}, New songs: {first_new_songs}")
+                except Exception:
+                    # Check if any songs were created despite timeout
+                    current_count = await page.locator(song_card_selector).count()
+                    if current_count > initial_song_count:
+                        print(f"[INFO] Songs detected despite timeout. Current: {current_count}, New: {current_count - initial_song_count}")
+                    else:
+                        error_message = f"No songs created after clicking Create button. Initial: {initial_song_count}, Current: {current_count}"
+                        print(f"[ERROR] {error_message}")
+                        raise Exception(error_message)
+
+                # Step 2: ALWAYS wait additional time to check for more songs
+                print("[INFO] Waiting for potential additional songs...")
+                await page.wait_for_timeout(5000)
+
+                # Final count after mandatory wait
+                new_song_count = await page.locator(song_card_selector).count()
+                new_songs_created = new_song_count - initial_song_count
+
+                if new_songs_created > 0:
+                    print(f"[SUCCESS] Final song count after progressive check. Total: {new_song_count}, New songs created: {new_songs_created}")
+                else:
+                    error_message = f"No songs were created. Initial: {initial_song_count}, Final: {new_song_count}"
                     print(f"[ERROR] {error_message}")
-                    print(f"[DEBUG] Song card selector used: {song_card_selector}")
-                    print(f"[DEBUG] Expression attempted: {expression if 'expression' in locals() else 'Not generated'}")
                     raise Exception(error_message)
 
                 print("[SUCCESS] Song creation initiated and page loaded.")
@@ -390,7 +409,7 @@ async def generate_song(
                 await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["long"])
 
                 #  get the song id from the newly generated songs
-                #  NOTE: Suno creates 2 songs per request, positioned at the TOP of the list
+                #  NOTE: Suno creates 1-2 songs per request, positioned at the TOP of the list
 
                 # Extract song IDs from the TOP of the song list (newest first)
                 print("[INFO] Extracting song IDs from top of feed (newest first)...")
@@ -410,7 +429,7 @@ async def generate_song(
 
                     print(f"[DEBUG] Total song elements found: {len(all_song_elements)}")
 
-                    # Check the top 4 songs (Suno typically generates 2, but may create up to 4)
+                    # Check the top 4 songs (Suno typically generates 1-2, but may create up to 4)
                     # We check extra to ensure we catch all new songs even if some are premium
                     candidate_elements = all_song_elements[:4] if len(all_song_elements) >= 4 else all_song_elements
                     print(f"[DEBUG] Examining top {len(candidate_elements)} songs for new non-premium songs")
@@ -432,7 +451,7 @@ async def generate_song(
                             non_premium_songs.append(element)
                             print(f"[DEBUG] Song {idx+1} is a standard song - will extract ID")
 
-                            # Stop after finding 2 non-premium songs
+                            # Stop after finding 2 non-premium songs (or whatever was created)
                             if len(non_premium_songs) >= 2:
                                 break
 
@@ -494,12 +513,12 @@ async def generate_song(
                     suno_song_id = song_ids[0]
 
                 # Save both song IDs to progress_v1_tbl for tracking
-                # Suno creates 2 songs per request, we should save both
+                # Suno creates 1-2 songs per request, we should save all created songs
                 print("[DATABASE] Attempting to save both songs to tblprogress_v1...")
                 
                 # Prepare data for both songs
                 songs_to_save = []
-                for idx, song_id in enumerate(song_ids):  # Process all extracted song IDs (should be 2)
+                for idx, song_id in enumerate(song_ids):  # Process all extracted song IDs (1-2 songs)
                     print(f"[DATABASE] Data to save for song {idx + 1}:")
                     print(f"  - pg1_song_struct_id: {song_structure_id}")
                     print(f"  - pg1_song_id: {song_id}")
