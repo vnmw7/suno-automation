@@ -572,9 +572,9 @@ async def review_all_songs(downloaded_songs: List[Dict], pg1_id: int) -> List[Di
                     from config.ai_review_config import DELAY_BETWEEN_SONGS
                     wait_time = DELAY_BETWEEN_SONGS
                 except ImportError:
-                    wait_time = 65  # Fallback: Wait 65 seconds between songs
+                    wait_time = 10  # Fallback: Wait 10 seconds between songs (Gemini Flash)
                 print(f"\n⏳ [RATE-LIMIT] Waiting {wait_time} seconds before next review...")
-                print("⏳ [RATE-LIMIT] Reason: Respecting API rate limits (Free tier: 2 RPM for Gemini Pro)")
+                print("⏳ [RATE-LIMIT] Reason: Respecting API rate limits (Free tier: 15 RPM for Gemini Flash)")
                 for remaining in range(wait_time, 0, -10):
                     print(f"⏳ [RATE-LIMIT] Time remaining: {remaining} seconds...")
                     await asyncio.sleep(min(10, remaining))
@@ -707,7 +707,7 @@ async def send_prompt_to_google_ai(
         Optional[str]: AI-generated text response on success, None on failure
     """
     try:
-        from middleware.gemini import model_pro
+        from middleware.gemini import model_flash
         
         # Build contents array
         contents = []
@@ -739,7 +739,7 @@ async def send_prompt_to_google_ai(
             "max_output_tokens": 8192,
         }
 
-        response = await model_pro.generate_content_async(
+        response = await model_flash.generate_content_async(
             contents, generation_config=generation_config
         )
 
@@ -875,7 +875,7 @@ async def review_song_with_ai(
             from backend.config.ai_review_config import DELAY_BETWEEN_API_CALLS
             wait_time = DELAY_BETWEEN_API_CALLS
         except ImportError:
-            wait_time = 30  # Fallback: 30 seconds for Gemini Pro free tier
+            wait_time = 5  # Fallback: 5 seconds for Gemini Flash free tier
         
         print(f"⏳ [RATE-LIMIT] Waiting {wait_time} seconds after file upload...")
         print("⏳ [RATE-LIMIT] Reason: Respecting API rate limits between upload and first prompt")
@@ -909,7 +909,7 @@ async def review_song_with_ai(
             from backend.config.ai_review_config import DELAY_BETWEEN_API_CALLS
             wait_time = DELAY_BETWEEN_API_CALLS
         except ImportError:
-            wait_time = 30  # Fallback: 30 seconds for Gemini Pro free tier
+            wait_time = 5  # Fallback: 5 seconds for Gemini Flash free tier
         
         print(f"⏳ [RATE-LIMIT] Waiting {wait_time} seconds before second prompt...")
         print("⏳ [RATE-LIMIT] Reason: Respecting API rate limits between first and second prompt")
