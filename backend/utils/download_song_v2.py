@@ -126,40 +126,64 @@ class SunoDownloader:
             Tuple of (is_enabled, reason_if_disabled)
         """
         try:
+            # Log element details for debugging
+            tag_name = await mp3_option.evaluate("el => el.tagName.toLowerCase()")
+            aria_label = await mp3_option.get_attribute("aria-label")
+            print(f"[DEBUG-MP3] Checking element: tag={tag_name}, aria-label={aria_label}")
+
             # Check disabled attribute
             disabled_attr = await mp3_option.get_attribute("disabled")
+            print(f"[DEBUG-MP3] disabled attribute: {disabled_attr}")
             if disabled_attr is not None:
-                return False, "has [disabled] attribute"
+                return False, f"has [disabled] attribute (value: '{disabled_attr}')"
 
             # Check aria-disabled
             aria_disabled = await mp3_option.get_attribute("aria-disabled")
+            print(f"[DEBUG-MP3] aria-disabled: {aria_disabled}")
             if aria_disabled and aria_disabled.lower() == "true":
                 return False, "aria-disabled=true"
 
             # Check CSS classes for disabled indicators
             class_attr = await mp3_option.get_attribute("class") or ""
-            disabled_indicators = ["disabled", "opacity-50", "pointer-events-none", "cursor-not-allowed"]
+            print(f"[DEBUG-MP3] class attribute: {class_attr[:100]}...")  # First 100 chars
+
+            # Split classes and check for actual disabled state classes
+            # Avoid matching Tailwind conditional classes like "disabled:opacity-50"
+            class_list = class_attr.lower().split()
+            disabled_indicators = ["opacity-50", "pointer-events-none", "cursor-not-allowed"]
+
+            # Check for standalone "disabled" class (not as part of "disabled:")
+            if "disabled" in class_list:  # Only match if "disabled" is a standalone class
+                return False, "has 'disabled' class"
+
+            # Check for other disabled indicators
             for indicator in disabled_indicators:
-                if indicator in class_attr.lower():
+                if indicator in class_list:  # Check for exact class match
                     return False, f"class suggests disabled: {indicator}"
 
             # Check computed style for pointer-events
             pointer_events = await mp3_option.evaluate("el => getComputedStyle(el).pointerEvents")
+            print(f"[DEBUG-MP3] computed pointer-events: {pointer_events}")
             if pointer_events and pointer_events.lower() == "none":
                 return False, "pointer-events: none"
 
             # Check visibility
-            if not await mp3_option.is_visible():
+            is_visible = await mp3_option.is_visible()
+            print(f"[DEBUG-MP3] is_visible: {is_visible}")
+            if not is_visible:
                 return False, "not visible"
 
             # Check bounding box
             box = await mp3_option.bounding_box()
+            print(f"[DEBUG-MP3] bounding box: {box}")
             if not box or box["width"] < 1 or box["height"] < 1:
-                return False, "zero-size bounding box"
+                return False, f"zero-size bounding box (box={box})"
 
+            print("[DEBUG-MP3] All checks passed - button is enabled!")
             return True, None
 
         except Exception as e:
+            print(f"[DEBUG-MP3] Exception during check: {type(e).__name__}: {str(e)}")
             return False, f"check failed: {type(e).__name__}: {str(e)}"
 
     async def _close_menus(self, page: Page):
@@ -285,7 +309,15 @@ class SunoDownloader:
                     try:
                         option = submenu_panel.locator(selector)
                         await option.wait_for(state="visible", timeout=3000)
+
+                        # Verify we found an actual button element, not a parent container
+                        tag_name = await option.evaluate("el => el.tagName.toLowerCase()")
+                        if tag_name != "button":
+                            print(f"⚠️ [WAIT-MP3] Selector matched {tag_name} instead of button, trying next selector...")
+                            continue
+
                         mp3_option = option
+                        print(f"✅ [WAIT-MP3] Found MP3 button element with selector: {selector}")
                         break
                     except Exception:
                         continue
@@ -848,8 +880,15 @@ class SunoDownloader:
                             try:
                                 option = submenu_panel.locator(selector)
                                 await option.wait_for(state="visible", timeout=mp3_timeout)
+
+                                # Verify we found an actual button element, not a parent container
+                                tag_name = await option.evaluate("el => el.tagName.toLowerCase()")
+                                if tag_name != "button":
+                                    print(f"⚠️ Selector matched {tag_name} instead of button, trying next selector...")
+                                    continue
+
                                 mp3_option = option
-                                print(f"Found MP3 option: {selector}")
+                                print(f"Found MP3 button element: {selector}")
                                 break
                             except Exception:
                                 continue
@@ -945,6 +984,12 @@ class SunoDownloader:
                                 try:
                                     option = submenu_panel.locator(selector)
                                     await option.wait_for(state="visible", timeout=3000)
+
+                                    # Verify we found an actual button element
+                                    tag_name = await option.evaluate("el => el.tagName.toLowerCase()")
+                                    if tag_name != "button":
+                                        continue
+
                                     mp3_option = option
                                     break
                                 except Exception:

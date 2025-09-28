@@ -110,15 +110,23 @@ class SunoSelectors:
 
     MP3_OPTION = {
         "selectors": [
-            # New selectors based on provided HTML structure
+            # Most specific - using aria-label attribute (based on user's HTML sample)
+            'button[aria-label="MP3 Audio"]',
+            'button[type="button"][aria-label="MP3 Audio"]',
+
+            # Text-based selectors with button element constraint
             "button.context-menu-button:has(span:has-text('MP3 Audio'))",
             "button.context-menu-button:has(svg):has-text('MP3 Audio')",
             "div.context-menu-item button:has-text('MP3 Audio')",
+
+            # SVG path-based selector (specific to MP3 icon)
             "button[type='button']:has(svg path[d*='M9 20a1']):has-text('MP3 Audio')",
-            # Original selectors as fallback
-            "div[role='menuitem']:has-text('MP3 Audio')",
-            "*:has-text('MP3 Audio')",
+
+            # Less specific fallbacks - but still constrained to button elements
+            "div[role='menuitem'] button:has-text('MP3 Audio')",
+            "button:has-text('MP3 Audio')",
             "[data-testid*='mp3']"
+            # REMOVED: "*:has-text('MP3 Audio')" - too generic, matches parent containers
         ],
         "timeout": 8000
     }
