@@ -361,8 +361,13 @@ async def generate_song(
                 await create_button.click()
                 print("[ACTION] Create button clicked. Waiting for new songs to appear...")
 
+                # 10 minute pause for manual inspection
+                # print("[DEBUG] Pausing for 10 minutes to allow manual element inspection...")
+                # await page.wait_for_timeout(600000)  # 10 minutes = 600000ms
+                # print("[DEBUG] Resuming after 10 minute inspection pause")
+
                 # Progressive checking: First wait for initial processing
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(10000)
                 print("[INFO] Waited 3 seconds for initial song processing")
 
                 # Step 1: Wait for at least 1 new song

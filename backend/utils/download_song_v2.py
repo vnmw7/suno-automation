@@ -68,6 +68,64 @@ class SunoDownloader:
 
         print("Could not find options button with any known selector")
         return None
+
+    async def _click_options_button(self, page: Page, options_button: Locator):
+        """
+        Reliably clicks the options button with multiple fallback methods.
+
+        The options button often has data-mouseover-id attribute requiring hover first.
+
+        Args:
+            page (Page): Playwright Page instance
+            options_button (Locator): The options button locator
+
+        Returns:
+            bool: True if click succeeded, False otherwise
+        """
+        try:
+            # First, always hover to activate any mouseover handlers
+            print("🔄 Hovering over options button to activate handlers...")
+            await self.teleport_hover(page, options_button, delay=200)
+
+            # Try regular click first
+            try:
+                print("🔄 Attempting regular click on options button...")
+                await options_button.click(timeout=5000)
+                print("✅ Options button clicked successfully (regular click)")
+                return True
+            except Exception as click_error:
+                print(f"⚠️ Regular click failed: {str(click_error)[:100]}")
+
+                # Try teleport click as first fallback
+                try:
+                    print("🔄 Trying teleport click as fallback...")
+                    await self.teleport_click(page, options_button)
+                    print("✅ Options button clicked successfully (teleport click)")
+                    return True
+                except Exception as teleport_error:
+                    print(f"⚠️ Teleport click failed: {str(teleport_error)[:100]}")
+
+                    # Try force click as last resort
+                    try:
+                        print("🔄 Trying force click as last resort...")
+                        await options_button.click(force=True, timeout=5000)
+                        print("✅ Options button clicked successfully (force click)")
+                        return True
+                    except Exception as force_error:
+                        print(f"⚠️ Force click failed: {str(force_error)[:100]}")
+
+                        # Final attempt: dispatch click event directly
+                        try:
+                            print("🔄 Dispatching click event directly...")
+                            await options_button.dispatch_event('click')
+                            print("✅ Options button clicked successfully (dispatch event)")
+                            return True
+                        except Exception as dispatch_error:
+                            print(f"❌ All click methods failed: {str(dispatch_error)[:100]}")
+                            return False
+        except Exception as e:
+            print(f"❌ Error in _click_options_button: {str(e)}")
+            return False
     
     async def teleport_click(self, page: Page, locator: Locator, button: str = "left", delay: int = 50):
         """
@@ -232,9 +290,17 @@ class SunoDownloader:
             attempt += 1
 
             try:
-                # Open options menu
+                # Open options menu using the reliable click helper
                 print(f"\n🔄 [WAIT-MP3] Attempt {attempt} - Opening menu...")
-                await options_button.click()
+
+                # Use the dedicated method that handles all fallback scenarios
+                click_success = await self._click_options_button(page, options_button)
+                if not click_success:
+                    print("⚠️ [WAIT-MP3] Failed to click options button, retrying...")
+                    await self._close_menus(page)
+                    await page.wait_for_timeout(check_interval_seconds * 1000)
+                    continue
+
                 await page.wait_for_timeout(1000)
 
                 # Wait for dropdown menu

@@ -135,7 +135,7 @@ async def execute_song_workflow(
                 if not song_ids and song_id:
                     song_ids = [song_id]
 
-                print(f"🎼 [WORKFLOW] ✅ Generation successful!")
+                print("🎼 [WORKFLOW] ✅ Generation successful!")
                 print(f"🎼 [WORKFLOW] First Song ID: {song_id}")
                 print(f"🎼 [WORKFLOW] All Song IDs: {song_ids}")
                 print(f"🎼 [WORKFLOW] pg1_id: {pg1_id}")
