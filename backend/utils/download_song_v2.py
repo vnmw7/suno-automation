@@ -112,11 +112,218 @@ class SunoDownloader:
         """
         print("Teleporting via JS hover")
         await locator.scroll_into_view_if_needed(timeout=10000)
-        
+
         # This dispatches a mouseover event directly to the element in the browser.
         await locator.dispatch_event('mouseover')
         await page.wait_for_timeout(delay)
         print("Teleport hover completed.")
+
+    async def _is_mp3_enabled(self, mp3_option: Locator) -> tuple[bool, str]:
+        """
+        Check if MP3 download option is enabled and clickable.
+
+        Returns:
+            Tuple of (is_enabled, reason_if_disabled)
+        """
+        try:
+            # Check disabled attribute
+            disabled_attr = await mp3_option.get_attribute("disabled")
+            if disabled_attr is not None:
+                return False, "has [disabled] attribute"
+
+            # Check aria-disabled
+            aria_disabled = await mp3_option.get_attribute("aria-disabled")
+            if aria_disabled and aria_disabled.lower() == "true":
+                return False, "aria-disabled=true"
+
+            # Check CSS classes for disabled indicators
+            class_attr = await mp3_option.get_attribute("class") or ""
+            disabled_indicators = ["disabled", "opacity-50", "pointer-events-none", "cursor-not-allowed"]
+            for indicator in disabled_indicators:
+                if indicator in class_attr.lower():
+                    return False, f"class suggests disabled: {indicator}"
+
+            # Check computed style for pointer-events
+            pointer_events = await mp3_option.evaluate("el => getComputedStyle(el).pointerEvents")
+            if pointer_events and pointer_events.lower() == "none":
+                return False, "pointer-events: none"
+
+            # Check visibility
+            if not await mp3_option.is_visible():
+                return False, "not visible"
+
+            # Check bounding box
+            box = await mp3_option.bounding_box()
+            if not box or box["width"] < 1 or box["height"] < 1:
+                return False, "zero-size bounding box"
+
+            return True, None
+
+        except Exception as e:
+            return False, f"check failed: {type(e).__name__}: {str(e)}"
+
+    async def _close_menus(self, page: Page):
+        """
+        Close any open menus by pressing ESC key twice.
+        """
+        try:
+            await page.keyboard.press("Escape")
+            await page.wait_for_timeout(200)
+            await page.keyboard.press("Escape")
+            await page.wait_for_timeout(300)
+            print("🔄 Menus closed")
+        except Exception as e:
+            print(f"⚠️ Could not close menus: {e}")
+
+    async def _wait_for_mp3_ready(
+        self,
+        page: Page,
+        options_button: Locator,
+        max_wait_seconds: int = 180,
+        check_interval_seconds: int = 5
+    ) -> Locator:
+        """
+        Wait for MP3 option to become enabled by repeatedly opening menu and checking.
+
+        Args:
+            page: Page instance
+            options_button: Options button locator
+            max_wait_seconds: Maximum time to wait (default 3 minutes)
+            check_interval_seconds: Time between checks (default 5 seconds)
+
+        Returns:
+            Enabled MP3 option locator
+
+        Raises:
+            Exception if MP3 never becomes enabled
+        """
+        import time
+        start_time = time.time()
+        attempt = 0
+        last_reason = "unknown"
+
+        print(f"⏳ [WAIT-MP3] Waiting up to {max_wait_seconds}s for MP3 to become enabled...")
+
+        while (time.time() - start_time) < max_wait_seconds:
+            attempt += 1
+
+            try:
+                # Open options menu
+                print(f"\n🔄 [WAIT-MP3] Attempt {attempt} - Opening menu...")
+                await options_button.click()
+                await page.wait_for_timeout(1000)
+
+                # Wait for dropdown menu
+                context_menu_selectors = SunoSelectors.CONTEXT_MENU["selectors"]
+                context_menu = None
+
+                for selector in context_menu_selectors:
+                    try:
+                        menu = page.locator(selector).first
+                        await menu.wait_for(state="visible", timeout=5000)
+                        context_menu = menu
+                        break
+                    except Exception:
+                        continue
+
+                if not context_menu:
+                    print("⚠️ [WAIT-MP3] Menu didn't appear, retrying...")
+                    await self._close_menus(page)
+                    await page.wait_for_timeout(check_interval_seconds * 1000)
+                    continue
+
+                # Find download trigger
+                download_trigger = None
+                for trigger_selector in SunoSelectors.DOWNLOAD_TRIGGER["selectors"]:
+                    try:
+                        trigger = context_menu.locator(trigger_selector)
+                        await trigger.wait_for(state="visible", timeout=3000)
+                        download_trigger = trigger
+                        break
+                    except Exception:
+                        continue
+
+                if not download_trigger:
+                    print("⚠️ [WAIT-MP3] Download trigger not found, retrying...")
+                    await self._close_menus(page)
+                    await page.wait_for_timeout(check_interval_seconds * 1000)
+                    continue
+
+                # Hover to open submenu (keep humanized hover)
+                print("🔄 [WAIT-MP3] Opening download submenu...")
+                await download_trigger.hover()
+                await page.wait_for_timeout(1000)
+
+                # Find submenu panel
+                download_trigger_id = await download_trigger.get_attribute("id")
+                submenu_selectors = []
+                if download_trigger_id:
+                    submenu_selectors.append(
+                        f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
+                    )
+                submenu_selectors.extend(SunoSelectors.DOWNLOAD_SUBMENU["selectors"])
+
+                submenu_panel = None
+                for selector in submenu_selectors:
+                    try:
+                        panel = page.locator(selector).last
+                        await panel.wait_for(state="visible", timeout=3000)
+                        submenu_panel = panel
+                        break
+                    except Exception:
+                        continue
+
+                if not submenu_panel:
+                    print("⚠️ [WAIT-MP3] Submenu didn't appear, retrying...")
+                    await self._close_menus(page)
+                    await page.wait_for_timeout(check_interval_seconds * 1000)
+                    continue
+
+                # Find MP3 option
+                mp3_option = None
+                for selector in SunoSelectors.MP3_OPTION["selectors"]:
+                    try:
+                        option = submenu_panel.locator(selector)
+                        await option.wait_for(state="visible", timeout=3000)
+                        mp3_option = option
+                        break
+                    except Exception:
+                        continue
+
+                if not mp3_option:
+                    print("⚠️ [WAIT-MP3] MP3 option not found, retrying...")
+                    await self._close_menus(page)
+                    await page.wait_for_timeout(check_interval_seconds * 1000)
+                    continue
+
+                # Check if MP3 is enabled
+                is_enabled, reason = await self._is_mp3_enabled(mp3_option)
+
+                if is_enabled:
+                    elapsed = int(time.time() - start_time)
+                    print(f"✅ [WAIT-MP3] MP3 is now enabled! (after {elapsed}s, {attempt} attempts)")
+                    return mp3_option
+                else:
+                    last_reason = reason or "unknown"
+                    print(f"⚠️ [WAIT-MP3] MP3 still disabled: {last_reason}")
+
+                # Close menu and wait before retry
+                await self._close_menus(page)
+
+            except Exception as e:
+                print(f"⚠️ [WAIT-MP3] Error during check: {e}")
+                last_reason = str(e)
+                await self._close_menus(page)
+
+            # Wait before next check
+            await page.wait_for_timeout(check_interval_seconds * 1000)
+
+        # Timeout reached
+        elapsed = int(time.time() - start_time)
+        raise Exception(
+            f"MP3 option did not become enabled within {max_wait_seconds}s "
+            f"(checked {attempt} times, last reason: {last_reason})"
+        )
 
     async def download_song(
         self, 
@@ -221,106 +428,14 @@ class SunoDownloader:
                             print(f"🔄 [DOWNLOAD-ATTEMPT] Starting download process for '{strTitle}'...")
 
                             try:
-                                # Click the options button to open the dropdown menu
-                                print("Clicking options button to open menu...")
-                                await options_button.click()
-                                await page.wait_for_timeout(1000)
-
-                                # Wait for dropdown menu with enhanced detection
-                                print("Waiting for dropdown menu to appear...")
-                                context_menu_selectors = SunoSelectors.CONTEXT_MENU["selectors"]
-
-                                context_menu = None
-                                context_menu_timeout = SunoSelectors.CONTEXT_MENU.get("timeout", 10000)
-                                for selector in context_menu_selectors:
-                                    try:
-                                        menu = page.locator(selector).first
-                                        await menu.wait_for(state="visible", timeout=context_menu_timeout)
-                                        context_menu = menu
-                                        print(f"Dropdown menu found with selector: {selector}")
-                                        break
-                                    except Exception:
-                                        continue
-
-                                if not context_menu:
-                                    raise Exception("Dropdown menu did not appear after clicking options button")
-
-                                await page.wait_for_timeout(500)
-
-                                # Find and hover download submenu trigger
-                                print("Locating download submenu trigger...")
-                                download_triggers = SunoSelectors.DOWNLOAD_TRIGGER["selectors"]
-
-                                download_trigger = None
-                                download_trigger_timeout = SunoSelectors.DOWNLOAD_TRIGGER.get("timeout", 8000)
-                                for trigger_selector in download_triggers:
-                                    try:
-                                        trigger = context_menu.locator(trigger_selector)
-                                        await trigger.wait_for(state="visible", timeout=download_trigger_timeout)
-                                        download_trigger = trigger
-                                        print(f"Found download trigger: {trigger_selector}")
-                                        break
-                                    except Exception:
-                                        continue
-
-                                if not download_trigger:
-                                    raise Exception("Download option not found in context menu")
-
-                                # ################################################################## #
-                                # ##                  THE CRITICAL EXCEPTION                      ## #
-                                # ## Here, we use the NORMAL hover to ensure the menu triggers.  ## #
-                                # ################################################################## #
-                                print("Performing REGULAR (humanized) hover on Download trigger...")
-                                await download_trigger.hover()  # Use the standard hover to trigger the sub-menu
-                                # ################################################################## #
-
-                                await page.wait_for_timeout(1000)
-
-                                # Wait for download submenu panel
-                                print("Waiting for download submenu panel...")
-                                download_trigger_id = await download_trigger.get_attribute("id")
-
-                                submenu_selectors = []
-                                if download_trigger_id:
-                                    submenu_selectors.append(
-                                        f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
-                                    )
-                                # Add the rest from config
-                                submenu_selectors.extend(SunoSelectors.DOWNLOAD_SUBMENU["selectors"])
-
-                                submenu_panel = None
-                                submenu_timeout = SunoSelectors.DOWNLOAD_SUBMENU.get("timeout", 8000)
-                                for selector in submenu_selectors:
-                                    try:
-                                        panel = page.locator(selector).last
-                                        await panel.wait_for(state="visible", timeout=submenu_timeout)
-                                        submenu_panel = panel
-                                        print(f"Download submenu panel found: {selector}")
-                                        break
-                                    except Exception:
-                                        continue
-
-                                if not submenu_panel:
-                                    raise Exception("Download submenu panel did not appear")
-
-                                # Find MP3 Audio option
-                                print("Locating MP3 Audio download option...")
-                                mp3_selectors = SunoSelectors.MP3_OPTION["selectors"]
-
-                                mp3_option = None
-                                mp3_timeout = SunoSelectors.MP3_OPTION.get("timeout", 8000)
-                                for selector in mp3_selectors:
-                                    try:
-                                        option = submenu_panel.locator(selector)
-                                        await option.wait_for(state="visible", timeout=mp3_timeout)
-                                        mp3_option = option
-                                        print(f"Found MP3 option: {selector}")
-                                        break
-                                    except Exception:
-                                        continue
-
-                                if not mp3_option:
-                                    raise Exception("MP3 Audio download option not found")
+                                # Wait for MP3 to be enabled using our new helper
+                                print("📥 [DOWNLOAD] Checking if song is ready for download...")
+                                mp3_option = await self._wait_for_mp3_ready(
+                                    page=page,
+                                    options_button=options_button,
+                                    max_wait_seconds=120,  # 2 minutes max per attempt
+                                    check_interval_seconds=5
+                                )
 
                                 # Use the extracted_song_id if available for filename
                                 if 'extracted_song_id' in locals() and extracted_song_id:
@@ -412,52 +527,45 @@ class SunoDownloader:
                                     error_msg = str(download_error)
                                     print(f"❌ [DOWNLOAD-ATTEMPT] Attempt {download_attempt} failed: {error_msg}")
 
-                                    # Check if it's a timeout error and we have retries left
-                                    if "Timeout" in error_msg and download_attempt < MAX_DOWNLOAD_RETRIES:
-                                        print(f"⏳ [RETRY] Timeout detected. Will retry in 3 seconds...")
-                                        await page.wait_for_timeout(3000)
+                                    # Check if we have retries left
+                                    if download_attempt < MAX_DOWNLOAD_RETRIES:
+                                        # Close any open menus before retry
+                                        await self._close_menus(page)
 
-                                        # Refresh the page for next attempt
-                                        print("🔄 [RETRY] Refreshing page for retry...")
-                                        await page.reload(wait_until="domcontentloaded", timeout=30000)
-                                        await page.wait_for_timeout(2000)
+                                        # Progressive wait based on attempt number
+                                        wait_time = min(5 * download_attempt, 15)  # 5s, 10s, 15s max
+                                        print(f"⏳ [RETRY] Will retry in {wait_time} seconds (no page refresh)...")
+                                        await page.wait_for_timeout(wait_time * 1000)
 
-                                        # Re-find the options button for the next attempt
+                                        # Verify options button is still available
                                         options_button = await self._find_options_button(page)
                                         if not options_button:
-                                            print("❌ [RETRY] Could not find options button after refresh")
+                                            print("❌ [RETRY] Could not find options button, breaking retry loop")
                                             break
-                                    elif download_attempt == MAX_DOWNLOAD_RETRIES:
+                                    else:
                                         # On last attempt, raise the error
                                         print(f"❌ [DOWNLOAD-ATTEMPT] All {MAX_DOWNLOAD_RETRIES} attempts failed!")
                                         raise Exception(f"Download failed after {MAX_DOWNLOAD_RETRIES} attempts: {download_error}")
-                                    else:
-                                        # For non-timeout errors on non-final attempts, still retry
-                                        if download_attempt < MAX_DOWNLOAD_RETRIES:
-                                            print(f"🔄 [RETRY] Will retry after non-timeout error...")
-                                            await page.wait_for_timeout(2000)
-                                            await page.reload(wait_until="domcontentloaded", timeout=30000)
-                                            await page.wait_for_timeout(2000)
-                                            options_button = await self._find_options_button(page)
-                                            if not options_button:
-                                                print("❌ [RETRY] Could not find options button after refresh")
-                                                break
-                                        else:
-                                            raise download_error
 
                             except Exception as outer_error:
-                                # This catches errors from the menu navigation part
+                                # This catches errors from wait_for_mp3_ready or other failures
                                 error_msg = str(outer_error)
-                                print(f"❌ [DOWNLOAD-ATTEMPT] Navigation/menu error on attempt {download_attempt}: {error_msg}")
+                                print(f"❌ [DOWNLOAD-ATTEMPT] Error on attempt {download_attempt}: {error_msg}")
 
                                 if download_attempt < MAX_DOWNLOAD_RETRIES:
-                                    print(f"🔄 [RETRY] Will retry after menu navigation error...")
-                                    await page.wait_for_timeout(2000)
-                                    await page.reload(wait_until="domcontentloaded", timeout=30000)
-                                    await page.wait_for_timeout(2000)
+                                    # Check if it's a specific MP3 not ready error
+                                    if "did not become enabled" in error_msg:
+                                        print("⚠️ [RETRY] Song still processing, will retry...")
+                                    else:
+                                        print("🔄 [RETRY] Will retry after error...")
+
+                                    await self._close_menus(page)
+                                    await page.wait_for_timeout(3000)
+
+                                    # Verify options button is still available
                                     options_button = await self._find_options_button(page)
                                     if not options_button:
-                                        print("❌ [RETRY] Could not find options button after refresh")
+                                        print("❌ [RETRY] Could not find options button, breaking retry loop")
                                         break
                                 else:
                                     raise outer_error
@@ -748,7 +856,114 @@ class SunoDownloader:
 
                         if not mp3_option:
                             raise Exception("MP3 Audio download option not found")
-                        
+
+                        # Check if MP3 is enabled before proceeding
+                        is_enabled, reason = await self._is_mp3_enabled(mp3_option)
+
+                        # If disabled, wait and retry with right-click
+                        retry_count = 0
+                        MAX_ENABLE_RETRIES = 10  # Maximum retries for waiting for MP3 to be enabled
+
+                        while not is_enabled and retry_count < MAX_ENABLE_RETRIES:
+                            retry_count += 1
+                            print(f"⚠️ [WAIT-MP3] MP3 option is disabled: {reason}")
+                            print(f"⏳ [WAIT-MP3] Retry {retry_count}/{MAX_ENABLE_RETRIES} - Waiting for song to be ready...")
+
+                            # Close menu and wait
+                            await self._close_menus(page)
+
+                            # Progressive wait: 5s, 10s, 15s, then 10s for remaining
+                            wait_time = min(5 * min(retry_count, 3), 15)
+                            print(f"⏳ [WAIT-MP3] Waiting {wait_time} seconds before retry...")
+                            await page.wait_for_timeout(wait_time * 1000)
+
+                            # Right-click again to open fresh menu
+                            print("🔄 [WAIT-MP3] Right-clicking on song again...")
+                            await self.teleport_click(page, target_song, button="right")
+                            await page.wait_for_timeout(1000)
+
+                            # Re-navigate through menu
+                            context_menu = None
+                            for selector in context_menu_selectors:
+                                try:
+                                    menu = page.locator(selector)
+                                    await menu.wait_for(state="visible", timeout=5000)
+                                    context_menu = menu
+                                    break
+                                except Exception:
+                                    continue
+
+                            if not context_menu:
+                                print("⚠️ [WAIT-MP3] Context menu didn't appear, will retry...")
+                                continue
+
+                            # Find download trigger again
+                            download_trigger = None
+                            for trigger_selector in download_triggers:
+                                try:
+                                    trigger = context_menu.locator(trigger_selector)
+                                    await trigger.wait_for(state="visible", timeout=3000)
+                                    download_trigger = trigger
+                                    break
+                                except Exception:
+                                    continue
+
+                            if not download_trigger:
+                                print("⚠️ [WAIT-MP3] Download trigger not found, will retry...")
+                                continue
+
+                            # Hover to open submenu
+                            await download_trigger.hover()
+                            await page.wait_for_timeout(1000)
+
+                            # Find submenu panel
+                            download_trigger_id = await download_trigger.get_attribute("id")
+                            submenu_selectors = []
+                            if download_trigger_id:
+                                submenu_selectors.append(
+                                    f"div[data-radix-menu-content][data-state='open'][aria-labelledby='{download_trigger_id}']"
+                                )
+                            submenu_selectors.extend(SunoSelectors.DOWNLOAD_SUBMENU["selectors"])
+
+                            submenu_panel = None
+                            for selector in submenu_selectors:
+                                try:
+                                    panel = page.locator(selector).last
+                                    await panel.wait_for(state="visible", timeout=3000)
+                                    submenu_panel = panel
+                                    break
+                                except Exception:
+                                    continue
+
+                            if not submenu_panel:
+                                print("⚠️ [WAIT-MP3] Submenu didn't appear, will retry...")
+                                continue
+
+                            # Find MP3 option again
+                            mp3_option = None
+                            for selector in mp3_selectors:
+                                try:
+                                    option = submenu_panel.locator(selector)
+                                    await option.wait_for(state="visible", timeout=3000)
+                                    mp3_option = option
+                                    break
+                                except Exception:
+                                    continue
+
+                            if not mp3_option:
+                                print("⚠️ [WAIT-MP3] MP3 option not found after retry, will retry...")
+                                continue
+
+                            # Check if now enabled
+                            is_enabled, reason = await self._is_mp3_enabled(mp3_option)
+
+                            if is_enabled:
+                                print(f"✅ [WAIT-MP3] MP3 is now enabled after {retry_count} retries!")
+                                break
+
+                        if not is_enabled:
+                            raise Exception(f"MP3 option remained disabled after {MAX_ENABLE_RETRIES} retries. Last reason: {reason}")
+
                         # Use the extracted_song_id if available for filename
                         if 'extracted_song_id' in locals() and extracted_song_id:
                             song_id_for_filename = extracted_song_id
@@ -756,7 +971,7 @@ class SunoDownloader:
                             song_id_for_filename = song_id
 
                         # Initiate download with enhanced handling
-                        print("Starting download process...")
+                        print("📥 [DOWNLOAD] Starting download process (MP3 is enabled)...")
                         download_successful = False
                         final_file_path = None
 
