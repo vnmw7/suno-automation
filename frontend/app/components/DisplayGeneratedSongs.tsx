@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { API_SONGS_URL } from '../lib/api';
+import { API_SONGS_URL, deleteSong } from '../lib/api';
 import type { ManualReviewResponse } from '../lib/api';
 
 interface Song {
@@ -68,6 +68,11 @@ const DisplayGeneratedSongs = ({
   const [debugMode, setDebugMode] = useState(false); // Toggle with Ctrl+Shift+D
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [bulkReviewStatus, setBulkReviewStatus] = useState<ReviewStatus>('pending');
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ show: boolean; fileName: string | null }>({
+    show: false,
+    fileName: null
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Parse song metadata from filename
   const parseSongMetadata = (fileName: string): Song => {
@@ -284,8 +289,68 @@ const DisplayGeneratedSongs = ({
     }));
   }, []);
 
+  // Extract song ID from filename
+  const extractSongId = (fileName: string): string | null => {
+    // Pattern: {title}_{song_id}_{timestamp}.mp3
+    // Example: isaiah-1-1-10_0536dd17-8cfd-4bca-9fd7-831621daac10_20250913152839.mp3
+    const match = fileName.match(/[^_]+_([a-f0-9-]{36})_\d+\.mp3/i);
+    return match ? match[1] : null;
+  };
+
+  // Handle song deletion
+  const handleDeleteSong = useCallback(async (fileName: string) => {
+    setIsDeleting(true);
+
+    try {
+      // Extract song ID from filename
+      const songId = extractSongId(fileName);
+
+      // Get the full file path from manualReviewData
+      const filePath = filePathMap.get(fileName);
+
+      console.log(`[DisplayGeneratedSongs] Deleting song - fileName: ${fileName}, songId: ${songId}, filePath: ${filePath}`);
+
+      // Call the delete API
+      const result = await deleteSong(songId || undefined, filePath || undefined);
+
+      if (result.success) {
+        console.log(`[DisplayGeneratedSongs] Song deleted successfully: ${fileName}`);
+
+        // Remove the song from the UI
+        setSongStates(prev => {
+          const newStates = { ...prev };
+          delete newStates[fileName];
+          return newStates;
+        });
+
+        // Also remove from localStorage
+        const reviewData = JSON.parse(localStorage.getItem('songReviews') || '{}');
+        delete reviewData[fileName];
+        localStorage.setItem('songReviews', JSON.stringify(reviewData));
+
+        // Show success message (you could add a toast notification here)
+        alert(`Song deleted successfully from both local storage and Suno.com`);
+      } else {
+        console.error(`[DisplayGeneratedSongs] Failed to delete song: ${fileName}`, result.errors);
+        alert(`Failed to delete song: ${result.errors.join(', ')}`);
+      }
+    } catch (error) {
+      console.error(`[DisplayGeneratedSongs] Error deleting song: ${fileName}`, error);
+      alert(`Error deleting song: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmation({ show: false, fileName: null });
+    }
+  }, [filePathMap]);
+
   // Handle review status change
   const changeReviewStatus = useCallback((fileName: string, status: ReviewStatus) => {
+    // If status is rejected, show confirmation dialog
+    if (status === 'rejected') {
+      setDeleteConfirmation({ show: true, fileName });
+      return;
+    }
+
     setSongStates(prev => ({
       ...prev,
       [fileName]: {
@@ -293,7 +358,7 @@ const DisplayGeneratedSongs = ({
         reviewStatus: status,
       },
     }));
-    
+
     // Save to localStorage for persistence
     const reviewData = JSON.parse(localStorage.getItem('songReviews') || '{}');
     if (!reviewData[fileName]) reviewData[fileName] = {};
@@ -1052,6 +1117,44 @@ const DisplayGeneratedSongs = ({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmation.show && deleteConfirmation.fileName && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Confirm Song Deletion</h3>
+            <p className="mb-6 text-gray-700">
+              Are you sure you want to delete this song?
+              <br />
+              <br />
+              <strong className="text-red-600">This will permanently remove the song from both local storage and Suno.com.</strong>
+              <br />
+              <br />
+              <span className="text-sm text-gray-600 break-all">File: {deleteConfirmation.fileName}</span>
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteConfirmation({ show: false, fileName: null })}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteSong(deleteConfirmation.fileName!)}
+                className={`px-4 py-2 text-white rounded transition-colors ${
+                  isDeleting
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-red-500 hover:bg-red-600'
+                }`}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Song'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -48,6 +48,21 @@ export interface SongReviewRequest {
   song_structure_id: number;
 }
 
+// Delete song interfaces
+export interface DeleteSongRequest {
+  song_id?: string;
+  file_path?: string;
+  delete_from_suno: boolean;
+}
+
+export interface DeleteSongResponse {
+  success: boolean;
+  local_deleted: boolean;
+  suno_deleted: boolean;
+  errors: string[];
+  message: string;
+}
+
 export interface SongReviewResponse {
   success: boolean;
   verdict: string;  // "continue", "re-roll", or "error"
@@ -100,7 +115,7 @@ export interface OrchestratorResponse {
   good_songs?: number;
   re_rolled_songs?: number;
   error?: string;
-  workflow_details?: any;
+  workflow_details?: Record<string, unknown>;
 }
 
 export interface SongResponse {
@@ -565,6 +580,73 @@ export const fetchManualReviewSongs = async (
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "An unknown error occurred while fetching manual review songs" 
+    };
+  }
+};
+
+// Delete a song locally and from Suno.com
+export const deleteSong = async (
+  songId?: string,
+  filePath?: string
+): Promise<DeleteSongResponse> => {
+  try {
+    // Validate that at least one identifier is provided
+    if (!songId && !filePath) {
+      return {
+        success: false,
+        local_deleted: false,
+        suno_deleted: false,
+        errors: ["Either song_id or file_path must be provided"],
+        message: "Either song_id or file_path must be provided"
+      };
+    }
+
+    const request: DeleteSongRequest = {
+      song_id: songId,
+      file_path: filePath,
+      delete_from_suno: true // Always delete from both local and Suno
+    };
+
+    console.log("[deleteSong] Sending delete request:", request);
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/song/delete`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        detail: `HTTP error! status: ${response.status}`
+      }));
+
+      console.error("[deleteSong] Error response:", errorData);
+
+      return {
+        success: false,
+        local_deleted: false,
+        suno_deleted: false,
+        errors: [errorData.detail || errorData.error || `Failed to delete song (${response.status})`],
+        message: errorData.detail || errorData.error || `Failed to delete song (${response.status})`
+      };
+    }
+
+    const data: DeleteSongResponse = await response.json();
+
+    console.log("[deleteSong] Delete response:", data);
+
+    return data;
+  } catch (error) {
+    console.error("[deleteSong] Failed to delete song:", error);
+
+    return {
+      success: false,
+      local_deleted: false,
+      suno_deleted: false,
+      errors: [error instanceof Error ? error.message : "An unknown error occurred while deleting song"],
+      message: error instanceof Error ? error.message : "An unknown error occurred while deleting song"
     };
   }
 };
