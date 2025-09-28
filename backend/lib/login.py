@@ -56,6 +56,10 @@ GOOGLE_PASSWORD = os.getenv("GOOGLE_PASSWORD")
 MICROSOFT_EMAIL = os.getenv("MICROSOFT_EMAIL")
 MICROSOFT_PASSWORD = os.getenv("MICROSOFT_PASSWORD")
 
+# Manual login configuration
+MANUAL_LOGIN_TIMEOUT = int(os.getenv("MANUAL_LOGIN_TIMEOUT", "300"))  # 5 minutes default
+KEEP_BROWSER_OPEN = os.getenv("KEEP_BROWSER_OPEN", "false").lower() == "true"
+
 
 async def wait_for_selector(page, selector, timeout=DEFAULT_TIMEOUT, state="visible"):
     """Helper function to wait for a selector to appear on the page."""
@@ -141,6 +145,60 @@ async def check_logged_in_state(page, logged_in_selector, timeout=DEFAULT_TIMEOU
     except Exception as e:
         logger.info(f"No logged-in state detected: {str(e)}")
         return False
+
+
+async def is_truly_logged_in_suno(page):
+    """
+    Helper function to reliably detect if user is logged into Suno.
+    Uses multiple indicators for robust detection.
+
+    Returns:
+        tuple: (is_logged_in: bool, confidence: str)
+               confidence can be 'high', 'medium', or 'low'
+    """
+    try:
+        # Most reliable: Credits element (only appears when logged in)
+        credits_selector = 'a[href="/account"]:has-text("Credits")'
+        credits_exists = await page.locator(credits_selector).count() > 0
+
+        if credits_exists:
+            return True, 'high'
+
+        # Strong indicator: Profile menu with actual user avatar
+        profile_with_avatar = 'div[data-testid="profile-menu-button"][aria-label="Profile menu button"] img[alt][src*="cdn"]'
+        avatar_exists = await page.locator(profile_with_avatar).count() > 0
+
+        # Check if sign in button is gone
+        sign_in_selectors = [
+            'button:has-text("Sign In")',
+            'button:has-text("Sign in")',
+            'button:has-text("Log in")'
+        ]
+        sign_in_gone = all([await page.locator(sel).count() == 0 for sel in sign_in_selectors])
+
+        # Check for create link
+        create_link = 'a[href="/create"]:has-text("Create")'
+        create_exists = await page.locator(create_link).count() > 0
+
+        # High confidence: avatar + create link + no sign in
+        if avatar_exists and create_exists and sign_in_gone:
+            return True, 'high'
+
+        # Medium confidence: avatar OR create exists AND sign in gone
+        if (avatar_exists or create_exists) and sign_in_gone:
+            return True, 'medium'
+
+        # Low confidence: just checking URL (not reliable alone)
+        if "/create" in page.url or "/home" in page.url:
+            # Only if sign in is also gone
+            if sign_in_gone:
+                return True, 'low'
+
+        return False, 'none'
+
+    except Exception as e:
+        logger.debug(f"Error in login detection: {str(e)}")
+        return False, 'none'
 
 
 # Login to Google (Corrected Version - Uses URL for state detection)
@@ -464,46 +522,69 @@ async def manual_login_suno():
             else:
                 logger.info("Sign In button clicked using teleport click")
 
+            # Add initial delay to allow login modal/options to appear
+            await page.wait_for_timeout(3000)  # 3 seconds for modal to appear
+            logger.info("Waiting for provider selection...")
+
             logger.info("[ACTION] Please complete login in the browser window...")
             print("\n" + "="*60)
             print("[ACTION] Please complete your login in the browser window")
             print("[INFO] You can login with Google, Microsoft, or any other provider")
-            print("[INFO] Waiting for login completion (5 minute timeout)")
+            print(f"[INFO] Waiting for login completion ({MANUAL_LOGIN_TIMEOUT//60} minute timeout)")
             print("="*60 + "\n")
 
             # Keep checking for login success with periodic status updates
-            max_wait_seconds = 300  # 5 minutes total
+            max_wait_seconds = MANUAL_LOGIN_TIMEOUT
             check_interval = 2  # Check every 2 seconds
             elapsed_seconds = 0
             last_message_time = 0
+            oauth_started = False
+            stable_login_checks = 0
+            required_stable_checks = 2  # Need 2 consecutive positive checks
 
             while elapsed_seconds < max_wait_seconds:
                 try:
-                    # Check multiple indicators of successful login
-                    create_button_selector = 'button:has(span:has-text("Create"))'
-                    profile_selector = 'button[aria-label*="profile"]'
-                    home_url_check = "suno.com/create" in page.url or "suno.com/home" in page.url
+                    current_url = page.url
 
-                    # Check if any success indicator is present
-                    create_exists = await page.locator(create_button_selector).count() > 0
-                    profile_exists = await page.locator(profile_selector).count() > 0
+                    # Track OAuth redirect to external providers
+                    if not oauth_started:
+                        oauth_providers = ['accounts.google.com', 'login.microsoftonline.com', 'discord.com', 'facebook.com', 'apple.com']
+                        if any(provider in current_url for provider in oauth_providers):
+                            oauth_started = True
+                            logger.info(f"OAuth authentication detected: {current_url}")
+                            print("[INFO] External authentication in progress...")
 
-                    if create_exists or profile_exists or home_url_check:
-                        logger.info("Manual login completed successfully")
-                        print("\n" + "="*60)
-                        print("[SUCCESS] Manual login completed successfully!")
-                        print("[INFO] You are now logged in to Suno")
-                        print("="*60 + "\n")
+                    # Only check for success after initial delay OR OAuth has started
+                    if elapsed_seconds > 5 or oauth_started:
+                        # Use the helper function for cleaner, more maintainable detection
+                        is_logged_in, confidence = await is_truly_logged_in_suno(page)
 
-                        # Give a moment for session to stabilize
-                        await page.wait_for_timeout(2000)
-                        return True
+                        # Accept high confidence always, medium confidence after OAuth started
+                        if is_logged_in and (confidence == 'high' or (oauth_started and confidence in ['medium', 'low'])):
+                            stable_login_checks += 1
+                            logger.debug(f"Positive login check #{stable_login_checks}")
+
+                            if stable_login_checks >= required_stable_checks:
+                                logger.info(f"Manual login completed successfully (confidence: {confidence}, stable detection)")
+                                print("\n" + "="*60)
+                                print("[SUCCESS] Manual login completed successfully!")
+                                print(f"[INFO] Login confirmed with {confidence} confidence")
+                                print("[INFO] You are now logged in to Suno")
+                                if KEEP_BROWSER_OPEN:
+                                    print("[INFO] Browser will remain open (KEEP_BROWSER_OPEN=true)")
+                                print("="*60 + "\n")
+
+                                # Give a moment for session to stabilize
+                                await page.wait_for_timeout(2000)
+                                return True
+                        else:
+                            stable_login_checks = 0  # Reset if check fails
 
                     # Check if browser/page is still alive
                     try:
                         # Simple check to see if page is still responsive
                         await page.evaluate("() => document.title")
-                    except:
+                    except Exception:
                         logger.info("Browser window was closed by user")
                         print("\n[INFO] Browser window was closed")
                         return False
@@ -534,10 +615,11 @@ async def manual_login_suno():
             return False
 
         else:
-            # Check if already logged in
-            create_button_selector = 'button:has(span:has-text("Create"))'
-            if await page.locator(create_button_selector).count() > 0:
-                logger.info("Already logged in to Suno")
+            # Check if already logged in using the helper function
+            is_logged_in, confidence = await is_truly_logged_in_suno(page)
+
+            if is_logged_in and confidence in ['high', 'medium']:
+                logger.info(f"Already logged in to Suno (confidence: {confidence})")
                 print("[SUCCESS] Already logged in to Suno!")
                 return True
 
@@ -550,12 +632,15 @@ async def manual_login_suno():
         print(f"[ERROR] Error during manual login: {str(e)}")
         return False
     finally:
-        # Ensure browser is properly closed
-        if browser:
+        # Ensure browser is properly closed (unless configured to keep open)
+        if browser and not KEEP_BROWSER_OPEN:
             try:
                 await browser.close()
-            except:
+                logger.info("Browser closed")
+            except Exception:
                 pass  # Browser might already be closed
+        elif browser and KEEP_BROWSER_OPEN:
+            logger.info("Browser kept open as configured (KEEP_BROWSER_OPEN=true)")
 
 
 if __name__ == "__main__":
