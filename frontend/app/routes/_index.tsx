@@ -11,8 +11,10 @@ export const meta: MetaFunction = () => {
 };
 
 export async function loader() {
+  // Use backend service name for server-side requests in Docker
+  const API_URL = process.env.BACKEND_URL || "http://backend:8000";
   try {
-    const response = await fetch("http://127.0.0.1:8000/");
+    const response = await fetch(`${API_URL}/`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -32,7 +34,7 @@ export default function Index() {
   const login_with_google = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/login");
+      const response = await fetch("http://localhost:8000/login");
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -83,7 +85,7 @@ export default function Index() {
     const login_with_microsoft = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/login/microsoft");
+      const response = await fetch("http://localhost:8000/login/microsoft");
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -134,7 +136,7 @@ export default function Index() {
   const triggerManualLogin = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/manual-login", {
+      const response = await fetch("http://localhost:8000/api/v1/auth/manual-login", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });

@@ -1,4 +1,9 @@
-const API_BASE_URL = "http://127.0.0.1:8000";
+// Use environment variable for API URL
+// In Docker, server-side should use 'backend' service name
+// Client-side should use localhost
+const API_BASE_URL = typeof window !== 'undefined'
+  ? "http://localhost:8000"  // Client-side: use localhost
+  : process.env.BACKEND_URL || "http://backend:8000"; // Server-side: use Docker network name
 export const API_SONGS_URL = `${API_BASE_URL}/api/songs`;
 import { supabase } from "../lib/supabase";
 

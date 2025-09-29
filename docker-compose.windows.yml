@@ -1,0 +1,11 @@
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.windows.yml up
+version: '3.8'
+
+services:
+  backend:
+    # Windows doesn't need X11 socket mounting
+    volumes:
+      - ./songs:/app/songs
+      - ./camoufox_session_data:/app/camoufox_session_data
+      - ./logs:/app/logs
+      - camoufox-cache:/app/.cache

@@ -14,28 +14,33 @@ from routes.songs import router as songs_router
 
 app = FastAPI()
 
-# Include routers
-app.include_router(song_router)
-app.include_router(ai_review_router)
-app.include_router(ai_generation_router)
-app.include_router(orchestrator_router)
-app.include_router(songs_router)
-
 # Define a specific list of allowed origins.
 # This should be managed via environment variables for different deployments.
 allowed_origins = [
+    "http://localhost:3000",  # Remix production server
     "http://localhost:5173",  # Remix dev server
     # Add production URLs here when deploying
     # e.g., "https://your-production-app.com"
 ]
 
+# Configure CORS BEFORE adding routers
+# Try without credentials to debug CORS issue
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,  # USE THE SPECIFIC LIST
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],  # Be explicit
-    allow_headers=["*"],  # Can be further restricted if needed
+    allow_origins=["*"],  # Allow all origins temporarily for debugging
+    allow_credentials=False,  # Disable credentials temporarily
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],  # Expose headers to the client
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
+
+# Include routers AFTER CORS middleware
+app.include_router(song_router)
+app.include_router(ai_review_router)
+app.include_router(ai_generation_router)
+app.include_router(orchestrator_router)
+app.include_router(songs_router)
 
 
 @app.get("/")
@@ -82,6 +87,11 @@ async def login_with_microsoft_endpoint():
     is_successful = await suno_login_microsoft()
     return {"success": is_successful}
 
+
+@app.options("/api/v1/auth/manual-login")
+async def manual_login_options():
+    """Handle OPTIONS preflight request for manual login endpoint"""
+    return {"status": "ok"}
 
 @app.post("/api/v1/auth/manual-login")
 async def manual_login_endpoint():

@@ -4,9 +4,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("GOOGLE_AI_API_KEY") or os.getenv("GEMINI_API_KEY")
 if not api_key:
-    raise ValueError("GEMINI_API_KEY not found. Please set it in your environment or a .env file.")
+    raise ValueError("GOOGLE_AI_API_KEY or GEMINI_API_KEY not found. Please set it in your environment or a .env file.")
 
 genai.configure(api_key=api_key)
 

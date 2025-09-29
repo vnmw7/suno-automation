@@ -96,7 +96,7 @@ export async function generate_verse_range(bookAbbr: string, chapter: string): P
       `[generate_verse_range] Generating verse range for book: ${bookName} (abbr: ${bookAbbr}), chapter: ${chapter}`
     );
     const response = await fetch(
-      `http://127.0.0.1:8000/api/v1/ai-generation/verse-ranges`,
+      `http://localhost:8000/api/v1/ai-generation/verse-ranges`,
       {
         method: "POST",
         headers: {

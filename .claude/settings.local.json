@@ -6,7 +6,11 @@
       "Bash(powershell -Command \"Get-ChildItem -Path ([Environment]::GetFolderPath(''LocalApplicationData'')) -Filter ''*camoufox*'' -Directory -Recurse -ErrorAction SilentlyContinue | Select-Object -First 5 | ForEach-Object { Write-Host $_FullName }\")",
       "Bash(powershell:*)",
       "Bash(dir .venvLibsite-packagescamoufox /s /b)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(curl:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker-compose:*)"
     ],
     "deny": [],
     "ask": []
