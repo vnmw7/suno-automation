@@ -1,6 +1,7 @@
 """
-suno_functions.py
-This file sets up the functions that will be used when automating Suno interactions.
+System: Suno Automation
+Module: Suno Functions
+Purpose: Provide automation helpers for interacting with Suno
 """
 
 from camoufox.async_api import AsyncCamoufox
@@ -8,8 +9,6 @@ import traceback
 import importlib
 import importlib.util
 import os
-from dotenv import load_dotenv
-import sys
 
 lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "lib"))
 supabase_utils_path = os.path.join(lib_path, "supabase.py")
@@ -19,27 +18,6 @@ supabase_utils = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(supabase_utils)
 
 supabase = supabase_utils.supabase
-
-load_dotenv()
-
-# Validate environment variables at startup
-REQUIRED_ENV_VARS = [
-    "GOOGLE_EMAIL",
-    "GOOGLE_PASSWORD",
-    "MICROSOFT_EMAIL",
-    "MICROSOFT_PASSWORD",
-]
-missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
-if missing_vars:
-    sys.exit(1)
-
-
-# Credentials from environment variables
-GOOGLE_EMAIL = os.getenv("GOOGLE_EMAIL")
-GOOGLE_PASSWORD = os.getenv("GOOGLE_PASSWORD")
-MICROSOFT_EMAIL = os.getenv("MICROSOFT_EMAIL")
-MICROSOFT_PASSWORD = os.getenv("MICROSOFT_PASSWORD")
-
 
 config = {
     "window.outerHeight": 1056,
