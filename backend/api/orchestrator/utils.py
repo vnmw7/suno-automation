@@ -14,9 +14,10 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Set
 
 import aiohttp
-from aiohttp import ClientError, ClientTimeout
+from camoufox import AsyncCamoufox
 
 from utils.delete_song import delete_song
+from configs.browser_config import config
 
 
 # CDN-first download strategy attempts CDN once per song ID before falling back to browser automation.
@@ -373,7 +374,7 @@ async def downloadSongsFromCdn(
     timeout_seconds: int = CDN_TIMEOUT_SECONDS,
     chunk_size: int = CDN_STREAM_CHUNK_SIZE
 ) -> Dict[str, Any]:
-    """Fetch an MP3 from the CDN, validating headers and preserving Result-pattern semantics."""
+    """Fetch an MP3 from the CDN using Camoufox browser automation."""
     if not song_id:
         return {
             "success": False,
@@ -389,101 +390,130 @@ async def downloadSongsFromCdn(
 
     candidate_path = download_directory / f"{song_id}.mp3"
     final_path = _resolve_collision_path(candidate_path)
-    temp_path = final_path.with_suffix(f"{final_path.suffix}.part")
 
-    session_timeout = ClientTimeout(total=timeout_seconds)
-    uses_ephemeral_session = False
-    active_session = session
-    if active_session is None:
-        active_session = aiohttp.ClientSession(timeout=session_timeout)
-        uses_ephemeral_session = True
-
-    first_chunk: bytes = b""
     try:
-        print(f"📥 [CDN] Fetching {song_id} from {cdn_url}")
-        async with active_session.get(cdn_url, timeout=session_timeout) as response:
-            if response.status != 200:
-                error_message = f"HTTP {response.status}: {response.reason or 'Unknown response'}"
+        print(f"📥 [CDN] Fetching {song_id} from {cdn_url} using Camoufox")
+
+        async with AsyncCamoufox(**config) as browser:
+            # Create a new page with download directory configured
+            page = await browser.new_page()
+
+            # Set up download directory
+            await page.context.set_extra_http_headers({
+                "Accept": "audio/mpeg,*/*;q=0.9"
+            })
+
+            # Navigate directly to the CDN URL
+            response = await page.goto(cdn_url, timeout=timeout_seconds * 1000)
+
+            if not response or response.status != 200:
+                error_message = f"HTTP {response.status if response else 'No Response'}: Failed to access CDN URL"
                 print(f"📥 [CDN] ❌ {error_message}")
+                await page.close()
                 return {
                     "success": False,
                     "song_id": song_id,
                     "error": error_message
                 }
 
-            with temp_path.open("wb") as destination:
-                async for chunk in response.content.iter_chunked(chunk_size):
-                    if not chunk:
-                        continue
-                    if not first_chunk:
-                        first_chunk = chunk
-                    destination.write(chunk)
+            # Wait for the page to load the audio content
+            await page.wait_for_load_state("networkidle")
 
-            if not first_chunk:
-                _remove_path_if_exists(temp_path)
-                empty_message = "Empty response body from CDN"
+            # Get the download from the page
+            downloads = await page.context.downloads()
+
+            if not downloads:
+                # If no automatic download triggered, try to trigger it manually
+                download = await page.evaluate("""
+                    async () => {
+                        const link = document.createElement('a');
+                        link.href = window.location.href;
+                        link.download = '';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        return true;
+                    }
+                """)
+
+                # Wait for download to start
+                await page.wait_for_timeout(2000)
+                downloads = await page.context.downloads()
+
+            if downloads:
+                download = downloads[0]
+                # Save the download to our desired path
+                await download.save_as(str(final_path))
+                await download.delete()
+
+                # Verify file exists and has content
+                if final_path.exists() and final_path.stat().st_size > 0:
+                    file_size = final_path.stat().st_size
+                    print(f"📥 [CDN] ✅ Downloaded {song_id} ({file_size:,} bytes) -> {final_path}")
+                    await page.close()
+                    return {
+                        "success": True,
+                        "song_id": song_id,
+                        "file_path": str(final_path),
+                        "message": "Downloaded from CDN via Camoufox"
+                    }
+                else:
+                    error_message = "Downloaded file is empty or missing"
+                    print(f"📥 [CDN] ❌ {error_message}")
+                    await page.close()
+                    return {
+                        "success": False,
+                        "song_id": song_id,
+                        "error": error_message
+                    }
+            else:
+                # Fallback: try to get the content directly and save it
+                print("📥 [CDN] No automatic download, attempting manual save...")
+
+                # Get the response content as buffer
+                content = await page.evaluate("""
+                    async () => {
+                        const response = await fetch(window.location.href);
+                        if (!response.ok) return null;
+                        const arrayBuffer = await response.arrayBuffer();
+                        return Array.from(new Uint8Array(arrayBuffer));
+                    }
+                """)
+
+                if content:
+                    # Write the content to file
+                    with open(final_path, 'wb') as f:
+                        f.write(bytes(content))
+
+                    if final_path.exists() and final_path.stat().st_size > 0:
+                        file_size = final_path.stat().st_size
+                        print(f"📥 [CDN] ✅ Manually saved {song_id} ({file_size:,} bytes) -> {final_path}")
+                        await page.close()
+                        return {
+                            "success": True,
+                            "song_id": song_id,
+                            "file_path": str(final_path),
+                            "message": "Manually saved from CDN via Camoufox"
+                        }
+
+                error_message = "Failed to download or save file from CDN"
+                print(f"📥 [CDN] ❌ {error_message}")
+                await page.close()
                 return {
                     "success": False,
                     "song_id": song_id,
-                    "error": empty_message
+                    "error": error_message
                 }
 
-            if not _is_likely_mp3_header(first_chunk):
-                _remove_path_if_exists(temp_path)
-                return {
-                    "success": False,
-                    "song_id": song_id,
-                    "error": "Invalid MP3 header returned by CDN"
-                }
-
-            if temp_path.stat().st_size == 0:
-                _remove_path_if_exists(temp_path)
-                return {
-                    "success": False,
-                    "song_id": song_id,
-                    "error": "Downloaded file is empty"
-                }
-
-            os.replace(temp_path, final_path)
-            file_size = final_path.stat().st_size
-            print(f"📥 [CDN] ✅ Downloaded {song_id} ({file_size:,} bytes) -> {final_path}")
-            return {
-                "success": True,
-                "song_id": song_id,
-                "file_path": str(final_path),
-                "message": "Downloaded from CDN"
-            }
-
-    except asyncio.TimeoutError:
-        _remove_path_if_exists(temp_path)
-        timeout_message = f"CDN request timed out after {timeout_seconds} seconds"
-        print(f"📥 [CDN] ❌ {timeout_message}")
-        return {
-            "success": False,
-            "song_id": song_id,
-            "error": timeout_message
-        }
-    except ClientError as exc:
-        _remove_path_if_exists(temp_path)
-        error_message = f"CDN request failed: {str(exc)}"
-        print(f"📥 [CDN] ❌ {error_message}")
-        return {
-            "success": False,
-            "song_id": song_id,
-            "error": error_message
-        }
     except Exception as exc:
-        _remove_path_if_exists(temp_path)
-        error_message = f"Unexpected CDN error: {str(exc)}"
+        error_message = f"CDN download error: {str(exc)}"
         print(f"📥 [CDN] ❌ {error_message}")
+        print(traceback.format_exc())
         return {
             "success": False,
             "song_id": song_id,
             "error": error_message
         }
-    finally:
-        if uses_ephemeral_session and active_session is not None:
-            await active_session.close()
 
 
 async def download_both_songs(title: str, temp_dir: str, song_ids: list = None) -> Dict[str, Any]:
