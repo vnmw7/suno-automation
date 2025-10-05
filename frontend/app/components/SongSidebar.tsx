@@ -22,7 +22,7 @@ interface SongSidebarProps {
 type ReviewStatus = "pending" | "approved" | "regenerate";
 type PlaybackSpeed = 0.25 | 0.5 | 0.75 | 1 | 1.25 | 1.5 | 1.75 | 2 | 2.25 | 2.5 | 2.75 | 3;
 
-const SONGS_PUBLIC_DIRECTORY = "/songs";
+const SONGS_PUBLIC_DIRECTORY = "/api/song-file";
 const PLAYBACK_SPEED_OPTIONS: PlaybackSpeed[] = [
   0.25,
   0.5,
@@ -56,7 +56,22 @@ export default function SongSidebar({
     if (!selectedSong) {
       return null;
     }
-    return `${SONGS_PUBLIC_DIRECTORY}/${encodeURIComponent(selectedSong.fileName)}`;
+    return `${SONGS_PUBLIC_DIRECTORY}?fileName=${encodeURIComponent(selectedSong.fileName)}`;
+  }, [selectedSong]);
+
+  const strSelectedSongCaptionSrc = useMemo(() => {
+    if (!selectedSong) {
+      return null;
+    }
+
+    const strCaptionText = [
+      "WEBVTT",
+      "",
+      "00:00.000 --> 00:10.000",
+      `Audio preview for ${selectedSong.name}. Use the player controls to review the track.`,
+    ].join("\n");
+
+    return `data:text/vtt;charset=utf-8,${encodeURIComponent(strCaptionText)}`;
   }, [selectedSong]);
 
   const numSelectedSongSpeed: PlaybackSpeed = selectedSong
@@ -205,10 +220,25 @@ export default function SongSidebar({
                   autoPlay
                   src={strSelectedSongPath}
                   className="w-full"
+                  aria-label={
+                    selectedSong
+                      ? `Audio preview for ${selectedSong.name}`
+                      : "Audio preview"
+                  }
                   onError={() =>
                     setErrPlaybackMessage("Unable to load this song preview. Please review from the source if needed.")
                   }
                 >
+                  <track
+                    kind="captions"
+                    src={strSelectedSongCaptionSrc ?? undefined}
+                    label={
+                      selectedSong
+                        ? `Caption summary for ${selectedSong.name}`
+                        : "Song preview caption"
+                    }
+                    default
+                  />
                   Your browser does not support the audio element.
                 </audio>
 
