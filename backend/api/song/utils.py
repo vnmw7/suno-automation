@@ -1,8 +1,8 @@
-"""Suno Automation - Song Utilities Module
-
-This module provides utility functions for generating songs using Suno's API
-and reviewing generated songs with Google AI Studio. It handles the entire
-song creation workflow from lyric generation to quality review.
+"""
+System: Suno Automation
+Module: Song Utilities
+File URL: backend/api/song/utils.py
+Purpose: Automate song creation and review workflows against the Suno web interface.
 """
 
 import os
@@ -44,6 +44,7 @@ async def generate_song_handler(
     strVerseRange: str,
     strStyle: str,
     strTitle: str,
+    blnCloseModal: bool = True,
 ) -> Dict[str, Any]:
     """
     Coordinates the song generation workflow by validating inputs and calling generate_song.
@@ -59,6 +60,7 @@ async def generate_song_handler(
         strVerseRange (str): Verse range in format "start-end" (e.g., "1-5")
         strStyle (str): Musical style/genre (e.g., "Pop", "Rock")
         strTitle (str): Title for the generated song
+        blnCloseModal (bool, optional): Close any blocking modal before typing lyrics. Defaults to True.
 
     Returns:
         Dict[str, Any]: Result dictionary with:
@@ -77,8 +79,50 @@ async def generate_song_handler(
         strVerseRange=strVerseRange,
         strStyle=strStyle,
         strTitle=strTitle,
+        blnCloseModal=blnCloseModal,
     )
 
+
+async def close_modal_if_present(page) -> bool:
+    """Ensure the Suno create page has no blocking modal before form entry."""
+    print("[ACTION] Checking for blocking modals before lyric entry")
+    arrSelectors = SunoSelectors.MODAL_CLOSE_BUTTON.get("selectors", [])
+    intMaxCycles = SunoSelectors.MODAL_CLOSE_BUTTON.get("max_cycles", 1)
+    blnClosedAny = False
+
+    for intCycle in range(intMaxCycles):
+        blnClosedThisCycle = False
+        for strSelector in arrSelectors:
+            try:
+                locator = page.locator(strSelector)
+                intCount = await locator.count()
+            except Exception as err:
+                print(f"[WARNING] Error evaluating modal close selector '{strSelector}': {err}")
+                continue
+            if intCount == 0:
+                continue
+            for intIndex in range(intCount):
+                objButton = locator.nth(intIndex)
+                try:
+                    if not await objButton.is_visible():
+                        continue
+                    await objButton.click()
+                    print(f"[SUCCESS] Closed modal via selector '{strSelector}'")
+                    await page.wait_for_timeout(SunoSelectors.WAIT_TIMES["short"])
+                    blnClosedAny = True
+                    blnClosedThisCycle = True
+                except Exception as err:
+                    print(f"[WARNING] Unable to click modal close button '{strSelector}': {err}")
+            if blnClosedThisCycle:
+                break
+        if not blnClosedThisCycle:
+            break
+
+    if not blnClosedAny:
+        print("[INFO] No blocking modal detected before lyric entry")
+    else:
+        print("[INFO] Modal cleanup completed before lyric entry")
+    return blnClosedAny
 
 async def generate_song(
     strBookName: str,
@@ -86,6 +130,7 @@ async def generate_song(
     strVerseRange: str,
     strStyle: str,
     strTitle: str,
+    blnCloseModal: bool = True,
 ) -> Union[Dict[str, Any], bool]:
     """
     Generates a song using Suno's API through automated browser interactions.
@@ -103,6 +148,7 @@ async def generate_song(
         strVerseRange (str): Verse range in "start-end" format
         strStyle (str): Musical style/genre
         strTitle (str): Song title
+        blnCloseModal (bool, optional): When True, dismiss any open modal dialog before entering lyrics. Defaults to True.
 
     Returns:
         Union[Dict[str, Any], bool]: On success: dictionary with:
@@ -228,6 +274,9 @@ async def generate_song(
                 except Exception as e2:
                     print(f"[ERROR] Alternative Custom button also failed: {e2}")
                     raise Exception("Could not find or click Custom button")
+
+            if blnCloseModal:
+                await close_modal_if_present(page)
 
             # Count initial songs right after Custom button is clicked, before filling any forms
             song_card_selector = SunoSelectors.SONG_CARD
@@ -683,3 +732,5 @@ async def download_song_handler(
             - song_index (int): Original song index
     """
     return await download_song_v2(strTitle, intIndex, download_path, song_id)
+
+

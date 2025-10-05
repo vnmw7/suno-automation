@@ -1,6 +1,7 @@
 """
 System: Suno Automation
 Module: Orchestrator Utils
+File URL: backend/api/orchestrator/utils.py
 Purpose: Coordinate generation, download, review, and verdict handling including remote deletion.
 """
 
@@ -295,12 +296,14 @@ async def generate_songs(book_name: str, chapter: int, verse_range: str, style: 
         from ..song.utils import generate_song_handler
         
         print(f"🎼 [GENERATE] Calling song generation handler for: {book_name} {chapter}:{verse_range}")
+        print('🎼 [GENERATE] Preparing to close any blocking modal before lyric entry')
         result = await generate_song_handler(
             strBookName=book_name,
             intBookChapter=chapter, 
             strVerseRange=verse_range,
             strStyle=style,
-            strTitle=title
+            strTitle=title,
+            blnCloseModal=True
         )
         
         print(f"🎼 [GENERATE] Raw result type: {type(result)}")
@@ -1347,3 +1350,4 @@ async def handle_failsafe_songs(final_attempt_songs: List[Dict], final_dir: str 
         "moved_count": moved_count,
         "error_count": error_count
     }
+
