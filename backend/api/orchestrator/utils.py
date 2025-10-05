@@ -10,9 +10,37 @@ import shutil
 import asyncio
 import traceback
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Set
+
+import aiohttp
+from aiohttp import ClientError, ClientTimeout
+
 from utils.delete_song import delete_song
 
+
+# CDN-first download strategy attempts CDN once per song ID before falling back to browser automation.
+# A 30-second timeout and timestamp-based collision handling protect existing pending_review assets.
+CDN_BASE_URL = "https://cdn1.suno.ai"
+CDN_TIMEOUT_SECONDS = 30
+CDN_STREAM_CHUNK_SIZE = 64 * 1024
+
+def _is_likely_mp3_header(header_bytes: bytes) -> bool:
+    if not header_bytes or len(header_bytes) < 2:
+        return False
+    if header_bytes.startswith(b"ID3"):
+        return True
+    return header_bytes[0] == 0xFF and (header_bytes[1] & 0xE0) == 0xE0
+
+def _resolve_collision_path(candidate_path: Path) -> Path:
+    if not candidate_path.exists():
+        return candidate_path
+    timestamp_suffix = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    return candidate_path.with_name(f"{candidate_path.stem}_{timestamp_suffix}{candidate_path.suffix}")
+
+def _remove_path_if_exists(target_path: Path) -> None:
+    if target_path.exists():
+        target_path.unlink()
 
 async def execute_song_workflow(
     book_name: str,
@@ -336,8 +364,130 @@ async def generate_songs(book_name: str, chapter: int, verse_range: str, style: 
         return {"success": False, "error": f"Song generation exception: {str(e)}"}
 
 
+async def downloadSongsFromCdn(
+    song_id: str,
+    download_dir: str,
+    *,
+    session: Optional[aiohttp.ClientSession] = None,
+    base_url: Optional[str] = None,
+    timeout_seconds: int = CDN_TIMEOUT_SECONDS,
+    chunk_size: int = CDN_STREAM_CHUNK_SIZE
+) -> Dict[str, Any]:
+    """Fetch an MP3 from the CDN, validating headers and preserving Result-pattern semantics."""
+    if not song_id:
+        return {
+            "success": False,
+            "song_id": song_id,
+            "error": "Missing song_id value"
+        }
+
+    download_directory = Path(download_dir)
+    download_directory.mkdir(parents=True, exist_ok=True)
+
+    resolved_base_url = (base_url or CDN_BASE_URL).rstrip("/")
+    cdn_url = f"{resolved_base_url}/{song_id}.mp3"
+
+    candidate_path = download_directory / f"{song_id}.mp3"
+    final_path = _resolve_collision_path(candidate_path)
+    temp_path = final_path.with_suffix(f"{final_path.suffix}.part")
+
+    session_timeout = ClientTimeout(total=timeout_seconds)
+    uses_ephemeral_session = False
+    active_session = session
+    if active_session is None:
+        active_session = aiohttp.ClientSession(timeout=session_timeout)
+        uses_ephemeral_session = True
+
+    first_chunk: bytes = b""
+    try:
+        print(f"📥 [CDN] Fetching {song_id} from {cdn_url}")
+        async with active_session.get(cdn_url, timeout=session_timeout) as response:
+            if response.status != 200:
+                error_message = f"HTTP {response.status}: {response.reason or 'Unknown response'}"
+                print(f"📥 [CDN] ❌ {error_message}")
+                return {
+                    "success": False,
+                    "song_id": song_id,
+                    "error": error_message
+                }
+
+            with temp_path.open("wb") as destination:
+                async for chunk in response.content.iter_chunked(chunk_size):
+                    if not chunk:
+                        continue
+                    if not first_chunk:
+                        first_chunk = chunk
+                    destination.write(chunk)
+
+            if not first_chunk:
+                _remove_path_if_exists(temp_path)
+                empty_message = "Empty response body from CDN"
+                return {
+                    "success": False,
+                    "song_id": song_id,
+                    "error": empty_message
+                }
+
+            if not _is_likely_mp3_header(first_chunk):
+                _remove_path_if_exists(temp_path)
+                return {
+                    "success": False,
+                    "song_id": song_id,
+                    "error": "Invalid MP3 header returned by CDN"
+                }
+
+            if temp_path.stat().st_size == 0:
+                _remove_path_if_exists(temp_path)
+                return {
+                    "success": False,
+                    "song_id": song_id,
+                    "error": "Downloaded file is empty"
+                }
+
+            os.replace(temp_path, final_path)
+            file_size = final_path.stat().st_size
+            print(f"📥 [CDN] ✅ Downloaded {song_id} ({file_size:,} bytes) -> {final_path}")
+            return {
+                "success": True,
+                "song_id": song_id,
+                "file_path": str(final_path),
+                "message": "Downloaded from CDN"
+            }
+
+    except asyncio.TimeoutError:
+        _remove_path_if_exists(temp_path)
+        timeout_message = f"CDN request timed out after {timeout_seconds} seconds"
+        print(f"📥 [CDN] ❌ {timeout_message}")
+        return {
+            "success": False,
+            "song_id": song_id,
+            "error": timeout_message
+        }
+    except ClientError as exc:
+        _remove_path_if_exists(temp_path)
+        error_message = f"CDN request failed: {str(exc)}"
+        print(f"📥 [CDN] ❌ {error_message}")
+        return {
+            "success": False,
+            "song_id": song_id,
+            "error": error_message
+        }
+    except Exception as exc:
+        _remove_path_if_exists(temp_path)
+        error_message = f"Unexpected CDN error: {str(exc)}"
+        print(f"📥 [CDN] ❌ {error_message}")
+        return {
+            "success": False,
+            "song_id": song_id,
+            "error": error_message
+        }
+    finally:
+        if uses_ephemeral_session and active_session is not None:
+            await active_session.close()
+
+
 async def download_both_songs(title: str, temp_dir: str, song_ids: list = None) -> Dict[str, Any]:
-    """Download both songs using negative indexing (-1, -2) with enhanced V2 downloader.
+    """Download both songs via CDN-first strategy with Playwright fallback for resilience.
 
     Args:
         title: Song title to search for
@@ -347,91 +497,108 @@ async def download_both_songs(title: str, temp_dir: str, song_ids: list = None) 
     try:
         from utils.download_song_v2 import download_song_v2
 
-        downloaded_songs = []
+        downloaded_songs: List[Dict[str, Any]] = []
+        existing_file_paths: Set[str] = set()
+        cdn_failures: List[Dict[str, Any]] = []
+        index_configs = [
+            {"index": -1, "label": "[DOWNLOAD-1]", "song_id": song_ids[0] if song_ids and len(song_ids) > 0 else None},
+            {"index": -2, "label": "[DOWNLOAD-2]", "song_id": song_ids[1] if song_ids and len(song_ids) > 1 else None},
+        ]
+        successful_cdn_indices: Set[int] = set()
 
-        # Download song at index -1 (last/newest song)
-        print("\n📥 [DOWNLOAD-1] ===========")
-        print("📥 [DOWNLOAD-1] Starting download for song at index -1 (newest)")
-        print(f"📥 [DOWNLOAD-1] Title: '{title}'")
-        print(f"📥 [DOWNLOAD-1] Temp directory: '{temp_dir}'")
+        if song_ids:
+            print("\n📥 [CDN] Starting CDN-first download attempts...")
+            for config in index_configs:
+                current_song_id = config["song_id"]
+                label = config["label"]
+                index_value = config["index"]
+                if not current_song_id:
+                    continue
 
-        # Use first song_id if available
-        first_song_id = song_ids[0] if song_ids and len(song_ids) > 0 else None
+                cdn_result = await downloadSongsFromCdn(
+                    song_id=current_song_id,
+                    download_dir=temp_dir
+                )
 
-        if first_song_id:
-            print(f"📥 [DOWNLOAD-1] Using song_id for direct navigation: {first_song_id}")
-        else:
-            print("📥 [DOWNLOAD-1] No song_id available, will navigate to /me page")
+                if cdn_result.get("success"):
+                    file_path = cdn_result.get("file_path")
+                    print(f"📥 {label} CDN success: {file_path}")
+                    if file_path and file_path not in existing_file_paths:
+                        downloaded_songs.append({
+                            "file_path": file_path,
+                            "title": title,
+                            "song_id": current_song_id
+                        })
+                        existing_file_paths.add(file_path)
+                        if os.path.exists(file_path):
+                            file_size = os.path.getsize(file_path)
+                            print(f"📥 {label} File size: {file_size:,} bytes")
+                    successful_cdn_indices.add(index_value)
+                else:
+                    error_detail = cdn_result.get("error", "Unknown CDN error")
+                    print(f"📥 {label} CDN failed: {error_detail}")
+                    cdn_failures.append({
+                        "song_id": current_song_id,
+                        "error": error_detail
+                    })
 
-        print("📥 [DOWNLOAD-1] Calling download_song_v2...")
-        download_1 = await download_song_v2(
-            strTitle=title,
-            intIndex=-1,
-            download_path=temp_dir,
-            song_id=first_song_id  # Pass first song_id for direct page navigation
-        )
+        if cdn_failures:
+            failure_summaries = ', '.join(f"{failure['song_id']}: {failure['error']}" for failure in cdn_failures)
+            print(f"📥 [CDN] Triggering Playwright fallback for CDN issues -> {failure_summaries}")
 
-        print("📥 [DOWNLOAD-1] Download completed")
-        print(f"📥 [DOWNLOAD-1] Success: {download_1['success']}")
+        async def _download_with_playwright(config: Dict[str, Any]) -> None:
+            index_value = config["index"]
+            label = config["label"]
+            direct_song_id = config["song_id"]
 
-        if download_1["success"]:
-            downloaded_songs.append({
-                "file_path": download_1["file_path"],
-                "title": title,
-                "song_id": download_1.get("song_id") or first_song_id
-            })
-            print("📥 [DOWNLOAD-1] ✅ Successfully downloaded")
-            print(f"📥 [DOWNLOAD-1] File path: {download_1['file_path']}")
-            print(f"📥 [DOWNLOAD-1] Song ID: {download_1.get('song_id') or first_song_id}")
-            if os.path.exists(download_1['file_path']):
-                file_size = os.path.getsize(download_1['file_path'])
-                print(f"📥 [DOWNLOAD-1] File size: {file_size:,} bytes")
-        else:
-            print("📥 [DOWNLOAD-1] ❌ Failed to download")
-            print(f"📥 [DOWNLOAD-1] Error: {download_1.get('error')}")
-        print("📥 [DOWNLOAD-1] ===========\n")
+            print(f"\n📥 {label} ===========")
+            print(f"📥 {label} Starting download for song at index {index_value}")
+            print(f"📥 {label} Title: '{title}'")
+            print(f"📥 {label} Temp directory: '{temp_dir}'")
+            if direct_song_id:
+                print(f"📥 {label} Using song_id for direct navigation: {direct_song_id}")
+            else:
+                print(f"📥 {label} No song_id available, will navigate to /me page")
+            print(f"📥 {label} Calling download_song_v2...")
 
-        # Download song at index -2 (second to last song)
-        print("\n📥 [DOWNLOAD-2] ===========")
-        print("📥 [DOWNLOAD-2] Starting download for song at index -2 (second newest)")
-        print(f"📥 [DOWNLOAD-2] Title: '{title}'")
-        print(f"📥 [DOWNLOAD-2] Temp directory: '{temp_dir}'")
+            download_result = await download_song_v2(
+                strTitle=title,
+                intIndex=index_value,
+                download_path=temp_dir,
+                song_id=direct_song_id
+            )
 
-        # Use second song_id if available
-        second_song_id = song_ids[1] if song_ids and len(song_ids) > 1 else None
+            print(f"📥 {label} Download completed")
+            print(f"📥 {label} Success: {download_result.get('success')}")
 
-        if second_song_id:
-            print(f"📥 [DOWNLOAD-2] Using song_id for direct navigation: {second_song_id}")
-        else:
-            print("📥 [DOWNLOAD-2] No second song_id available, will navigate to /me page")
+            if download_result.get("success"):
+                fallback_song_id = download_result.get("song_id") or direct_song_id
+                file_path = download_result.get("file_path")
+                if file_path and file_path not in existing_file_paths:
+                    downloaded_songs.append({
+                        "file_path": file_path,
+                        "title": title,
+                        "song_id": fallback_song_id
+                    })
+                    existing_file_paths.add(file_path)
+                    print(f"📥 {label} ✅ Successfully downloaded")
+                    print(f"📥 {label} File path: {file_path}")
+                    if fallback_song_id:
+                        print(f"📥 {label} Song ID: {fallback_song_id}")
+                    if os.path.exists(file_path):
+                        file_size = os.path.getsize(file_path)
+                        print(f"📥 {label} File size: {file_size:,} bytes")
+                else:
+                    print(f"📥 {label} ⚠️ Duplicate file path detected, skipping append")
+            else:
+                print(f"📥 {label} ❌ Failed to download")
+                print(f"📥 {label} Error: {download_result.get('error')}")
 
-        print("📥 [DOWNLOAD-2] Calling download_song_v2...")
-        download_2 = await download_song_v2(
-            strTitle=title,
-            intIndex=-2,
-            download_path=temp_dir,
-            song_id=second_song_id  # Pass second song_id for direct page navigation
-        )
-
-        print("📥 [DOWNLOAD-2] Download completed")
-        print(f"📥 [DOWNLOAD-2] Success: {download_2['success']}")
-
-        if download_2["success"]:
-            downloaded_songs.append({
-                "file_path": download_2["file_path"],
-                "title": title,
-                "song_id": download_2.get("song_id")
-            })
-            print("📥 [DOWNLOAD-2] ✅ Successfully downloaded")
-            print(f"📥 [DOWNLOAD-2] File path: {download_2['file_path']}")
-            print(f"📥 [DOWNLOAD-2] Song ID: {download_2.get('song_id', 'Not extracted')}")
-            if os.path.exists(download_2['file_path']):
-                file_size = os.path.getsize(download_2['file_path'])
-                print(f"📥 [DOWNLOAD-2] File size: {file_size:,} bytes")
-        else:
-            print("📥 [DOWNLOAD-2] ❌ Failed to download")
-            print(f"📥 [DOWNLOAD-2] Error: {download_2.get('error')}")
-        print("📥 [DOWNLOAD-2] ===========\n")
+        for config in index_configs:
+            if config["index"] in successful_cdn_indices:
+                print(f"📥 {config['label']} Skipping Playwright fallback; CDN download succeeded.")
+                continue
+            await _download_with_playwright(config)
 
         if len(downloaded_songs) == 0:
             return {
@@ -439,7 +606,7 @@ async def download_both_songs(title: str, temp_dir: str, song_ids: list = None) 
                 "error": "Failed to download any songs",
                 "downloads": []
             }
-        elif len(downloaded_songs) == 1:
+        if len(downloaded_songs) == 1:
             print("🎼 [DOWNLOAD] Warning: Only downloaded 1 of 2 songs")
 
         return {

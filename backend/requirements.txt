@@ -16,3 +16,7 @@ python-slugify
 google-generativeai
 pyinstaller
 requests
+aiohttp
+mutagen
+pytest
+pytest-asyncio
