@@ -278,10 +278,19 @@ async def generate_song(
             if blnCloseModal:
                 await close_modal_if_present(page)
 
-            # Count initial songs right after Custom button is clicked, before filling any forms
-            song_card_selector = SunoSelectors.SONG_CARD
-            initial_song_count = await page.locator(song_card_selector).count()
-            print(f"[INFO] Initial song count (before form filling): {initial_song_count}")
+            # Get initial song count using a more specific, robust XPath selector
+            initial_song_count = 0
+            try:
+                # Use specific parent container to avoid selector conflicts
+                song_count_locator = page.locator("//div[contains(@class, 'e1qr1dqp4')]//div[contains(text(), 'songs')]")
+                await song_count_locator.wait_for(state="visible", timeout=10000)
+                count_text = await song_count_locator.inner_text()
+                match = re.search(r'\d+', count_text)
+                if match:
+                    initial_song_count = int(match.group(0))
+                print(f"[INFO] Initial song count: {initial_song_count}")
+            except Exception as e:
+                print(f"[WARNING] Could not determine initial song count: {e}. Assuming 0.")
 
             print("[ACTION] Filling strLyrics...")
             try:
@@ -404,58 +413,59 @@ async def generate_song(
                 if not create_button:
                     raise Exception("Could not find a visible create button.")
 
-                # initial_song_count was already captured after Custom button click
                 print(f"[INFO] Using initial song count from before form filling: {initial_song_count}")
 
                 await create_button.click()
                 print("[ACTION] Create button clicked. Waiting for new songs to appear...")
 
-                # 10 minute pause for manual inspection
-                # print("[DEBUG] Pausing for 10 minutes to allow manual element inspection...")
-                # await page.wait_for_timeout(600000)  # 10 minutes = 600000ms
-                # print("[DEBUG] Resuming after 10 minute inspection pause")
-
-                # Progressive checking: First wait for initial processing
-                await page.wait_for_timeout(10000)
-                print("[INFO] Waited 3 seconds for initial song processing")
-
-                # Step 1: Wait for at least 1 new song
-                minimum_expected = initial_song_count + 1
+                # Use hardened JavaScript with XPath to wait for the song count to increase
+                wait_expression = f"""
+                ((initialCount) => {{
+                    const element = document.evaluate("//div[contains(@class, 'e1qr1dqp4')]//div[contains(text(), 'songs')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                    if (!element || !element.innerText) {{
+                        return false;
+                    }}
+                    const match = element.innerText.match(/\d+/);
+                    if (!match) {{
+                        return false;
+                    }}
+                    const newCount = parseInt(match[0], 10);
+                    return newCount > initialCount;
+                }})({initial_song_count})
+                """
 
                 try:
-                    # Wait for the first song to appear
-                    escaped_selector = song_card_selector.replace('"', '\\"').replace("'", "\\'")
-                    expression = f"() => document.querySelectorAll('{escaped_selector}').length >= {minimum_expected}"
-                    print(f"[DEBUG] Waiting for at least 1 new song with expression: {expression}")
-                    await page.wait_for_function(expression, timeout=8000)
+                    print(f"[INFO] Waiting for song count to become greater than {initial_song_count}...")
+                    await page.wait_for_function(wait_expression, timeout=90000)  # 90-second timeout for generation
+                    
+                    # Get final count for logging
+                    song_count_locator = page.locator("//div[contains(@class, 'e1qr1dqp4')]//div[contains(text(), 'songs')]")
+                    final_count_text = await song_count_locator.inner_text()
+                    final_match = re.search(r'\d+', final_count_text)
+                    final_song_count = int(final_match.group(0)) if final_match else initial_song_count
+                    new_songs_created = final_song_count - initial_song_count
 
-                    first_count = await page.locator(song_card_selector).count()
-                    first_new_songs = first_count - initial_song_count
-                    print(f"[SUCCESS] First song(s) detected. Current total: {first_count}, New songs: {first_new_songs}")
-                except Exception:
-                    # Check if any songs were created despite timeout
-                    current_count = await page.locator(song_card_selector).count()
-                    if current_count > initial_song_count:
-                        print(f"[INFO] Songs detected despite timeout. Current: {current_count}, New: {current_count - initial_song_count}")
-                    else:
-                        error_message = f"No songs created after clicking Create button. Initial: {initial_song_count}, Current: {current_count}"
-                        print(f"[ERROR] {error_message}")
-                        raise Exception(error_message)
+                    print(f"[SUCCESS] Song generation confirmed. New count: {final_song_count}. New songs: {new_songs_created}")
 
-                # Step 2: ALWAYS wait additional time to check for more songs
-                print("[INFO] Waiting for potential additional songs...")
-                await page.wait_for_timeout(5000)
+                except Exception as e:
+                    print(f"[ERROR] Timeout or error while waiting for new songs: {e}")
+                    
+                    # Take screenshot for debugging
+                    screenshot_path = os.path.join("logs", f"failure_screenshot_{int(time.time())}.png")
+                    await page.screenshot(path=screenshot_path, full_page=True)
+                    print(f"[DEBUG] Screenshot saved to {screenshot_path}")
 
-                # Final count after mandatory wait
-                new_song_count = await page.locator(song_card_selector).count()
-                new_songs_created = new_song_count - initial_song_count
+                    # Re-check count one last time to be sure
+                    try:
+                        final_count_text = await page.locator("//div[contains(@class, 'e1qr1dqp4')]//div[contains(text(), 'songs')]").inner_text()
+                        final_match = re.search(r'\d+', final_count_text)
+                        final_song_count = int(final_match.group(0)) if final_match else initial_song_count
+                    except Exception:
+                        final_song_count = initial_song_count
 
-                if new_songs_created > 0:
-                    print(f"[SUCCESS] Final song count after progressive check. Total: {new_song_count}, New songs created: {new_songs_created}")
-                else:
-                    error_message = f"No songs were created. Initial: {initial_song_count}, Final: {new_song_count}"
+                    error_message = f"No new songs detected. Initial count: {initial_song_count}, Final count: {final_song_count}"
                     print(f"[ERROR] {error_message}")
-                    raise Exception(error_message)
+                    raise Exception(error_message) from e
 
                 print("[SUCCESS] Song creation initiated and page loaded.")
 
