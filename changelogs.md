@@ -5,3 +5,5 @@
 - Updated the `/main` loader to fetch song metadata alongside Bible books for a unified page state.
 - Restyled filter and song panels with the new neutral palette and three-column desktop layout.
 - Simplified the `/main` header by removing the redundant link to `/songs`.
+- Enabled manual review playback in the song sidebar with inline audio controls.
+- Limited the song sidebar review panel to approve/regenerate toggles and playback speed adjustments.
