@@ -1,5 +1,12 @@
 # Changelog
 
+## 2025-10-06
+- **Fixed**: Resolved XPath selector strict mode violation in song generation automation
+  - Updated song count detection selector from generic `//div[contains(text(), 'songs')]` to specific `//div[contains(@class, 'e1qr1dqp4')]//div[contains(text(), 'songs')]`
+  - Applied fix to initial count detection, JavaScript wait expression, final count verification, and fallback verification
+  - Eliminated conflicts between notification div and target song count div
+  - Improved reliability of song generation workflow
+
 ## 2025-10-05
 - Added side panel for song list on `/main` and removed the legacy `/songs` route.
 - Updated the `/main` loader to fetch song metadata alongside Bible books for a unified page state.
