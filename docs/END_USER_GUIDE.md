@@ -2,10 +2,7 @@
 
 ## Quick Start (4 Steps)
 
-### Step 1: Download Backend Package
-Download `suno-automation-backend.zip` from the releases page and extract it to a folder (e.g., `C:\suno-backend`)
-
-### Step 2: Install Docker Desktop
+### Step 1: Install Docker Desktop
 Download and install Docker Desktop for your operating system:
 - **Windows**: https://docs.docker.com/desktop/install/windows-install/
 - **Mac**: https://docs.docker.com/desktop/install/mac-install/
@@ -13,10 +10,18 @@ Download and install Docker Desktop for your operating system:
 
 After installation, make sure Docker Desktop is running (you'll see the whale icon in your system tray).
 
-### Step 3: Start the Backend
-Navigate to the extracted backend folder and double-click `suno-automation-backend.exe`. Keep this window open.
+### Step 2: Choose Backend Installation Method
 
-### Step 4: Pull and Run the Frontend
+**Option A: Docker Backend (Recommended)**
+```bash
+docker pull vnmw7/suno-backend:latest
+docker run -d -p 8000:8000 --name suno-backend vnmw7/suno-backend:latest
+```
+
+**Option B: Manual Backend**
+Download `suno-automation-backend.zip` from the releases page and extract it to a folder (e.g., `C:\suno-backend`), then double-click `suno-automation-backend.exe`.
+
+### Step 3: Start the Frontend
 Open Terminal (Mac/Linux) or Command Prompt (Windows) and run:
 
 ```bash
@@ -24,7 +29,7 @@ docker pull vnmw7/suno-frontend:latest
 docker run -d -p 3001:3000 vnmw7/suno-frontend:latest
 ```
 
-### Step 5: Access the Application
+### Step 4: Access the Application
 Open your web browser and go to: **http://localhost:3001**
 
 ---
@@ -34,8 +39,8 @@ Open your web browser and go to: **http://localhost:3001**
 Before installing, ensure you have:
 - ✅ Docker Desktop installed and running
 - ✅ At least 4GB of available RAM
-- ✅ The backend package (`suno-automation-backend.zip`) downloaded and extracted
 - ✅ Active internet connection for initial download
+- ✅ Either the backend package (`suno-automation-backend.zip`) OR willingness to use Docker backend
 
 ---
 
@@ -51,13 +56,26 @@ Before installing, ensure you have:
    - Press `Windows + R`
    - Type `cmd` and press Enter
 
-3. **Install Suno Frontend**
+3. **Install Backend and Frontend**
+
+   **Option A: Docker Backend (Recommended)**
    ```cmd
-   REM First start the backend
+   REM Install backend via Docker
+   docker pull vnmw7/suno-backend:latest
+   docker run -d -p 8000:8000 --name suno-backend --restart unless-stopped vnmw7/suno-backend:latest
+
+   REM Install frontend
+   docker pull vnmw7/suno-frontend:latest
+   docker run -d -p 3001:3000 --restart unless-stopped vnmw7/suno-frontend:latest
+   ```
+
+   **Option B: Manual Backend**
+   ```cmd
+   REM Start manual backend
    cd C:\suno-backend
    start suno-automation-backend.exe
 
-   REM Then install frontend
+   REM Install frontend
    docker pull vnmw7/suno-frontend:latest
    docker run -d -p 3001:3000 --restart unless-stopped vnmw7/suno-frontend:latest
    ```
@@ -66,7 +84,7 @@ Before installing, ensure you have:
    ```cmd
    docker ps
    ```
-   You should see `suno-frontend` in the list of running containers.
+   You should see `suno-frontend` and optionally `suno-backend` in the list of running containers.
 
 ### For Mac/Linux Users
 
@@ -74,8 +92,22 @@ Before installing, ensure you have:
    - Mac: Press `Cmd + Space`, type "Terminal"
    - Linux: Press `Ctrl + Alt + T`
 
-2. **Install and Run**
+2. **Install Backend and Frontend**
+
+   **Option A: Docker Backend (Recommended)**
    ```bash
+   # Install backend via Docker
+   docker pull vnmw7/suno-backend:latest
+   docker run -d -p 8000:8000 --name suno-backend --restart unless-stopped vnmw7/suno-backend:latest
+
+   # Install frontend
+   docker pull vnmw7/suno-frontend:latest
+   docker run -d -p 3001:3000 --restart unless-stopped vnmw7/suno-frontend:latest
+   ```
+
+   **Option B: Manual Backend**
+   ```bash
+   # Install frontend only (backend must be running separately)
    docker pull vnmw7/suno-frontend:latest
    docker run -d -p 3001:3000 --restart unless-stopped vnmw7/suno-frontend:latest
    ```
@@ -117,9 +149,20 @@ docker start suno-frontend
 docker stop suno-frontend
 ```
 
+### Start the Backend (Docker only)
+```bash
+docker start suno-backend
+```
+
+### Stop the Backend (Docker only)
+```bash
+docker stop suno-backend
+```
+
 ### View Logs
 ```bash
 docker logs suno-frontend
+docker logs suno-backend  # For Docker backend
 ```
 
 ### Restart the Frontend
@@ -127,9 +170,15 @@ docker logs suno-frontend
 docker restart suno-frontend
 ```
 
+### Restart the Backend (Docker only)
+```bash
+docker restart suno-backend
+```
+
 ### Check Status
 ```bash
 docker ps | grep suno-frontend
+docker ps | grep suno-backend  # For Docker backend
 ```
 
 ---
@@ -139,13 +188,19 @@ docker ps | grep suno-frontend
 To update to the newest version:
 
 ```bash
-# Stop and remove current version
+# Stop and remove current frontend
 docker stop suno-frontend
 docker rm suno-frontend
 
-# Pull and run new version
+# Pull and run new frontend
 docker pull vnmw7/suno-frontend:latest
 docker run -d --name suno-frontend -p 3001:3000 --restart unless-stopped vnmw7/suno-frontend:latest
+
+# Optional: Update Docker backend if using it
+docker stop suno-backend
+docker rm suno-backend
+docker pull vnmw7/suno-backend:latest
+docker run -d --name suno-backend -p 8000:8000 --restart unless-stopped vnmw7/suno-backend:latest
 ```
 
 ---
@@ -153,6 +208,45 @@ docker run -d --name suno-frontend -p 3001:3000 --restart unless-stopped vnmw7/s
 ## Using Docker Compose (Alternative Method)
 
 1. **Create `docker-compose.yml` file**:
+   ```yaml
+   version: '3.8'
+   services:
+     backend:
+       image: vnmw7/suno-backend:latest
+       container_name: suno-backend
+       ports:
+         - "8000:8000"
+       restart: unless-stopped
+       volumes:
+         - ./songs:/app/songs
+         - ./camoufox_session_data:/app/camoufox_session_data
+         - ./logs:/app/logs
+
+     frontend:
+       image: vnmw7/suno-frontend:latest
+       container_name: suno-frontend
+       ports:
+         - "3001:3000"
+       restart: unless-stopped
+       environment:
+         - NODE_ENV=production
+       depends_on:
+         - backend
+       extra_hosts:
+         - "host.docker.internal:host-gateway"
+   ```
+
+2. **Start with Docker Compose**:
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Stop with Docker Compose**:
+   ```bash
+   docker-compose down
+   ```
+
+4. **Frontend Only (if using manual backend)**:
    ```yaml
    version: '3.8'
    services:
@@ -166,16 +260,6 @@ docker run -d --name suno-frontend -p 3001:3000 --restart unless-stopped vnmw7/s
          - NODE_ENV=production
        extra_hosts:
          - "host.docker.internal:host-gateway"
-   ```
-
-2. **Start with Docker Compose**:
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Stop with Docker Compose**:
-   ```bash
-   docker-compose down
    ```
 
 ---
@@ -200,6 +284,13 @@ docker rm -f suno-frontend
 
 ### "Cannot connect to backend API"
 **Solution**:
+
+**For Docker Backend:**
+1. Ensure backend container is running: `docker ps | grep suno-backend`
+2. Check backend logs: `docker logs suno-backend`
+3. Restart backend if needed: `docker restart suno-backend`
+
+**For Manual Backend:**
 1. Ensure `suno-automation-backend.exe` is running
 2. Check the console window shows "Server running at http://localhost:8000"
 3. If the backend crashes, check Windows Defender/Antivirus settings
@@ -234,7 +325,17 @@ docker rm suno-frontend
 docker rmi vnmw7/suno-frontend:latest
 ```
 
-### 2. Stop Backend:
+### 2. Stop and Remove Backend (Docker):
+```bash
+# Stop and remove container
+docker stop suno-backend
+docker rm suno-backend
+
+# Remove image
+docker rmi vnmw7/suno-backend:latest
+```
+
+### 3. Stop Backend (Manual):
 - Close the backend console window
 - Delete the extracted backend folder
 
@@ -310,24 +411,34 @@ The `--restart unless-stopped` flag ensures the container starts automatically w
 
 | Action | Command |
 |--------|---------|
-| Install | `docker pull vnmw7/suno-frontend:latest` |
-| Run | `docker run -d --name suno-frontend -p 3001:3000 vnmw7/suno-frontend:latest` |
-| Stop | `docker stop suno-frontend` |
-| Start | `docker start suno-frontend` |
-| Restart | `docker restart suno-frontend` |
-| View Logs | `docker logs suno-frontend` |
-| Remove | `docker rm -f suno-frontend` |
-| Update | `docker pull vnmw7/suno-frontend:latest` |
-| Status | `docker ps \| grep suno-frontend` |
+| Install Frontend | `docker pull vnmw7/suno-frontend:latest` |
+| Install Backend | `docker pull vnmw7/suno-backend:latest` |
+| Run Frontend | `docker run -d --name suno-frontend -p 3001:3000 vnmw7/suno-frontend:latest` |
+| Run Backend | `docker run -d --name suno-backend -p 8000:8000 vnmw7/suno-backend:latest` |
+| Stop Frontend | `docker stop suno-frontend` |
+| Stop Backend | `docker stop suno-backend` |
+| Start Frontend | `docker start suno-frontend` |
+| Start Backend | `docker start suno-backend` |
+| Restart Frontend | `docker restart suno-frontend` |
+| Restart Backend | `docker restart suno-backend` |
+| View Frontend Logs | `docker logs suno-frontend` |
+| View Backend Logs | `docker logs suno-backend` |
+| Remove Frontend | `docker rm -f suno-frontend` |
+| Remove Backend | `docker rm -f suno-backend` |
+| Update Frontend | `docker pull vnmw7/suno-frontend:latest` |
+| Update Backend | `docker pull vnmw7/suno-backend:latest` |
+| Check Status | `docker ps \| grep suno-frontend` |
+| Check Backend Status | `docker ps \| grep suno-backend` |
 
 ---
 
 ## Important Notes
 
 ### Backend Requirements
-- The backend (`suno-automation-backend.exe`) must be running for the application to work
-- Keep the backend console window open while using the application
-- If Windows Defender blocks the backend, you'll need to allow it in your security settings
+- A backend must be running for the application to work (either Docker or manual)
+- For Docker backend: `docker start suno-backend`
+- For manual backend: Keep `suno-automation-backend.exe` console window open
+- If Windows Defender blocks the manual backend, you'll need to allow it in your security settings
 
 ### Data Storage
 - Downloaded MP3 files are stored in the backend's local directory

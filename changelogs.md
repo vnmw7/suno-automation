@@ -1,6 +1,12 @@
 # Changelog
 
 ## 2025-10-06
+- **Added**: Published Docker backend image to Docker Hub as `vnmw7/suno-backend:latest`
+  - Built complete backend container with Python 3.11, Camoufox browser, and all dependencies
+  - Image size: 1.58GB with multi-stage build optimization
+  - Includes health checks, proper volume mounting, and production-ready configuration
+  - Users can now run backend via Docker: `docker run -d -p 8000:8000 vnmw7/suno-backend:latest`
+  - Provides alternative to manual backend executable installation
 - **Fixed**: Replaced failing aiohttp CDN download with Camoufox browser automation
   - Replaced `downloadSongsFromCdn` function in `backend/api/orchestrator/utils.py`
   - Removed aiohttp HTTP requests causing 403 Forbidden errors from CDN server
