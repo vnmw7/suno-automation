@@ -1,7 +1,14 @@
+/**
+ * System: Suno Automation
+ * Module: Root Route
+ * Purpose: Render the landing view and orchestrate authentication flows against the backend API.
+ */
+
 import type { MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
 import { useState } from "react";
+import { API_BASE_URL } from "../lib/api";
 
 export const meta: MetaFunction = () => {
   return [
@@ -11,8 +18,9 @@ export const meta: MetaFunction = () => {
 };
 
 export async function loader() {
+  const API_URL = API_BASE_URL;
   try {
-    const response = await fetch("http://127.0.0.1:8000/");
+    const response = await fetch(`${API_URL}/`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -32,7 +40,7 @@ export default function Index() {
   const login_with_google = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/login");
+      const response = await fetch(`${API_BASE_URL}/login`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -83,7 +91,7 @@ export default function Index() {
     const login_with_microsoft = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/login/microsoft");
+      const response = await fetch(`${API_BASE_URL}/login/microsoft`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -134,7 +142,7 @@ export default function Index() {
   const triggerManualLogin = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/manual-login", {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/manual-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });

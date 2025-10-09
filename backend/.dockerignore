@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.env
+.venv
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.git/
+.gitignore
+*.md
+.vscode/
+.idea/
+logs/*.log
+# Don't ignore songs folder structure, just the MP3s
+songs/**/*.mp3
+.ruff_cache/

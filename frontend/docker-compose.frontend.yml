@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.standalone
+    container_name: suno-frontend-standalone
+    ports:
+      - "3001:3000"  # Using 3001 to avoid conflict with existing setup
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      # Backend URL pointing to host machine
+      - BACKEND_URL=http://host.docker.internal:8000
+      - VITE_API_URL=http://localhost:8000
+      # Supabase configuration (if needed)
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-}
+      - VITE_SUPABASE_KEY=${VITE_SUPABASE_KEY:-}
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - frontend-network
+
+networks:
+  frontend-network:
+    driver: bridge

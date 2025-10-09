@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: suno-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./songs:/app/songs
+      - ./camoufox_session_data:/app/camoufox_session_data
+      - ./logs:/app/logs
+      - camoufox-cache:/app/.cache
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - backend-network
+
+networks:
+  backend-network:
+    driver: bridge
+
+volumes:
+  camoufox-cache:
+    driver: local

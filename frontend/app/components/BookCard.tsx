@@ -1,9 +1,14 @@
-// app/components/BookCard.tsx
+/**
+ * System: Suno Automation
+ * Module: Book Card Component
+ * Purpose: Present book selection UI and coordinate verse range lookups with the backend API.
+ */
 import { useState } from "react";
 import type { BibleBook } from "~/routes/main";
 import { BookOpenIcon } from "./ui/icon";
 import bookAbbreviations from "../constants/book-abrv.json";
 import { supabase } from "../lib/supabase";
+import { API_BASE_URL } from "../lib/api";
 import ChapterCard from "./CardChapter";
 
 interface BookCardProps {
@@ -96,7 +101,7 @@ export async function generate_verse_range(bookAbbr: string, chapter: string): P
       `[generate_verse_range] Generating verse range for book: ${bookName} (abbr: ${bookAbbr}), chapter: ${chapter}`
     );
     const response = await fetch(
-      `http://127.0.0.1:8000/api/v1/ai-generation/verse-ranges`,
+      `${API_BASE_URL}/api/v1/ai-generation/verse-ranges`,
       {
         method: "POST",
         headers: {

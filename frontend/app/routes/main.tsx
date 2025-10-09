@@ -5,6 +5,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import SidebarFilters from "../components/SidebarFilters";
 import BookCard from "../components/BookCard";
 import BookDetailsView from "../components/BookDetailsView";
+import SongSidebar, { type Song as SongItem } from "../components/SongSidebar";
 import { ListIcon, ViewGridIcon, BookOpenIcon } from "../components/ui/icon";
 import { supabase } from "../lib/supabase";
 import {
@@ -54,6 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       return {
         books: [],
         filters: { bookNames: [] },
+        songs: [],
         totalPages: 0,
         currentPage: 1,
         query: queryFromUrl,
@@ -67,6 +69,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       return {
         books: [],
         filters: { bookNames: [] },
+        songs: [],
         totalPages: 0,
         currentPage: 1,
         query: queryFromUrl,
@@ -80,8 +83,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       if (item && item.book_name && isCanonicalBook(item.book_name)) {
         const fullBookName = getFullBookName(item.book_name);
         databaseBooks.push({
-          id: item.book_name, // Keep the abbreviated ID for database consistency
-          name: fullBookName, // Use the full name for display
+          id: item.book_name,
+          name: fullBookName,
           maxChapter: item.max_chapter_number || 1,
         });
         bookNamesArray.push(fullBookName);
@@ -94,9 +97,38 @@ export async function loader({ request }: LoaderFunctionArgs) {
       bookNames: bookNamesArray,
     };
 
+    let songs: SongItem[] = [];
+    try {
+      const songsApiUrl = new URL("/api/list-songs", request.url);
+      const songsResponse = await fetch(songsApiUrl.toString(), {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (songsResponse.ok) {
+        const songsPayload = await songsResponse.json();
+        songs =
+          songsPayload.files?.map((fileName: string) => ({
+            id: fileName,
+            name: fileName.replace(/\.mp3$/, "").replace(/_/g, " "),
+            fileName,
+          })) ?? [];
+      } else {
+        console.error(
+          "[main.tsx] Failed to fetch songs:",
+          songsResponse.statusText
+        );
+      }
+    } catch (songsError) {
+      console.error("[main.tsx] Error fetching songs:", songsError);
+    }
+
     return {
       books: databaseBooks,
       filters: filterData,
+      songs,
       totalPages: 1,
       currentPage: 1,
       query: queryFromUrl,
@@ -120,6 +152,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return {
       books: [],
       filters: { bookNames: [] },
+      songs: [],
       totalPages: 0,
       currentPage: 1,
       query: queryFromUrl,
@@ -127,9 +160,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     };
   }
 }
-
 export default function BibleBooksPage() {
-  const { books, filters } = useLoaderData<typeof loader>();
+  const { books, filters, songs } = useLoaderData<typeof loader>();
   const [detailsViewBook, setDetailsViewBook] = useState<BibleBook | null>(
     null
   );
@@ -140,6 +172,7 @@ export default function BibleBooksPage() {
   }>({
     bookName: null,
   });
+  const [selectedSong, setSelectedSong] = useState<SongItem | null>(null);
 
   const filteredBooks = books.filter((book: BibleBook) => {
     let pass = true;
@@ -149,58 +182,67 @@ export default function BibleBooksPage() {
   });
 
   return (
-    <div className="min-h-screen flex flex-col p-4 sm:p-6 md:p-8">
-      <header className="mb-8 text-center">
-        <div className="inline-flex items-center text-sky-700 mb-2">
-          <BookOpenIcon className="w-10 h-10 mr-3" />
-          <h1 className="text-4xl font-bold">Song Automation</h1>
+    <div className="min-h-screen flex flex-col bg-neutral-50 p-4 sm:p-6 md:p-8">
+      <header className="mb-8 text-center space-y-3">
+        <div className="inline-flex items-center justify-center gap-3 text-neutral-800">
+          <BookOpenIcon className="w-10 h-10 text-neutral-500" />
+          <h1 className="text-3xl font-semibold text-neutral-900">Song Automation</h1>
         </div>
-        <p className="text-slate-600">This is for automation purposes only.</p>
+        <p className="text-neutral-600">This is for automation purposes only.</p>
       </header>
 
-      <div className="flex flex-col md:flex-row gap-8 flex-grow">
-        {" "}
-        <SidebarFilters
-          filters={filters}
-          activeFilters={activeFilters}
-          onFilterChange={(newFilters) =>
-            setActiveFilters((prev) => ({ ...prev, ...newFilters }))
-          }
-        />
-        <main className="w-full md:w-3/4">
-          {/* Sort & View Options Bar */}
-          <div className="bg-white p-3 rounded-md shadow-sm flex justify-between items-center mb-6 border border-slate-200">
-            <div className="flex gap-3"> </div>
+      <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+        <div className="order-2 md:order-1">
+          <SidebarFilters
+            filters={filters}
+            activeFilters={activeFilters}
+            onFilterChange={(newFilters) =>
+              setActiveFilters((prev) => ({ ...prev, ...newFilters }))
+            }
+          />
+        </div>
+
+        <main className="order-1 w-full md:order-2 md:flex-1">
+          <div className="mb-6 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-1 text-sm text-neutral-600">
+              <span>{filteredBooks.length} books found</span>
+              {selectedSong && (
+                <span className="text-neutral-500">
+                  Selected song:
+                  <span className="ml-1 font-medium text-neutral-700">
+                    {selectedSong.name}
+                  </span>
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600 mr-2">
-                {filteredBooks.length} books found
-              </span>
               <button
                 title="Grid View"
                 onClick={() => setViewMode("grid")}
-                className={`p-2 rounded ${
+                className={`h-9 w-9 rounded-md border border-neutral-300 text-neutral-700 transition-colors ${
                   viewMode === "grid"
-                    ? "bg-sky-600 text-white"
-                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    ? "bg-neutral-900 text-white border-neutral-900"
+                    : "bg-neutral-100 hover:bg-neutral-200"
                 }`}
+                aria-pressed={viewMode === "grid"}
               >
-                <ViewGridIcon className="w-5 h-5" />
+                <ViewGridIcon className="h-5 w-5" />
               </button>
               <button
                 title="List View"
                 onClick={() => setViewMode("list")}
-                className={`p-2 rounded ${
+                className={`h-9 w-9 rounded-md border border-neutral-300 text-neutral-700 transition-colors ${
                   viewMode === "list"
-                    ? "bg-sky-600 text-white"
-                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    ? "bg-neutral-900 text-white border-neutral-900"
+                    : "bg-neutral-100 hover:bg-neutral-200"
                 }`}
+                aria-pressed={viewMode === "list"}
               >
-                <ListIcon className="w-5 h-5" />
+                <ListIcon className="h-5 w-5" />
               </button>
             </div>
           </div>
 
-          {/* Books Grid/List */}
           {filteredBooks.length > 0 ? (
             <div
               className={`grid gap-6 ${
@@ -214,13 +256,20 @@ export default function BibleBooksPage() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-10 text-slate-500">
+            <div className="py-10 text-center text-neutral-500">
               <p className="text-xl">No books match your current filters.</p>
               <p>Try adjusting your search criteria.</p>
             </div>
           )}
-          {/* Pagination could go here if many books */}
         </main>
+
+        <div className="order-3 md:order-3">
+          <SongSidebar
+            songs={songs}
+            selectedSong={selectedSong}
+            onSongSelect={setSelectedSong}
+          />
+        </div>
       </div>
 
       {detailsViewBook && (

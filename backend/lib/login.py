@@ -1,6 +1,7 @@
 """
-login.py
-This file contains the login functionality for the application.
+System: Suno Automation
+Module: Login
+Purpose: Handle Suno authentication flows with automated and manual options
 """
 
 import sys
@@ -32,20 +33,6 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# Validate environment variables at startup
-REQUIRED_ENV_VARS = [
-    "GOOGLE_EMAIL",
-    "GOOGLE_PASSWORD",
-    "MICROSOFT_EMAIL",
-    "MICROSOFT_PASSWORD",
-]
-missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
-if missing_vars:
-    warning_msg = f"WARNING: Missing environment variables: {', '.join(missing_vars)}. Manual login will be used as fallback."
-    logger.warning(warning_msg)
-    print(f"[WARNING] {warning_msg}")
-    # Don't exit - allow manual fallback
-
 # Global timeout settings (in milliseconds)
 DEFAULT_TIMEOUT = 10000
 LOGIN_CONFIRMATION_TIMEOUT = 30000
@@ -55,6 +42,9 @@ GOOGLE_EMAIL = os.getenv("GOOGLE_EMAIL")
 GOOGLE_PASSWORD = os.getenv("GOOGLE_PASSWORD")
 MICROSOFT_EMAIL = os.getenv("MICROSOFT_EMAIL")
 MICROSOFT_PASSWORD = os.getenv("MICROSOFT_PASSWORD")
+
+blnHasGoogleCredentials = bool(GOOGLE_EMAIL and GOOGLE_PASSWORD)
+blnHasMicrosoftCredentials = bool(MICROSOFT_EMAIL and MICROSOFT_PASSWORD)
 
 # Manual login configuration
 MANUAL_LOGIN_TIMEOUT = int(os.getenv("MANUAL_LOGIN_TIMEOUT", "300"))  # 5 minutes default
@@ -209,7 +199,7 @@ async def login_google():
     Falls back to manual login if credentials are not available.
     """
     # Check if credentials exist
-    if not GOOGLE_EMAIL or not GOOGLE_PASSWORD:
+    if not blnHasGoogleCredentials:
         logger.info("No Google credentials found, falling back to manual login")
         print("[INFO] No Google credentials configured - opening manual login...")
         return await manual_login_suno()
@@ -300,7 +290,7 @@ async def suno_login_microsoft():
     Falls back to manual login if credentials are not available.
     """
     # Check if credentials exist
-    if not MICROSOFT_EMAIL or not MICROSOFT_PASSWORD:
+    if not blnHasMicrosoftCredentials:
         logger.info("No Microsoft credentials found, falling back to manual login")
         print("[INFO] No Microsoft credentials configured - opening manual login...")
         return await manual_login_suno()
@@ -505,7 +495,22 @@ async def manual_login_suno():
 
         logger.info("Opening Suno for manual login...")
         await page.goto("https://suno.com/home")
-        await page.wait_for_load_state("networkidle", timeout=10000)
+
+        # Wait for networkidle, but don't treat timeout as hard failure
+        try:
+            await page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception as e:
+            logger.warning(f"Page did not reach networkidle (continuing anyway): {str(e)}")
+
+        # Check if already logged in before looking for Sign In button
+        is_logged_in, confidence = await is_truly_logged_in_suno(page)
+        if is_logged_in and confidence in ['high', 'medium']:
+            logger.info(f"Already logged in to Suno (confidence: {confidence})")
+            print("\n" + "="*60)
+            print("[SUCCESS] Already logged in to Suno!")
+            print(f"[INFO] Login confirmed with {confidence} confidence")
+            print("="*60 + "\n")
+            return True
 
         # Click the Sign In button using teleport for faster response
         sign_in_selector = 'button:has(span:has-text("Sign In"))'

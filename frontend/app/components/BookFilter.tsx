@@ -11,7 +11,7 @@ export default function BookFilter({
 }: BookFilterProps) {
   return (
     <div>
-      <h3 className="text-md font-semibold mb-2 text-slate-600">Book</h3>
+      <h3 className="text-md font-semibold mb-2 text-neutral-600">Book</h3>
       <div className="space-y-1.5">
         {bookNames.map((bookName) => (
           <button
@@ -20,8 +20,8 @@ export default function BookFilter({
             className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors
               ${
                 selectedBookName === bookName
-                  ? "bg-sky-600 text-white font-medium"
-                  : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  ? "bg-neutral-900 text-white font-medium"
+                  : "bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
               }`}
           >
             {bookName}

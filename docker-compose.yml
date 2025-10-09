@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: suno-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Pass through display for desktop browser
+      - DISPLAY=${DISPLAY:-:0}
+    volumes:
+      # Persistent storage for MP3 files
+      - ./songs:/app/songs
+      # Browser session persistence
+      - ./camoufox_session_data:/app/camoufox_session_data
+      # Logs
+      - ./logs:/app/logs
+      # Browser cache (speeds up subsequent runs)
+      - camoufox-cache:/app/.cache
+      # For Linux: X11 socket for display
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    networks:
+      - suno-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: suno-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./frontend/.env
+    environment:
+      - NODE_ENV=production
+      - BACKEND_URL=http://backend:8000
+      - VITE_API_URL=http://backend:8000
+      - HOST=0.0.0.0
+      - PORT=3000
+    depends_on:
+      - backend
+    networks:
+      - suno-network
+
+networks:
+  suno-network:
+    driver: bridge
+
+volumes:
+  camoufox-cache:
+    driver: local

@@ -1,6 +1,20 @@
-const API_BASE_URL = "http://127.0.0.1:8000";
-export const API_SONGS_URL = `${API_BASE_URL}/api/songs`;
+/**
+ * System: Suno Automation
+ * Module: Frontend Api Client
+ * Purpose: Provide shared helpers for calling backend APIs from the Remix app.
+ */
+
 import { supabase } from "../lib/supabase";
+
+const DEFAULT_CLIENT_API_URL = "http://localhost:8000";
+const DEFAULT_SERVER_API_URL = "http://backend:8000";
+
+export const API_BASE_URL =
+  typeof window !== "undefined"
+    ? import.meta.env.VITE_API_URL ?? DEFAULT_CLIENT_API_URL
+    : process.env.VITE_API_URL ?? process.env.BACKEND_URL ?? DEFAULT_SERVER_API_URL;
+
+export const API_SONGS_URL = `${API_BASE_URL}/api/songs`;
 
 export interface SongRequest {
   strBookName: string;

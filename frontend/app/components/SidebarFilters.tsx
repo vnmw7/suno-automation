@@ -24,20 +24,11 @@ export default function SidebarFilters({
   onFilterChange,
 }: SidebarFiltersProps) {
   return (
-    <aside className="w-full md:w-1/4 space-y-6 p-4 bg-white rounded-lg shadow-sm border border-slate-200 self-start md:sticky md:top-8 md:max-h-[calc(100vh-4rem)] md:overflow-y-auto">
-      <h2 className="text-xl font-semibold text-slate-700 border-b pb-2 mb-4 flex items-center sticky top-0 bg-white z-10">
-        <FilterIcon className="w-5 h-5 mr-2 text-sky-600" />
+    <aside className="flex w-full flex-col gap-6 rounded-lg border border-neutral-200 bg-white p-4 md:w-80 md:shrink-0 md:sticky md:top-8 md:max-h-[calc(100vh-4rem)] md:overflow-y-auto">
+      <h2 className="flex items-center border-b border-neutral-200 pb-3 text-lg font-semibold text-neutral-800">
+        <FilterIcon className="mr-2 h-5 w-5 text-neutral-500" />
         Filter Books
       </h2>
-      {/* <TestamentFilter // Removed TestamentFilter
-        testaments={filters.testaments}
-        selectedTestament={activeFilters.testament}
-        onSelectTestament={(testament: "Old Testament" | "New Testament") =>
-          onFilterChange({
-            testament: activeFilters.testament === testament ? null : testament,
-          })
-        }
-      /> */}
       <BookFilter
         bookNames={filters.bookNames}
         selectedBookName={activeFilters.bookName}
@@ -46,17 +37,19 @@ export default function SidebarFilters({
             bookName: activeFilters.bookName === bookName ? null : bookName,
           })
         }
-      />{" "}
+      />
       <button
+        type="button"
         onClick={() =>
           onFilterChange({
             bookName: null,
           })
         }
-        className="w-full mt-4 px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-100 text-sm"
+        className="w-full rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
       >
         Clear All Filters
       </button>
     </aside>
   );
 }
+

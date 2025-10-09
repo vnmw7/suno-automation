@@ -1,6 +1,7 @@
 """
 System: Suno Automation
 Module: Suno UI Selectors Configuration
+File URL: backend/configs/suno_selectors.py
 Purpose: Centralized configuration for all Suno website UI selectors and element references
 """
 
@@ -27,6 +28,14 @@ class SunoSelectors:
         "timeout": 5000
     }
 
+    MODAL_CLOSE_BUTTON = {
+        "selectors": [
+            'button[aria-label="Close"]',
+            'button[type="button"][aria-label="Close"]',
+            'button[aria-label="Close"]:has(svg)'
+        ],
+        "max_cycles": 2
+    }
     # Context Menu Selectors
     OPTIONS_BUTTON = {
         "selectors": [
@@ -247,7 +256,7 @@ class SunoSelectors:
 
     # Browser Configuration
     BROWSER_CONFIG = {
-        "headless": True,
+        "headless": False,
         "persistent_context": True,
         "user_data_dir": "backend/camoufox_session_data",
         "os": "windows",
@@ -287,3 +296,4 @@ class SunoSelectors:
         if element and isinstance(element, dict):
             return element.get("timeout", 10000)
         return 10000
+

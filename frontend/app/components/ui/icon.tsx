@@ -102,3 +102,20 @@ export const ChevronUpIcon = (props: React.SVGProps<SVGSVGElement>) => (
     />
   </svg>
 );
+
+export const MusicIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+    {...props}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M9 9h6.75M12 12h6.75M12 15h6.75M9 15l3-3 3 3M9 12l3-3 3 3M12 3v18"
+    />
+  </svg>
+);

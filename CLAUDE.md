@@ -28,19 +28,22 @@ When implementing new features, always follow the **Minimum Viable Approach (MVA
 - Write straightforward, readable code over clever solutions
 - Avoid premature optimization
 - Keep error handling simple but effective
+- When defining UI selectors, rely on stable attributes (aria-label, role, deterministic text) and avoid dynamic or hashed identifiers unless unavoidable.
 
 ### File Header Requirements
 Every source file must include a header at the beginning containing:
-- **System name**: Suno Automation
+- **System name**: Project or System name here
 - **Module name**: (if applicable)
+- **File URL**: Relative Path to the file
 - **Purpose**: Brief description of the file's purpose
 
 Example:
 ```python
 """
-System: Suno Automation
+System: {Project/System Name}
 Module: Song Download
-Purpose: Download and process songs from Suno API with error handling
+File URL: project-root/filename.example
+Purpose: Download and process songs from {Project/System Name} API with error handling
 """
 ```
 
