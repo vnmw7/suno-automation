@@ -495,7 +495,22 @@ async def manual_login_suno():
 
         logger.info("Opening Suno for manual login...")
         await page.goto("https://suno.com/home")
-        await page.wait_for_load_state("networkidle", timeout=10000)
+
+        # Wait for networkidle, but don't treat timeout as hard failure
+        try:
+            await page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception as e:
+            logger.warning(f"Page did not reach networkidle (continuing anyway): {str(e)}")
+
+        # Check if already logged in before looking for Sign In button
+        is_logged_in, confidence = await is_truly_logged_in_suno(page)
+        if is_logged_in and confidence in ['high', 'medium']:
+            logger.info(f"Already logged in to Suno (confidence: {confidence})")
+            print("\n" + "="*60)
+            print("[SUCCESS] Already logged in to Suno!")
+            print(f"[INFO] Login confirmed with {confidence} confidence")
+            print("="*60 + "\n")
+            return True
 
         # Click the Sign In button using teleport for faster response
         sign_in_selector = 'button:has(span:has-text("Sign In"))'
