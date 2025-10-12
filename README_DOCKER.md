@@ -26,6 +26,19 @@
 5. **Edit .env files** if prompted (first time only)
 6. **Access the app** at http://localhost:3000
 
+## Apple Silicon Build Workflow
+
+- **Native arm64 image**: `docker buildx build --platform linux/arm64 --target macos --tag suno-backend:latest-arm64 --load ./backend`
+- **amd64 image (Rosetta/emulation)**: `docker buildx build --platform linux/amd64 --tag suno-backend:latest-amd64 --load ./backend`
+- **Run locally**: `docker run -p 8000:8000 --rm -it suno-backend:latest-arm64` (swap tag for the amd64 build when testing Intel compatibility)
+- **Force manual Camoufox provisioning** (use when upstream `camoufox fetch` fails for arm64):
+  1. Export `CAMOUFOX_VERSION` (example: `export CAMOUFOX_VERSION=135.0.1-beta.24`).
+  2. Download the archive: `curl -sSL -o camoufox.zip "https://github.com/daijro/camoufox/releases/download/v${CAMOUFOX_VERSION}/camoufox-${CAMOUFOX_VERSION}-lin.arm64.zip"`.
+  3. Verify integrity (replace with the release checksum): `sha256sum camoufox.zip`.
+  4. Unzip and inspect locally if needed: `unzip -l camoufox.zip`.
+  5. Move the zip into `backend/build/artifacts/camoufox/`.
+  6. Build with manual source: `docker buildx build --platform linux/arm64 --target macos --tag suno-backend:manual-arm64 --build-arg CAMOUFOX_SOURCE=manual --load ./backend`.
+
 ## Stopping the Application
 
 ### Windows
