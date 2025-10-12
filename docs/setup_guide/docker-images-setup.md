@@ -20,100 +20,75 @@ This guide explains how to build, download, and run the Suno Automation frontend
 
 ## Image Naming Conventions
 
-- **Frontend macOS (arm64):** `suno-frontend:latest-macos-arm64`
-- **Frontend Windows/Linux (amd64):** `suno-frontend:latest-windows-amd64`
-- **Backend macOS (arm64):** `suno-backend:latest-macos-arm64`
-- **Backend Windows/Linux (amd64):** `suno-backend:latest-windows-amd64`
+Each service is published under a single architecture-neutral tag. Docker
+automatically pulls the matching image for your platform:
 
-You can adjust tags as needed. Use semantic tags (for example, `1.2.0`) when publishing images to a registry.
+- **Frontend development:** `suno-frontend:latest`
+- **Backend API:** `suno-backend:latest`
 
-## Build the Frontend Image
+When you cut formal releases, append semantic versions such as
+`suno-frontend:1.2.3` and `suno-backend:1.2.3`.
 
-### macOS (Apple Silicon arm64)
+## Build the Images with Helper Scripts
 
-1. Open a terminal and change to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-2. Make the script executable on the first run:
-   ```bash
-   chmod +x build-image-macos.sh
-   ```
-3. Build the arm64 image:
-   ```bash
-   ./build-image-macos.sh
-   ```
-   The script wraps the command below and loads the image into your local Docker Desktop installation:
-   ```bash
-   docker buildx build --platform linux/arm64 -f Dockerfile.macos -t suno-frontend:latest-macos-arm64 .
-   ```
-4. Verify the image:
-   ```bash
-   docker images suno-frontend
-   ```
+To remove platform-specific build commands, use the scripts in the project
+`scripts/` folder. They detect your host architecture automatically and can also
+publish multi-platform manifests when a registry is provided.
 
-### Windows (amd64)
+### Local build (host architecture)
 
-1. Launch a PowerShell window and change to the frontend folder:
-   ```powershell
-   Set-Location frontend
-   ```
-2. Run the build script:
-   ```powershell
-   .\build-image.bat
-   ```
-   The batch script invokes:
-   ```powershell
-   docker build -f Dockerfile.standalone -t suno-frontend:latest-windows-amd64 .
-   ```
-3. (Optional) Export the image to a tarball for offline sharing:
-   ```powershell
-   .\build-image.bat export
-   ```
-4. Confirm the image is available:
-   ```powershell
-   docker images suno-frontend
-   ```
+```bash
+# macOS/Linux
+./scripts/build-images.sh --tag latest
+```
 
-## Build the Backend Image
+```powershell
+# Windows PowerShell
+pwsh ./scripts/build-images.ps1 -Tag latest
+```
 
-### macOS (Apple Silicon arm64)
+The helper builds both frontend and backend and loads the images into Docker.
+Use the optional flags to tailor the build:
 
-1. From the project root, run:
-   ```bash
-   docker buildx build --platform linux/arm64 --target macos --tag suno-backend:latest-macos-arm64 --load ./backend
-   ```
-   This matches the workflow outlined in `README_DOCKER.md` and bundles the Camoufox browser for arm64.
-2. (Optional) Provide a manually downloaded Camoufox archive if automated fetching fails:
-   ```bash
-   docker buildx build --platform linux/arm64 --target macos --tag suno-backend:manual-macos-arm64 --build-arg CAMOUFOX_SOURCE=manual --load ./backend
-   ```
-   Place the archive inside `backend/build/artifacts/camoufox/` before running the command.
-3. Validate the resulting image:
-   ```bash
-   docker images suno-backend
-   ```
+- `--platform linux/amd64` – build for a specific platform (for example, debug amd64 issues on an Apple Silicon host).
+- `--platform linux/amd64,linux/arm64 --push` – publish both platforms in one pass.
+- `--manual-camoufox` – force the backend to consume a pre-downloaded Camoufox zip.
+- `--fetch-camoufox` – download the Camoufox archive ahead of time without changing the source mode.
 
-### Windows (amd64)
+On Apple Silicon hosts the script still prepares the Camoufox archive automatically
+for local builds so the backend works offline.
 
-1. Ensure Docker Desktop is configured for Linux containers (default).
-2. Run the amd64 build:
-   ```powershell
-   docker buildx build --platform linux/amd64 --target macos --tag suno-backend:latest-windows-amd64 --load ./backend
-   ```
-   Buildx ships with Docker Desktop for Windows and provides consistent cross-platform output.
-3. If Buildx is not available, fall back to the default builder:
-   ```powershell
-   docker build -t suno-backend:latest-windows-amd64 -f backend\Dockerfile backend
-   ```
-4. Confirm the image is available:
-   ```powershell
-   docker images suno-backend
-   ```
+> **Manual Camoufox fallback:** The `--manual-camoufox` flag assumes the archive
+> already exists under `backend/build/artifacts/camoufox/`. Fetch it with
+> `./scripts/fetch-camoufox.sh` (or the PowerShell equivalent) when you need an
+> offline build or an upstream download fails.
+
+Verify the result:
+
+```bash
+docker images | grep suno-
+```
+
+### Publish a multi-platform manifest
+
+Provide a registry (Docker Hub username, GHCR namespace, etc.) and pass `--push`
+to build `linux/amd64` and `linux/arm64` images together:
+
+```bash
+./scripts/build-images.sh --registry your-namespace --tag latest --push
+```
+
+```powershell
+pwsh ./scripts/build-images.ps1 -Registry your-namespace -Tag latest -Push
+```
+
+This workflow publishes a single tag (`your-namespace/suno-backend:latest`) whose
+manifest lists both architectures. Developers only need `docker pull
+your-namespace/suno-backend:latest`.
 
 ## Download Existing Images
 
-When a teammate publishes images (for example, via `frontend\docker-publish.bat`), you can pull them by tag:
+When a teammate publishes images (for example, by running `./scripts/build-images.sh --registry <name> --push`), you can pull them by tag:
 
 ```bash
 docker pull <registry-username>/suno-frontend:<tag>
@@ -121,8 +96,8 @@ docker pull <registry-username>/suno-backend:<tag>
 ```
 
 Common tag patterns:
-- `latest-macos-arm64` or `latest-windows-amd64` for the most recent stable build.
-- Versioned tags such as `1.0.0-macos-arm64` or `1.0.0-windows-amd64` for reproducible deployments.
+- `latest` for the most recent stable build.
+- Versioned tags such as `1.0.0` for reproducible deployments.
 
 Always confirm the pulled image:
 
@@ -143,13 +118,10 @@ automatically because of `--rm`.
 
 ```bash
 # Frontend (replace tag as needed)
-docker run --rm -it --name suno-frontend-preview -p 3001:3000 suno-frontend:latest-windows-amd64
+docker run --rm -it --name suno-frontend-preview -p 3001:3000 suno-frontend:latest
 
-# Backend arm64 (Mac host)
-docker run --rm -it --name suno-backend-arm-preview -p 8000:8000 suno-backend:latest-macos-arm64
-
-# Backend amd64 (Windows host)
-docker run --rm -it --name suno-backend-amd-preview -p 8000:8000 suno-backend:latest-windows-amd64
+# Backend service
+docker run --rm -it --name suno-backend-preview -p 8000:8000 suno-backend:latest
 ```
 
 #### Troubleshooting mode (detailed logging)
@@ -160,16 +132,12 @@ and the second line streams the startup logs with timestamps:
 
 ```bash
 # Frontend (replace tag as needed)
-docker run --rm -d --name suno-frontend-startup -p 3001:3000 suno-frontend:latest-windows-amd64 && \
+docker run --rm -d --name suno-frontend-startup -p 3001:3000 suno-frontend:latest && \
 docker logs suno-frontend-startup --follow --details --timestamps
 
-# Backend arm64 (Mac host)
-docker run --rm -d --name suno-backend-arm-startup -p 8000:8000 suno-backend:latest-macos-arm64 && \
-docker logs suno-backend-arm-startup --follow --details --timestamps
-
-# Backend amd64 (Windows host)
-docker run --rm -d --name suno-backend-amd-startup -p 8000:8000 suno-backend:latest-windows-amd64 && \
-docker logs suno-backend-amd-startup --follow --details --timestamps
+# Backend service
+docker run --rm -d --name suno-backend-startup -p 8000:8000 suno-backend:latest && \
+docker logs suno-backend-startup --follow --details --timestamps
 ```
 
 Stop the detached container later with `docker stop <container-name>` if you need to
@@ -177,37 +145,69 @@ tear it down manually.
 
 ### Integrate with docker-compose
 
-Update `docker-compose.yml` (or a custom override) to point at the freshly built or downloaded tags:
+For day-to-day development, `docker-compose` acts as the single entry point. The
+project ships with a root `.env` file that Compose loads automatically:
 
-```yaml
-services:
-  frontend:
-    image: suno-frontend:latest-windows-amd64
-  backend:
-    image: suno-backend:latest-macos-arm64
+```ini
+TAG=latest
+CAMOUFOX_SOURCE=auto
+# FRONTEND_IMAGE=your-namespace/suno-frontend:latest
+# BACKEND_IMAGE=your-namespace/suno-backend:latest
 ```
 
-Then restart the stack:
+Leave the defaults as-is for local builds. To override any setting, copy the
+file to `.env.local` (already ignored by Git), adjust the values, and pass it to
+Compose:
 
 ```bash
-docker-compose down
-docker-compose up -d
+docker-compose --env-file .env.local up --build -d
 ```
+
+Running without an override continues to use `.env` automatically:
+
+```bash
+docker-compose up --build -d
+```
+
+This single command reads the configuration, rebuilds the images when needed,
+and starts the stack in the background.
+
+View log output and stop the stack when you are finished:
+
+```bash
+docker-compose logs -f
+docker-compose down
+```
+
+### Local overrides
+
+1. **Camoufox mode:** Set `CAMOUFOX_SOURCE=manual` inside `.env.local` when you
+   want Compose to reuse a pre-downloaded archive.
+2. **Remote images:** Uncomment and populate `FRONTEND_IMAGE` and
+   `BACKEND_IMAGE` in `.env.local` to run published tags instead of building
+   locally.
+3. **Custom docker-compose overrides:** Create `docker-compose.override.yml`
+   (already ignored by Git) for machine-specific tweaks such as bind mounts or
+   debugging ports. Compose loads it automatically alongside the base file, so
+   the primary workflow (`docker-compose up --build`) stays untouched.
+
+When using remote images, `docker-compose up -d` is sufficient because Compose
+skips the build step once an explicit image tag is provided.
 
 ## Share Images Offline
 
 ### Save to a Tarball
 
 ```bash
-docker save suno-frontend:latest-windows-amd64 > suno-frontend.tar
-docker save suno-backend:latest-macos-arm64 > suno-backend-arm64.tar
+docker save suno-frontend:latest > suno-frontend.tar
+docker save suno-backend:latest > suno-backend.tar
 ```
 
 ### Load from a Tarball
 
 ```bash
 docker load < suno-frontend.tar
-docker load < suno-backend-arm64.tar
+docker load < suno-backend.tar
 ```
 
 ## Troubleshooting
@@ -215,7 +215,27 @@ docker load < suno-backend-arm64.tar
 - **Buildx not found:** Run `docker buildx create --use` once, or upgrade Docker Desktop to a version that bundles Buildx.
 - **Insufficient disk space:** Remove unused assets with `docker system prune --all`.
 - **Camoufox download errors:** Use the manual build flow with `CAMOUFOX_SOURCE=manual` as shown above.
-- **Permission denied on scripts (macOS):** Ensure executable permissions with `chmod +x build-image-macos.sh`.
+- **Permission denied on scripts (macOS):** Ensure executable permissions with `chmod +x scripts/*.sh`.
+- **Multi-platform build is not supported:** Docker Desktop defaults to the lightweight `docker` builder, which cannot emulate other architectures. Create a multi-platform builder once and reuse it forever:
+  ```bash
+  docker buildx create --name multi-platform-builder --use
+  docker buildx inspect --bootstrap
+  ```
+  After switching builders, rerun your original `buildx` command (for example,
+  `pwsh ./scripts/build-images.ps1 -Registry your-namespace -Tag latest -Push`)
+  and both `linux/amd64` and `linux/arm64` layers will be produced successfully.
+
+## Container Hardening Best Practices
+
+- **.dockerignore:** Keep `frontend/.dockerignore` and `backend/.dockerignore` updated to exclude `node_modules`, `.git`, temporary files, and local secrets. This reduces build context size and prevents accidental leakage.
+- **Multi-stage builds:** Retain the existing multi-stage Dockerfiles so build tooling and dev dependencies never reach the final runtime image.
+- **Non-root execution:** The backend Dockerfile already drops to the `suno-user` account. Apply the same pattern to any new services:
+  ```dockerfile
+  RUN addgroup --system suno-group && adduser --system --ingroup suno-group suno-user
+  USER suno-user
+  ```
+  *Debian/Ubuntu note:* use `adduser --system --group suno-user` to achieve the same result.
+- **Image scanning:** After publishing, run `docker scout cves <image>` or your registry's vulnerability scanner. Address high/critical issues before release.
 
 ## Next Steps
 
