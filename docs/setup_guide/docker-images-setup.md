@@ -95,6 +95,11 @@ docker pull <registry-username>/suno-frontend:<tag>
 docker pull <registry-username>/suno-backend:<tag>
 ```
 
+For a single-click experience, use the bundled helper scripts in the `scripts/` directory:
+
+- Windows: double-click `scripts/pull-images.bat` or run `scripts\pull-images.bat <registry> <tag>` from a terminal. The script prompts for missing values and pauses on completion.
+- macOS/Linux: run `./scripts/pull-images.sh <registry> <tag>` (make it executable once with `chmod +x scripts/pull-images.sh`). The script accepts optional arguments and falls back to interactive prompts.
+
 Common tag patterns:
 - `latest` for the most recent stable build.
 - Versioned tags such as `1.0.0` for reproducible deployments.
