@@ -145,6 +145,11 @@ docker run --rm -d --name suno-backend-startup -p 8000:8000 suno-backend:latest 
 docker logs suno-backend-startup --follow --details --timestamps
 ```
 
+Prefer one-click helpers instead of copy/paste? Use the bundled scripts that wrap both commands:
+
+- Windows: double-click `scripts/start-containers.bat` or run `scripts\start-containers.bat [frontend-image] [backend-image]`. Two PowerShell windows stream logs automatically; close them or press any key in the launcher window to stop both services.
+- macOS/Linux: run `./scripts/start-containers.sh [frontend-image] [backend-image]` (mark it executable once with `chmod +x scripts/start-containers.sh`). Logs stream in the same terminal; press `Ctrl+C` to stop everything.
+
 Stop the detached container later with `docker stop <container-name>` if you need to
 tear it down manually.
 
