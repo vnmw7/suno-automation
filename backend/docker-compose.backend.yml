@@ -2,9 +2,12 @@ version: '3.8'
 
 services:
   backend:
+    image: ${BACKEND_IMAGE:-suno-backend:${TAG}}
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        CAMOUFOX_SOURCE: ${CAMOUFOX_SOURCE}
     container_name: suno-backend
     restart: unless-stopped
     env_file:

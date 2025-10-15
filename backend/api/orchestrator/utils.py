@@ -416,87 +416,36 @@ async def downloadSongsFromCdn(
                     "error": error_message
                 }
 
-            # Wait for the page to load the audio content
-            await page.wait_for_load_state("networkidle")
+            # Get the MP3 content directly from response body
+            content = await response.body()
 
-            # Get the download from the page
-            downloads = await page.context.downloads()
+            if not content or len(content) < 100:
+                error_message = "Empty or invalid MP3 content"
+                print(f"📥 [CDN] ❌ {error_message}")
+                await page.close()
+                return {
+                    "success": False,
+                    "song_id": song_id,
+                    "error": error_message
+                }
 
-            if not downloads:
-                # If no automatic download triggered, try to trigger it manually
-                download = await page.evaluate("""
-                    async () => {
-                        const link = document.createElement('a');
-                        link.href = window.location.href;
-                        link.download = '';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        return true;
-                    }
-                """)
+            # Save to file
+            with open(final_path, 'wb') as f:
+                f.write(content)
 
-                # Wait for download to start
-                await page.wait_for_timeout(2000)
-                downloads = await page.context.downloads()
-
-            if downloads:
-                download = downloads[0]
-                # Save the download to our desired path
-                await download.save_as(str(final_path))
-                await download.delete()
-
-                # Verify file exists and has content
-                if final_path.exists() and final_path.stat().st_size > 0:
-                    file_size = final_path.stat().st_size
-                    print(f"📥 [CDN] ✅ Downloaded {song_id} ({file_size:,} bytes) -> {final_path}")
-                    await page.close()
-                    return {
-                        "success": True,
-                        "song_id": song_id,
-                        "file_path": str(final_path),
-                        "message": "Downloaded from CDN via Camoufox"
-                    }
-                else:
-                    error_message = "Downloaded file is empty or missing"
-                    print(f"📥 [CDN] ❌ {error_message}")
-                    await page.close()
-                    return {
-                        "success": False,
-                        "song_id": song_id,
-                        "error": error_message
-                    }
+            # Verify file was saved
+            if final_path.exists() and final_path.stat().st_size > 0:
+                file_size = final_path.stat().st_size
+                print(f"📥 [CDN] ✅ Downloaded {song_id} ({file_size:,} bytes) -> {final_path}")
+                await page.close()
+                return {
+                    "success": True,
+                    "song_id": song_id,
+                    "file_path": str(final_path),
+                    "message": "Downloaded from CDN via Camoufox"
+                }
             else:
-                # Fallback: try to get the content directly and save it
-                print("📥 [CDN] No automatic download, attempting manual save...")
-
-                # Get the response content as buffer
-                content = await page.evaluate("""
-                    async () => {
-                        const response = await fetch(window.location.href);
-                        if (!response.ok) return null;
-                        const arrayBuffer = await response.arrayBuffer();
-                        return Array.from(new Uint8Array(arrayBuffer));
-                    }
-                """)
-
-                if content:
-                    # Write the content to file
-                    with open(final_path, 'wb') as f:
-                        f.write(bytes(content))
-
-                    if final_path.exists() and final_path.stat().st_size > 0:
-                        file_size = final_path.stat().st_size
-                        print(f"📥 [CDN] ✅ Manually saved {song_id} ({file_size:,} bytes) -> {final_path}")
-                        await page.close()
-                        return {
-                            "success": True,
-                            "song_id": song_id,
-                            "file_path": str(final_path),
-                            "message": "Manually saved from CDN via Camoufox"
-                        }
-
-                error_message = "Failed to download or save file from CDN"
+                error_message = "File save failed"
                 print(f"📥 [CDN] ❌ {error_message}")
                 await page.close()
                 return {

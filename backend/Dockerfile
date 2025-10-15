@@ -1,24 +1,89 @@
 # syntax=docker/dockerfile:1
 
-# Stage 1: install Python dependencies into a relocatable prefix
-FROM python:3.11-slim AS builder
-WORKDIR /app
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-COPY requirements.txt ./
-RUN python -m pip install --upgrade pip \
-    && python -m pip install --no-cache-dir --prefix /install -r requirements.txt
+ARG PYTHON_IMAGE=python:3.11-slim-bookworm
 
-# Stage 2: runtime image for the backend API server
-FROM python:3.11-slim
-WORKDIR /app
+FROM ${PYTHON_IMAGE} AS builder
+ARG TARGETARCH
+ARG CAMOUFOX_VERSION=135.0.1-beta.24
+ARG CAMOUFOX_SOURCE=auto
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    CAMOUFOX_INSTALL_ROOT=/build/camoufox-install \
+    CAMOUFOX_CACHE_DIR=/root/.cache/camoufox
+WORKDIR /build
 
-# Install Camoufox/Firefox runtime dependencies needed for headless execution
+COPY requirements.txt ./requirements.txt
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    wget \
     unzip \
-    xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --upgrade pip \
+    && python -m pip install --no-cache-dir --prefix /install -r requirements.txt \
+    && python -m pip install --no-cache-dir "camoufox[geoip]"
+
+COPY build/artifacts/camoufox/ ./artifacts/camoufox/
+RUN set -eux; \
+    mkdir -p "${CAMOUFOX_INSTALL_ROOT}"; \
+    rm -rf "${CAMOUFOX_INSTALL_ROOT:?}/"*; \
+    case "${CAMOUFOX_SOURCE}" in \
+      manual) \
+        if ! compgen -G "./artifacts/camoufox/*.zip" > /dev/null; then \
+          echo "Manual Camoufox archive not found in build/artifacts/camoufox" >&2; \
+          exit 1; \
+        fi; \
+        cp "./artifacts/camoufox/"*.zip camoufox.zip; \
+        unzip camoufox.zip -d camoufox-unpacked; \
+        cp -a camoufox-unpacked/. "${CAMOUFOX_INSTALL_ROOT}/"; \
+        ;; \
+      auto) \
+        if [ "${TARGETARCH}" = "arm64" ]; then \
+          curl -sSL -o camoufox.zip "https://github.com/daijro/camoufox/releases/download/v${CAMOUFOX_VERSION}/camoufox-${CAMOUFOX_VERSION}-lin.arm64.zip"; \
+          unzip camoufox.zip -d camoufox-unpacked; \
+          cp -a camoufox-unpacked/. "${CAMOUFOX_INSTALL_ROOT}/"; \
+        elif [ "${TARGETARCH}" = "amd64" ]; then \
+          python -m camoufox fetch; \
+          if [ ! -f "${CAMOUFOX_CACHE_DIR}/camoufox-bin" ]; then \
+            echo "Camoufox fetch did not install binary at ${CAMOUFOX_CACHE_DIR}/camoufox-bin" >&2; \
+            exit 1; \
+          fi; \
+          cp -a "${CAMOUFOX_CACHE_DIR}/." "${CAMOUFOX_INSTALL_ROOT}/"; \
+        else \
+          echo "Unsupported architecture: ${TARGETARCH}" >&2; \
+          exit 1; \
+        fi; \
+        ;; \
+      *) \
+        echo "Unsupported CAMOUFOX_SOURCE=${CAMOUFOX_SOURCE}" >&2; \
+        exit 1; \
+        ;; \
+    esac; \
+    CAMOUFOX_VERSION_BASE="${CAMOUFOX_VERSION%%-*}"; \
+    CAMOUFOX_RELEASE_PART="${CAMOUFOX_VERSION#*-}"; \
+    if [ "${CAMOUFOX_RELEASE_PART}" = "${CAMOUFOX_VERSION_BASE}" ]; then \
+      CAMOUFOX_RELEASE_PART="${CAMOUFOX_VERSION_BASE}"; \
+    fi; \
+    if [ ! -f "${CAMOUFOX_INSTALL_ROOT}/version.json" ]; then \
+      printf '{"version": "%s", "release": "%s"}' "${CAMOUFOX_VERSION_BASE}" "${CAMOUFOX_RELEASE_PART}" > "${CAMOUFOX_INSTALL_ROOT}/version.json"; \
+    fi; \
+    chmod -R 0755 "${CAMOUFOX_INSTALL_ROOT}"; \
+    rm -rf camoufox.zip camoufox-unpacked
+
+FROM ${PYTHON_IMAGE} AS macos
+ARG TARGETARCH
+ARG CAMOUFOX_SOURCE=auto
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/app/.cache/browsers \
+    CAMOUFOX_CACHE_DIR=/home/suno-user/.cache/camoufox \
+    PATH="/home/suno-user/.local/bin:${PATH}"
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    fonts-liberation \
+    fonts-noto-color-emoji \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -43,28 +108,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxss1 \
     libxt6 \
     libxtst6 \
-    fonts-liberation \
-    fonts-noto-color-emoji \
     && rm -rf /var/lib/apt/lists/*
 
-# Mirror the install from the builder stage
 COPY --from=builder /install /usr/local
+COPY --from=builder /build/camoufox-install /opt/camoufox
 
-# Copy application source
-COPY . .
+RUN useradd --create-home --shell /bin/bash suno-user \
+    && mkdir -p /home/suno-user/.cache \
+    && cp -a /opt/camoufox /home/suno-user/.cache/camoufox \
+    && mkdir -p /home/suno-user/.local/bin \
+    && if [ -f /home/suno-user/.cache/camoufox/camoufox ]; then ln -sf /home/suno-user/.cache/camoufox/camoufox /home/suno-user/.local/bin/camoufox; fi \
+    && if [ -f /home/suno-user/.cache/camoufox/camoufox-bin ]; then ln -sf /home/suno-user/.cache/camoufox/camoufox-bin /home/suno-user/.local/bin/camoufox-bin; fi \
+    && chown -R suno-user:suno-user /home/suno-user /opt/camoufox
 
-# Configure runtime environment
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PATH="/usr/local/bin:${PATH}" \
-    PLAYWRIGHT_BROWSERS_PATH=/app/.cache/browsers \
-    CAMOUFOX_CACHE_DIR=/app/.cache/camoufox
+COPY --chown=suno-user:suno-user . .
 
-# Create directories for persistent volumes
-RUN mkdir -p /app/songs /app/camoufox_session_data /app/logs /app/.cache
+RUN mkdir -p /app/songs /app/camoufox_session_data /app/logs /app/.cache \
+    && chown -R suno-user:suno-user /app
 
-# Pre-fetch the Camoufox browser so the container is ready on first boot.
-RUN python -c "from camoufox import fetch; fetch()" || true
+USER suno-user
 
 EXPOSE 8000
 
