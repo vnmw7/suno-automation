@@ -13,6 +13,21 @@ echo.
 
 setlocal EnableDelayedExpansion
 
+REM Inline environment configuration used when .env files are not available
+set "strBackendSupabaseUrl=https://qptddifkwfdyuhqhujul.supabase.co"
+set "strBackendSupabaseKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwdGRkaWZrd2ZkeXVocWh1anVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNDUxNzIsImV4cCI6MjA2MjkyMTE3Mn0.roePCKt1WCX1bpDmOGMSL2XPTQGLO_9Kp9hfbbgP5ds"
+set "strBackendDbUser=postgres.qptddifkwfdyuhqhujul"
+set "strBackendDbPassword=PcXI4D0S4PMAEyKd"
+set "strBackendDbHost=aws-0-ap-southeast-1.pooler.supabase.com"
+set "strBackendDbPort=5432"
+set "strBackendDbName=postgres"
+set "strBackendGoogleAiApiKey=AIzaSyCY4b4mhpy-1fXkt4NF224JWsiPJio6b5Q"
+set "strFrontendApiUrl=http://localhost:8000"
+set "strFrontendSupabaseUrl=https://qptddifkwfdyuhqhujul.supabase.co"
+set "strFrontendSupabaseKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwdGRkaWZrd2ZkeXVocWh1anVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNDUxNzIsImV4cCI6MjA2MjkyMTE3Mn0.roePCKt1WCX1bpDmOGMSL2XPTQGLO_9Kp9hfbbgP5ds"
+
+set "strBackendDatabaseUrl=postgresql://%strBackendDbUser%:%strBackendDbPassword%@%strBackendDbHost%:%strBackendDbPort%/%strBackendDbName%"
+
 REM Set up logging
 for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
 set "TIMESTAMP=%dt:~0,4%%dt:~4,2%%dt:~6,2%_%dt:~8,2%%dt:~10,2%%dt:~12,2%"
@@ -175,18 +190,22 @@ echo.
 REM Default environment variables for backend (embedded for hassle-free usage)
 set "BACKEND_ENV_VARS=-e PYTHONUNBUFFERED=1"
 set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e LOG_LEVEL=DEBUG"
-set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e PORT=8000"
-set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e HOST=0.0.0.0"
-set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e SUPABASE_URL=https://placeholder.supabase.co"
-set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e SUPABASE_KEY=placeholder-key"
-set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e DATABASE_URL=postgresql://user:pass@localhost/db"
+set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e SUPABASE_URL=!strBackendSupabaseUrl!"
+set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e SUPABASE_KEY=!strBackendSupabaseKey!"
+set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e DATABASE_URL=!strBackendDatabaseUrl!"
+set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e USER=!strBackendDbUser!"
+set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e PASSWORD=!strBackendDbPassword!"
+set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e HOST=!strBackendDbHost!"
+set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e PORT=!strBackendDbPort!"
+set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e DBNAME=!strBackendDbName!"
+set "BACKEND_ENV_VARS=!BACKEND_ENV_VARS! -e GOOGLE_AI_API_KEY=!strBackendGoogleAiApiKey!"
 
 REM Check if .env exists and load it if present
 if exist "!BASE_DIR!\backend\.env" (
     call :log "INFO" "ENV" "Found backend .env file, loading environment variables..."
     set "BACKEND_ENV_FILE=--env-file !BASE_DIR!\backend\.env"
 ) else (
-    call :log "WARNING" "ENV" "No backend .env file found, using embedded defaults"
+    call :log "INFO" "ENV" "No backend .env file found, using inline environment configuration"
     set "BACKEND_ENV_FILE="
 )
 
@@ -253,18 +272,18 @@ echo.
 
 REM Default environment variables for frontend (embedded for hassle-free usage)
 set "FRONTEND_ENV_VARS=-e NODE_ENV=production"
-set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e VITE_API_URL=http://localhost:8000"
+set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e VITE_API_URL=!strFrontendApiUrl!"
 set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e PORT=3000"
 set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e HOST=0.0.0.0"
-set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e VITE_SUPABASE_URL=https://placeholder.supabase.co"
-set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e VITE_SUPABASE_KEY=placeholder-key"
+set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e VITE_SUPABASE_URL=!strFrontendSupabaseUrl!"
+set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e VITE_SUPABASE_KEY=!strFrontendSupabaseKey!"
 
 REM Check if frontend .env exists
 if exist "!BASE_DIR!\frontend\.env" (
     call :log "INFO" "ENV" "Found frontend .env file, loading environment variables..."
     set "FRONTEND_ENV_FILE=--env-file !BASE_DIR!\frontend\.env"
 ) else (
-    call :log "WARNING" "ENV" "No frontend .env file found, using embedded defaults"
+    call :log "INFO" "ENV" "No frontend .env file found, using inline environment configuration"
     set "FRONTEND_ENV_FILE="
 )
 

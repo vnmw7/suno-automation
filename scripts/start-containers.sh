@@ -11,12 +11,27 @@ echo "SUNO AUTOMATION CONTAINER STARTUP"
 echo "========================================"
 echo ""
 
-# Set up logging
+# Set up paths and defaults
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "${SCRIPT_DIR}")"
 LOG_DIR="${BASE_DIR}/logs"
 LOG_FILE="${LOG_DIR}/containers_${TIMESTAMP}.log"
+
+# Inline environment configuration used when .env files are not available
+strBackendSupabaseUrl="https://qptddifkwfdyuhqhujul.supabase.co"
+strBackendSupabaseKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwdGRkaWZrd2ZkeXVocWh1anVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNDUxNzIsImV4cCI6MjA2MjkyMTE3Mn0.roePCKt1WCX1bpDmOGMSL2XPTQGLO_9Kp9hfbbgP5ds"
+strBackendDbUser="postgres.qptddifkwfdyuhqhujul"
+strBackendDbPassword="PcXI4D0S4PMAEyKd"
+strBackendDbHost="aws-0-ap-southeast-1.pooler.supabase.com"
+strBackendDbPort="5432"
+strBackendDbName="postgres"
+strBackendGoogleAiApiKey="AIzaSyCY4b4mhpy-1fXkt4NF224JWsiPJio6b5Q"
+strFrontendApiUrl="http://localhost:8000"
+strFrontendSupabaseUrl="https://qptddifkwfdyuhqhujul.supabase.co"
+strFrontendSupabaseKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwdGRkaWZrd2ZkeXVocWh1anVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNDUxNzIsImV4cCI6MjA2MjkyMTE3Mn0.roePCKt1WCX1bpDmOGMSL2XPTQGLO_9Kp9hfbbgP5ds"
+
+strBackendDatabaseUrl="postgresql://${strBackendDbUser}:${strBackendDbPassword}@${strBackendDbHost}:${strBackendDbPort}/${strBackendDbName}"
 
 # Create logs directory if it doesn't exist
 if [[ ! -d "${LOG_DIR}" ]]; then
@@ -178,18 +193,22 @@ echo ""
 # Default environment variables for backend (embedded for hassle-free usage)
 BACKEND_ENV_VARS="-e PYTHONUNBUFFERED=1"
 BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e LOG_LEVEL=DEBUG"
-BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e PORT=8000"
-BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e HOST=0.0.0.0"
-BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e SUPABASE_URL=https://placeholder.supabase.co"
-BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e SUPABASE_KEY=placeholder-key"
-BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e DATABASE_URL=postgresql://user:pass@localhost/db"
+BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e SUPABASE_URL=${strBackendSupabaseUrl}"
+BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e SUPABASE_KEY=${strBackendSupabaseKey}"
+BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e DATABASE_URL=${strBackendDatabaseUrl}"
+BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e USER=${strBackendDbUser}"
+BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e PASSWORD=${strBackendDbPassword}"
+BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e HOST=${strBackendDbHost}"
+BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e PORT=${strBackendDbPort}"
+BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e DBNAME=${strBackendDbName}"
+BACKEND_ENV_VARS="${BACKEND_ENV_VARS} -e GOOGLE_AI_API_KEY=${strBackendGoogleAiApiKey}"
 
 # Check if .env exists and load it if present
 if [[ -f "${BASE_DIR}/backend/.env" ]]; then
     log "INFO" "ENV" "Found backend .env file, loading environment variables..."
     BACKEND_ENV_FILE="--env-file ${BASE_DIR}/backend/.env"
 else
-    log "WARNING" "ENV" "No backend .env file found, using embedded defaults"
+    log "INFO" "ENV" "No backend .env file found, using inline environment configuration"
     BACKEND_ENV_FILE=""
 fi
 
@@ -260,18 +279,18 @@ echo ""
 
 # Default environment variables for frontend (embedded for hassle-free usage)
 FRONTEND_ENV_VARS="-e NODE_ENV=production"
-FRONTEND_ENV_VARS="${FRONTEND_ENV_VARS} -e VITE_API_URL=http://localhost:8000"
+FRONTEND_ENV_VARS="${FRONTEND_ENV_VARS} -e VITE_API_URL=${strFrontendApiUrl}"
 FRONTEND_ENV_VARS="${FRONTEND_ENV_VARS} -e PORT=3000"
 FRONTEND_ENV_VARS="${FRONTEND_ENV_VARS} -e HOST=0.0.0.0"
-FRONTEND_ENV_VARS="${FRONTEND_ENV_VARS} -e VITE_SUPABASE_URL=https://placeholder.supabase.co"
-FRONTEND_ENV_VARS="${FRONTEND_ENV_VARS} -e VITE_SUPABASE_KEY=placeholder-key"
+FRONTEND_ENV_VARS="${FRONTEND_ENV_VARS} -e VITE_SUPABASE_URL=${strFrontendSupabaseUrl}"
+FRONTEND_ENV_VARS="${FRONTEND_ENV_VARS} -e VITE_SUPABASE_KEY=${strFrontendSupabaseKey}"
 
 # Check if frontend .env exists
 if [[ -f "${BASE_DIR}/frontend/.env" ]]; then
     log "INFO" "ENV" "Found frontend .env file, loading environment variables..."
     FRONTEND_ENV_FILE="--env-file ${BASE_DIR}/frontend/.env"
 else
-    log "WARNING" "ENV" "No frontend .env file found, using embedded defaults"
+    log "INFO" "ENV" "No frontend .env file found, using inline environment configuration"
     FRONTEND_ENV_FILE=""
 fi
 
