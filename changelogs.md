@@ -1,5 +1,21 @@
 # Suno Automation Changelogs
 
+## 2025-10-16
+
+#### 1. Embedded Environment Defaults for Container Startup Scripts
+- **Problem**: Running the container startup scripts without `.env` files left critical Supabase and database variables unset, causing runtime failures in fresh setups.
+- **Solution**: Added inline environment configuration in both Windows and Unix launcher scripts so containers boot with the necessary credentials and API keys even when `.env` files are absent.
+
+##### Key Notes
+- Unified backend defaults now export Supabase URL/key, Postgres connection pieces, and `GOOGLE_AI_API_KEY` when no `.env` is present, mirroring the shipped sample configuration.
+- Missing `.env` files now log informational messages rather than warnings, reflecting the expected inline fallback.
+- Frontend defaults reuse the backend Supabase configuration and API URL, eliminating placeholder values and keeping both environments aligned.
+- **Security Reminder**: These inline values are convenience defaults; migrate sensitive secrets to a managed store before production use.
+
+- **Files Modified**:
+  - `scripts/start-containers.bat`
+  - `scripts/start-containers.sh`
+
 ## 2025-10-15
 
 ### 1. Enhanced Docker Container Scripts with Robust Logging and Zero Configuration
