@@ -2,9 +2,12 @@ version: '3.8'
 
 services:
   backend:
+    image: ${BACKEND_IMAGE:-suno-backend:${TAG}}
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        CAMOUFOX_SOURCE: ${CAMOUFOX_SOURCE}
     container_name: suno-backend
     restart: unless-stopped
     ports:
@@ -32,6 +35,7 @@ services:
       - "host.docker.internal:host-gateway"
 
   frontend:
+    image: ${FRONTEND_IMAGE:-suno-frontend:${TAG}}
     build:
       context: ./frontend
       dockerfile: Dockerfile

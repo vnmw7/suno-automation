@@ -28,6 +28,20 @@ class DownloadTestResponse(BaseModel):
     error: Optional[str] = None
 
 
+class CdnDownloadTestRequest(BaseModel):
+    song_id: str
+    download_dir: str = "backend/songs/pending_review"
+
+
+class CdnDownloadTestResponse(BaseModel):
+    success: bool
+    message: str
+    song_id: str
+    file_path: Optional[str] = None
+    file_size: Optional[int] = None
+    error: Optional[str] = None
+
+
 class ReviewTestRequest(BaseModel):
     audio_file_path: str
     pg1_id: int = 0
@@ -132,7 +146,8 @@ async def orchestrator_status():
         "endpoints": [
             "/orchestrator/workflow - Main workflow execution",
             "/orchestrator/status - Service health check",
-            "/orchestrator/debug/download - Test song download functionality",
+            "/orchestrator/debug/download - Test hybrid download (CDN + fallback)",
+            "/orchestrator/debug/cdn-download - Test direct CDN download",
             "/orchestrator/debug/review - Test song review functionality"
         ],
         "workflow_features": [
@@ -190,6 +205,66 @@ async def debug_download_both_songs(request: DownloadTestRequest):
             success=False,
             message="Download test failed with exception",
             downloads=[],
+            error=error_msg
+        )
+
+
+@router.post("/debug/cdn-download", response_model=CdnDownloadTestResponse)
+async def debug_cdn_download(request: CdnDownloadTestRequest):
+    """
+    🔧 DEBUG ENDPOINT: Test CDN download directly
+
+    Tests the simplified downloadSongsFromCdn function with a specific song_id.
+    Useful for verifying the browser-based CDN download with authentication.
+
+    Args:
+        request: CdnDownloadTestRequest with song_id and download directory
+
+    Returns:
+        CdnDownloadTestResponse: CDN download results
+    """
+    print(f"🔧 [DEBUG-CDN] Testing CDN download for song_id: '{request.song_id}'")
+    print(f"🔧 [DEBUG-CDN] Download directory: {request.download_dir}")
+
+    try:
+        from .utils import downloadSongsFromCdn
+
+        result = await downloadSongsFromCdn(
+            song_id=request.song_id,
+            download_dir=request.download_dir
+        )
+
+        print(f"🔧 [DEBUG-CDN] CDN download result: {result}")
+
+        # Get file size if successful
+        file_size = None
+        if result.get("success") and result.get("file_path"):
+            file_path = result["file_path"]
+            if os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+
+        response_data = {
+            "success": result["success"],
+            "message": result.get("message", "CDN download test completed"),
+            "song_id": request.song_id,
+            "file_path": result.get("file_path"),
+            "file_size": file_size
+        }
+
+        if "error" in result and result["error"]:
+            response_data["error"] = result["error"]
+
+        return CdnDownloadTestResponse(**response_data)
+
+    except Exception as e:
+        error_msg = f"CDN download test failed: {str(e)}"
+        print(f"🔧 [DEBUG-CDN] {error_msg}")
+        print(traceback.format_exc())
+
+        return CdnDownloadTestResponse(
+            success=False,
+            message="CDN download test failed",
+            song_id=request.song_id,
             error=error_msg
         )
 

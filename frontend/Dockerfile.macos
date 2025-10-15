@@ -1,0 +1,35 @@
+# System: Suno Automation
+# Module: Frontend Docker Build for MacOS
+# File URL: frontend/Dockerfile.macos
+# Purpose: Multi-stage Dockerfile optimized for linux/arm64 platform for MacOS users with Apple Silicon
+
+# Stage 1: Dependencies
+FROM --platform=linux/arm64 node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Stage 2: Builder
+FROM --platform=linux/arm64 node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Stage 3: Production
+FROM --platform=linux/arm64 node:20-alpine
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/public ./public
+COPY package.json ./
+
+EXPOSE 3000
+ENV NODE_ENV=production
+ENV PORT=3000
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+
+CMD ["npm", "start"]

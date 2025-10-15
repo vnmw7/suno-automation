@@ -26,6 +26,89 @@
 5. **Edit .env files** if prompted (first time only)
 6. **Access the app** at http://localhost:3000
 
+## Developer Build Workflow (Unified Tags)
+
+Use the helper scripts in `scripts/` to build the current host architecture with
+consistent tags. Docker automatically resolves the correct image for each
+platform when everyone shares the `suno-frontend:latest` and `suno-backend:latest`
+tags.
+
+```bash
+# macOS/Linux
+./scripts/build-images.sh --tag latest
+```
+
+```powershell
+# Windows PowerShell
+pwsh ./scripts/build-images.ps1 -Tag latest
+```
+
+- Build for a specific platform: `./scripts/build-images.sh --tag latest --platform linux/amd64`
+- Fetch the Camoufox archive ahead of time: `./scripts/build-images.sh --fetch-camoufox`
+- Use a pre-downloaded archive: `./scripts/build-images.sh --manual-camoufox`
+
+### Publishing multi-platform images
+
+Ready to share images? Provide your registry namespace and push both
+architectures in one step:
+
+```bash
+./scripts/build-images.sh --registry your-namespace --tag latest --push
+```
+
+```powershell
+pwsh ./scripts/build-images.ps1 -Registry your-namespace -Tag latest -Push
+```
+
+### Manual Camoufox bundle (arm64 fallback)
+
+When GitHub downloads are blocked or you need an offline bundle, run:
+
+```bash
+./scripts/fetch-camoufox.sh
+./scripts/build-images.sh --tag latest --manual-camoufox
+```
+
+```powershell
+pwsh ./scripts/fetch-camoufox.ps1
+pwsh ./scripts/build-images.ps1 -Tag latest -ManualCamoufox
+```
+
+The helper stores the archive in `backend/build/artifacts/camoufox/` so the
+backend Dockerfile can copy it during the build.
+
+## Recommended Local Development Loop
+
+Compose reads defaults from the root `.env` file:
+
+```ini
+TAG=latest
+CAMOUFOX_SOURCE=auto
+# FRONTEND_IMAGE=your-namespace/suno-frontend:latest
+# BACKEND_IMAGE=your-namespace/suno-backend:latest
+```
+
+Leave the file untouched for local builds. To override anything, create
+`.env.local` (already ignored by Git), adjust the values, and run Compose with it:
+
+```bash
+docker-compose --env-file .env.local up --build -d
+```
+
+Running without overrides continues to rely on `.env` automatically:
+
+```bash
+docker-compose up --build -d
+docker-compose logs -f
+docker-compose down
+```
+
+Common overrides:
+
+1. Set `CAMOUFOX_SOURCE=manual` inside `.env.local` to reuse a pre-downloaded archive.
+2. Uncomment and populate `FRONTEND_IMAGE` / `BACKEND_IMAGE` to run images pulled from a registry (`docker-compose up -d` is enough once images are set).
+3. Create `docker-compose.override.yml` (git-ignored) for machine-specific tweaks such as local bind mounts; Compose loads it automatically alongside the base file.
+
 ## Stopping the Application
 
 ### Windows

@@ -10,3 +10,5 @@ backend/logs/*.log
 dist
 build
 node_modules
+.env.local
+docker-compose.override.yml
