@@ -2,7 +2,44 @@
 
 ## 2025-10-15
 
-### Fixed and Enhanced Docker Pull Scripts
+### 1. Enhanced Docker Container Scripts with Robust Logging and Zero Configuration
+- **Problem**: Backend containers were crashing without logs, frontend missing environment variables
+- **Solution**: Complete overhaul of start-containers scripts for hassle-free deployment
+
+#### Key Improvements
+- **Embedded Environment Variables**: Scripts now include default environment variables - no .env dependency
+- **Comprehensive Logging**:
+  - Timestamped log files saved to `logs/` directory
+  - Separate logs for frontend and backend containers
+  - Crash logs automatically captured when containers fail
+  - All operations logged with [INFO], [DEBUG], [ERROR], [SUCCESS] prefixes
+- **Automatic Setup**:
+  - Creates required directories automatically (logs, songs, camoufox_session_data)
+  - Port availability checking before container start
+  - Docker daemon status verification
+  - Image existence validation
+- **Container Resilience**:
+  - Added `--restart unless-stopped` policy to keep containers running
+  - Health check monitoring with 30-attempt retry logic
+  - Volume mounting for persistent data (logs, songs, session data)
+- **User-Friendly Output**:
+  - Clear status messages with visual indicators (✓, ✗, →)
+  - Container configuration display
+  - Service URLs displayed on success
+  - Detailed error messages with troubleshooting tips
+
+#### Technical Details
+- **Fixed**: Removed conflicting `--rm` flag when using `--restart unless-stopped`
+- **Fixed**: Windows-specific command compatibility (replaced tail/tee with native alternatives)
+- **Added**: Fallback to .env files if they exist, embedded defaults otherwise
+- **Added**: Container health monitoring using Python/curl health checks
+- **Files Modified**:
+  - `scripts/start-containers.bat`: Complete rewrite with logging and error handling
+  - `scripts/start-containers.sh`: Linux/macOS version with same improvements
+
+---
+
+### 2. Fixed and Enhanced Docker Pull Scripts
 - **Fixed**: Resolved immediate closing issue in `pull-images.bat` caused by parentheses syntax error
 - **Added**: Extensive debug output and logging in both Windows and Linux scripts
 - **Features**:
@@ -16,7 +53,9 @@
   - `scripts/pull-images.bat`: Fixed syntax errors and added comprehensive debugging
   - `scripts/pull-images.sh`: Enhanced with matching debug output and error handling
 
-### Implemented Automatic Default Registry for One-Click Usage
+---
+
+### 3. Implemented Automatic Default Registry for One-Click Usage
 - **Added**: Automatic defaults for non-technical users
 - **Changed**: Scripts now default to `vnmw7` registry and `latest` tag without prompting
 - **Features**:
