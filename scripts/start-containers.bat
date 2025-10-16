@@ -13,25 +13,124 @@ echo.
 
 setlocal EnableDelayedExpansion
 
-REM Inline environment configuration used when .env files are not available
-set "strBackendSupabaseUrl=https://qptddifkwfdyuhqhujul.supabase.co"
-set "strBackendSupabaseKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwdGRkaWZrd2ZkeXVocWh1anVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNDUxNzIsImV4cCI6MjA2MjkyMTE3Mn0.roePCKt1WCX1bpDmOGMSL2XPTQGLO_9Kp9hfbbgP5ds"
-set "strBackendDbUser=postgres.qptddifkwfdyuhqhujul"
-set "strBackendDbPassword=PcXI4D0S4PMAEyKd"
-set "strBackendDbHost=aws-0-ap-southeast-1.pooler.supabase.com"
-set "strBackendDbPort=5432"
-set "strBackendDbName=postgres"
-set "strBackendGoogleAiApiKey=AIzaSyCY4b4mhpy-1fXkt4NF224JWsiPJio6b5Q"
-set "strFrontendApiUrl=http://localhost:8000"
-set "strFrontendSupabaseUrl=https://qptddifkwfdyuhqhujul.supabase.co"
-set "strFrontendSupabaseKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwdGRkaWZrd2ZkeXVocWh1anVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNDUxNzIsImV4cCI6MjA2MjkyMTE3Mn0.roePCKt1WCX1bpDmOGMSL2XPTQGLO_9Kp9hfbbgP5ds"
+for %%I in ("%~dp0..") do set "BASE_DIR=%%~fI"
 
-set "strBackendDatabaseUrl=postgresql://%strBackendDbUser%:%strBackendDbPassword%@%strBackendDbHost%:%strBackendDbPort%/%strBackendDbName%"
+REM Inline environment configuration with override support (no .env required)
+set "strBackendSupabaseUrl=!SUPABASE_URL!"
+if defined strBackendSupabaseUrl (
+    set "strBackendSupabaseUrlSource=env:SUPABASE_URL"
+) else (
+    set "strBackendSupabaseUrl=https://qptddifkwfdyuhqhujul.supabase.co"
+    set "strBackendSupabaseUrlSource=default"
+)
+
+set "strBackendSupabaseKey=!SUPABASE_KEY!"
+if defined strBackendSupabaseKey (
+    set "strBackendSupabaseKeySource=env:SUPABASE_KEY"
+) else (
+    set "strBackendSupabaseKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwdGRkaWZrd2ZkeXVocWh1anVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNDUxNzIsImV4cCI6MjA2MjkyMTE3Mn0.roePCKt1WCX1bpDmOGMSL2XPTQGLO_9Kp9hfbbgP5ds"
+    set "strBackendSupabaseKeySource=default"
+)
+
+set "strBackendDbUser=!USER!"
+if defined strBackendDbUser (
+    set "strBackendDbUserSource=env:USER"
+) else (
+    set "strBackendDbUser=postgres.qptddifkwfdyuhqhujul"
+    set "strBackendDbUserSource=default"
+)
+
+set "strBackendDbPassword=!PASSWORD!"
+if defined strBackendDbPassword (
+    set "strBackendDbPasswordSource=env:PASSWORD"
+) else (
+    set "strBackendDbPassword=PcXI4D0S4PMAEyKd"
+    set "strBackendDbPasswordSource=default"
+)
+
+set "strBackendDbHost=!HOST!"
+if defined strBackendDbHost (
+    set "strBackendDbHostSource=env:HOST"
+) else (
+    set "strBackendDbHost=aws-0-ap-southeast-1.pooler.supabase.com"
+    set "strBackendDbHostSource=default"
+)
+
+set "strBackendDbPort=!PORT!"
+if defined strBackendDbPort (
+    set "strBackendDbPortSource=env:PORT"
+) else (
+    set "strBackendDbPort=5432"
+    set "strBackendDbPortSource=default"
+)
+
+set "strBackendDbName=!DBNAME!"
+if defined strBackendDbName (
+    set "strBackendDbNameSource=env:DBNAME"
+) else (
+    set "strBackendDbName=postgres"
+    set "strBackendDbNameSource=default"
+)
+
+set "strBackendGoogleAiApiKey=!GOOGLE_AI_API_KEY!"
+if defined strBackendGoogleAiApiKey (
+    set "strBackendGoogleAiApiKeySource=env:GOOGLE_AI_API_KEY"
+) else (
+    set "strBackendGoogleAiApiKey=AIzaSyCY4b4mhpy-1fXkt4NF224JWsiPJio6b5Q"
+    set "strBackendGoogleAiApiKeySource=default"
+)
+
+set "strFrontendApiUrl=!FRONTEND_API_URL!"
+if not defined strFrontendApiUrl set "strFrontendApiUrl=!VITE_API_URL!"
+if defined strFrontendApiUrl (
+    if defined FRONTEND_API_URL (
+        set "strFrontendApiUrlSource=env:FRONTEND_API_URL"
+    ) else (
+        set "strFrontendApiUrlSource=env:VITE_API_URL"
+    )
+) else (
+    set "strFrontendApiUrl=http://localhost:8000"
+    set "strFrontendApiUrlSource=default"
+)
+
+set "strFrontendSupabaseUrl=!VITE_SUPABASE_URL!"
+if not defined strFrontendSupabaseUrl set "strFrontendSupabaseUrl=!SUPABASE_URL!"
+if defined strFrontendSupabaseUrl (
+    if defined VITE_SUPABASE_URL (
+        set "strFrontendSupabaseUrlSource=env:VITE_SUPABASE_URL"
+    ) else (
+        set "strFrontendSupabaseUrlSource=env:SUPABASE_URL"
+    )
+) else (
+    set "strFrontendSupabaseUrl=https://qptddifkwfdyuhqhujul.supabase.co"
+    set "strFrontendSupabaseUrlSource=default"
+)
+
+set "strFrontendSupabaseKey=!VITE_SUPABASE_KEY!"
+if not defined strFrontendSupabaseKey set "strFrontendSupabaseKey=!SUPABASE_KEY!"
+if defined strFrontendSupabaseKey (
+    if defined VITE_SUPABASE_KEY (
+        set "strFrontendSupabaseKeySource=env:VITE_SUPABASE_KEY"
+    ) else (
+        set "strFrontendSupabaseKeySource=env:SUPABASE_KEY"
+    )
+) else (
+    set "strFrontendSupabaseKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwdGRkaWZrd2ZkeXVocWh1anVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDczNDUxNzIsImV4cCI6MjA2MjkyMTE3Mn0.roePCKt1WCX1bpDmOGMSL2XPTQGLO_9Kp9hfbbgP5ds"
+    set "strFrontendSupabaseKeySource=default"
+)
+
+set "strBackendDatabaseUrl=!DATABASE_URL!"
+if defined strBackendDatabaseUrl (
+    set "strBackendDatabaseUrlSource=env:DATABASE_URL"
+) else (
+    set "strBackendDatabaseUrl=postgresql://!strBackendDbUser!:!strBackendDbPassword!@!strBackendDbHost!:!strBackendDbPort!/!strBackendDbName!"
+    set "strBackendDatabaseUrlSource=derived"
+)
 
 REM Set up logging
 for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
 set "TIMESTAMP=%dt:~0,4%%dt:~4,2%%dt:~6,2%_%dt:~8,2%%dt:~10,2%%dt:~12,2%"
-set "LOG_DIR=%~dp0..\logs"
+set "LOG_DIR=!BASE_DIR!\logs"
 set "LOG_FILE=%LOG_DIR%\containers_%TIMESTAMP%.log"
 
 REM Create logs directory if it doesn't exist
@@ -102,7 +201,6 @@ call :log "INFO" "PORT-CHECK" "Port check completed"
 
 REM Create required directories
 call :log "INFO" "SETUP" "Creating required directories..."
-set "BASE_DIR=%~dp0.."
 if not exist "!BASE_DIR!\songs" (
     mkdir "!BASE_DIR!\songs"
     call :log "INFO" "SETUP" "Created songs directory"
@@ -116,6 +214,40 @@ if not exist "!BASE_DIR!\container_health" (
     call :log "INFO" "SETUP" "Created container_health directory"
 )
 call :log "SUCCESS" "SETUP" "All required directories verified/created"
+
+REM Note configuration source without exposing secret values
+if /I "!strBackendSupabaseUrlSource!"=="default" (
+    call :log "WARNING" "CONFIG" "Backend Supabase URL using bundled default (override with SUPABASE_URL or backend\.env)."
+) else (
+    call :log "INFO" "CONFIG" "Backend Supabase URL sourced from !strBackendSupabaseUrlSource!"
+)
+if /I "!strBackendSupabaseKeySource!"=="default" (
+    call :log "WARNING" "CONFIG" "Backend Supabase key using bundled default (override with SUPABASE_KEY or backend\.env)."
+) else (
+    call :log "INFO" "CONFIG" "Backend Supabase key sourced from !strBackendSupabaseKeySource!"
+)
+if /I "!strBackendDatabaseUrlSource!"=="derived" (
+    call :log "INFO" "CONFIG" "Database URL constructed from bundled credentials."
+) else if /I "!strBackendDatabaseUrlSource!"=="default" (
+    call :log "WARNING" "CONFIG" "Database URL using bundled default value."
+) else (
+    call :log "INFO" "CONFIG" "Database URL sourced from !strBackendDatabaseUrlSource!"
+)
+if /I "!strBackendGoogleAiApiKeySource!"=="default" (
+    call :log "WARNING" "CONFIG" "Google AI API key using bundled default."
+) else (
+    call :log "INFO" "CONFIG" "Google AI API key sourced from !strBackendGoogleAiApiKeySource!"
+)
+if /I "!strFrontendApiUrlSource!"=="default" (
+    call :log "INFO" "CONFIG" "Frontend API URL using bundled default (http://localhost:8000)."
+) else (
+    call :log "INFO" "CONFIG" "Frontend API URL sourced from !strFrontendApiUrlSource!"
+)
+if /I "!strFrontendSupabaseKeySource!"=="default" (
+    call :log "WARNING" "CONFIG" "Frontend Supabase key using bundled default."
+) else (
+    call :log "INFO" "CONFIG" "Frontend Supabase key sourced from !strFrontendSupabaseKeySource!"
+)
 
 REM Process input parameters or use defaults
 set "strFrontendImage=%~1"
@@ -219,12 +351,12 @@ set "BACKEND_CMD=!BACKEND_CMD! --restart unless-stopped"
 set "BACKEND_CMD=!BACKEND_CMD! -p 8000:8000"
 set "BACKEND_CMD=!BACKEND_CMD! !BACKEND_ENV_VARS!"
 set "BACKEND_CMD=!BACKEND_CMD! !BACKEND_ENV_FILE!"
-set "BACKEND_CMD=!BACKEND_CMD! -v !BASE_DIR!\logs:/app/logs"
-set "BACKEND_CMD=!BACKEND_CMD! -v !BASE_DIR!\songs:/app/songs"
-set "BACKEND_CMD=!BACKEND_CMD! -v !BASE_DIR!\camoufox_session_data:/app/camoufox_session_data"
+set "BACKEND_CMD=!BACKEND_CMD! --mount type=bind,src=""!BASE_DIR!\logs"",dst=/app/logs"
+set "BACKEND_CMD=!BACKEND_CMD! --mount type=bind,src=""!BASE_DIR!\songs"",dst=/app/songs"
+set "BACKEND_CMD=!BACKEND_CMD! --mount type=bind,src=""!BASE_DIR!\camoufox_session_data"",dst=/app/camoufox_session_data"
 set "BACKEND_CMD=!BACKEND_CMD! !strBackendImage!"
 
-call :log "DEBUG" "BACKEND" "Executing: !BACKEND_CMD!"
+call :log "DEBUG" "BACKEND" "Executing docker run with inline environment and bind mounts."
 for /f "tokens=*" %%i in ('!BACKEND_CMD! 2^>^&1') do set BACKEND_ID=%%i
 
 REM Check if backend started successfully
@@ -252,20 +384,11 @@ echo   → Status: ✓ Running
 
 REM Wait for backend to be healthy
 call :log "INFO" "BACKEND" "Waiting for backend to be healthy..."
-echo   → Health check: Waiting...
-set "HEALTH_RETRIES=0"
-:backend_health_loop
-if !HEALTH_RETRIES! GEQ 30 (
-    call :log "ERROR" "BACKEND" "Backend health check failed after 30 attempts"
-    echo   → Health check: ✗ Failed
-    goto backend_logs_on_error
-)
-timeout /t 2 >nul 2>&1
-docker exec "!strBackendName!" python -c "import http.client; conn=http.client.HTTPConnection('127.0.0.1', 8000, timeout=5); conn.request('GET', '/'); print(conn.getresponse().status)" >nul 2>&1
-if errorlevel 1 (
-    set /a HEALTH_RETRIES+=1
-    goto backend_health_loop
-)
+echo   → Health check: Waiting for healthy status...
+call :wait_for_health "!strBackendName!" 40
+if errorlevel 3 goto backend_health_inspect_error
+if errorlevel 2 goto backend_health_unhealthy
+if errorlevel 1 goto backend_health_timeout
 call :log "SUCCESS" "BACKEND" "Backend is healthy and responding"
 echo   → Health check: ✓ Healthy
 echo.
@@ -273,10 +396,13 @@ echo.
 REM Default environment variables for frontend (embedded for hassle-free usage)
 set "FRONTEND_ENV_VARS=-e NODE_ENV=production"
 set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e VITE_API_URL=!strFrontendApiUrl!"
+set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e BACKEND_URL=!strFrontendApiUrl!"
 set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e PORT=3000"
 set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e HOST=0.0.0.0"
 set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e VITE_SUPABASE_URL=!strFrontendSupabaseUrl!"
 set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e VITE_SUPABASE_KEY=!strFrontendSupabaseKey!"
+set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e SUPABASE_URL=!strFrontendSupabaseUrl!"
+set "FRONTEND_ENV_VARS=!FRONTEND_ENV_VARS! -e SUPABASE_KEY=!strFrontendSupabaseKey!"
 
 REM Check if frontend .env exists
 if exist "!BASE_DIR!\frontend\.env" (
@@ -299,7 +425,7 @@ set "FRONTEND_CMD=!FRONTEND_CMD! !FRONTEND_ENV_VARS!"
 set "FRONTEND_CMD=!FRONTEND_CMD! !FRONTEND_ENV_FILE!"
 set "FRONTEND_CMD=!FRONTEND_CMD! !strFrontendImage!"
 
-call :log "DEBUG" "FRONTEND" "Executing: !FRONTEND_CMD!"
+call :log "DEBUG" "FRONTEND" "Executing docker run for frontend container."
 for /f "tokens=*" %%i in ('!FRONTEND_CMD! 2^>^&1') do set FRONTEND_ID=%%i
 
 REM Check if frontend started successfully
@@ -322,20 +448,11 @@ echo   → Status: ✓ Running
 
 REM Wait for frontend to be healthy
 call :log "INFO" "FRONTEND" "Waiting for frontend to be healthy..."
-echo   → Health check: Waiting...
-set "HEALTH_RETRIES=0"
-:frontend_health_loop
-if !HEALTH_RETRIES! GEQ 30 (
-    call :log "ERROR" "FRONTEND" "Frontend health check failed after 30 attempts"
-    echo   → Health check: ✗ Failed
-    goto frontend_logs_on_error
-)
-timeout /t 2 >nul 2>&1
-powershell -Command "(Invoke-WebRequest -Uri 'http://localhost:3001' -UseBasicParsing -TimeoutSec 5).StatusCode" >nul 2>&1
-if errorlevel 1 (
-    set /a HEALTH_RETRIES+=1
-    goto frontend_health_loop
-)
+echo   → Health check: Waiting for healthy status...
+call :wait_for_health "!strFrontendName!" 40
+if errorlevel 3 goto frontend_health_inspect_error
+if errorlevel 2 goto frontend_health_unhealthy
+if errorlevel 1 goto frontend_health_timeout
 call :log "SUCCESS" "FRONTEND" "Frontend is healthy and responding"
 echo   → Health check: ✓ Healthy
 
@@ -350,6 +467,10 @@ echo Logs Directory: !LOG_DIR!
 echo.
 echo Container Status:
 docker ps --filter "name=suno" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+echo.
+echo Detailed Health:
+docker inspect --format "{{.Name}}\t{{.State.Status}}\t{{if .State.Health}}{{.State.Health.Status}}{{end}}" "!strBackendName!"
+docker inspect --format "{{.Name}}\t{{.State.Status}}\t{{if .State.Health}}{{.State.Health.Status}}{{end}}" "!strFrontendName!"
 echo ========================================
 echo.
 
@@ -388,6 +509,65 @@ echo [SUCCESS] Containers stopped successfully
 echo [INFO] Session logs saved to: !LOG_FILE!
 goto end
 
+:wait_for_health
+setlocal EnableDelayedExpansion
+set "WFH_CONTAINER=%~1"
+set "WFH_MAX_ATTEMPTS=%~2"
+if not defined WFH_MAX_ATTEMPTS set "WFH_MAX_ATTEMPTS=30"
+set /a WFH_ATTEMPT=0
+set "WFH_LAST_STATUS="
+:wait_for_health_loop
+set "WFH_STATUS="
+for /f "usebackq tokens=*" %%H in (`docker inspect --format="{{.State.Health.Status}}" "!WFH_CONTAINER!" 2^>^&1`) do (
+    if not defined WFH_STATUS set "WFH_STATUS=%%~H"
+)
+if not defined WFH_STATUS (
+    set "WFH_STATUS=pending"
+)
+if /I "!WFH_STATUS:~0,5!"=="Error" (
+    endlocal & exit /b 3
+)
+if "!WFH_STATUS!" NEQ "!WFH_LAST_STATUS!" (
+    call :log "INFO" "HEALTH" "Container %~1 status: !WFH_STATUS!"
+    set "WFH_LAST_STATUS=!WFH_STATUS!"
+)
+if /I "!WFH_STATUS!"=="healthy" (
+    endlocal & exit /b 0
+)
+if /I "!WFH_STATUS!"=="unhealthy" (
+    endlocal & exit /b 2
+)
+if /I "!WFH_STATUS!"=="starting" (
+    REM Continue waiting
+) else if /I "!WFH_STATUS!"=="pending" (
+    REM Continue waiting when status not yet available
+) else if /I "!WFH_STATUS!"=="null" (
+    REM Treat null as pending
+) else (
+    REM Unknown status signals continue but still subject to timeout
+)
+if !WFH_ATTEMPT! GEQ !WFH_MAX_ATTEMPTS! (
+    endlocal & exit /b 1
+)
+timeout /t 2 >nul 2>&1
+set /a WFH_ATTEMPT+=1
+goto wait_for_health_loop
+
+:backend_health_timeout
+call :log "ERROR" "BACKEND" "Backend health check timed out before reaching healthy status"
+echo   → Health check: ✗ Timed out
+goto backend_logs_on_error
+
+:backend_health_unhealthy
+call :log "ERROR" "BACKEND" "Backend reported unhealthy status"
+echo   → Health check: ✗ Unhealthy
+goto backend_logs_on_error
+
+:backend_health_inspect_error
+call :log "ERROR" "BACKEND" "Failed to query backend health status via docker inspect"
+echo   → Health check: ✗ Inspect error
+goto backend_logs_on_error
+
 :backend_logs_on_error
 echo.
 echo [ERROR] Backend container logs:
@@ -396,6 +576,21 @@ docker logs "!strBackendName!" --tail 100 2>&1 > "!LOG_DIR!\backend_crash_%TIMES
 call :log "ERROR" "BACKEND" "Backend crash log saved to backend_crash_%TIMESTAMP%.log"
 pause
 exit /b 1
+
+:frontend_health_timeout
+call :log "ERROR" "FRONTEND" "Frontend health check timed out before reaching healthy status"
+echo   → Health check: ✗ Timed out
+goto frontend_logs_on_error
+
+:frontend_health_unhealthy
+call :log "ERROR" "FRONTEND" "Frontend reported unhealthy status"
+echo   → Health check: ✗ Unhealthy
+goto frontend_logs_on_error
+
+:frontend_health_inspect_error
+call :log "ERROR" "FRONTEND" "Failed to query frontend health status via docker inspect"
+echo   → Health check: ✗ Inspect error
+goto frontend_logs_on_error
 
 :frontend_logs_on_error
 echo.

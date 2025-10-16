@@ -1,4 +1,8 @@
 # syntax=docker/dockerfile:1
+# System: Suno Automation Backend
+# Module: Docker Runtime
+# File URL: backend/Dockerfile
+# Purpose: Build the FastAPI backend container with Camoufox dependencies and health instrumentation.
 
 ARG PYTHON_IMAGE=python:3.11-slim-bookworm
 
@@ -130,7 +134,9 @@ USER suno-user
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD python -c "import http.client, sys; conn=http.client.HTTPConnection('127.0.0.1', 8000, timeout=5); conn.request('GET', '/'); status = conn.getresponse().status; sys.exit(0 if 200 <= status < 500 else 1)" || exit 1
+ENV BACKEND_HEALTH_TIMEOUT=5
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD python -c "import http.client, os, sys; timeout=float(os.getenv('BACKEND_HEALTH_TIMEOUT','5')); conn=http.client.HTTPConnection('127.0.0.1', 8000, timeout=timeout); conn.request('GET', '/health'); status = conn.getresponse().status; sys.exit(0 if 200 <= status < 500 else 1)"
+
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

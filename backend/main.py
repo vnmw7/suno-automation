@@ -4,8 +4,12 @@ Module: main
 Purpose: Main FastAPI application setup, including routing, middleware, and API endpoints for song generation and related functionalities.
 """
 
+import os
+from typing import List
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from api.song.routes import router as song_router
 from api.ai_review.routes import router as ai_review_router
 from api.ai_generation.routes import router as ai_generation_router
@@ -41,6 +45,36 @@ app.include_router(ai_review_router)
 app.include_router(ai_generation_router)
 app.include_router(orchestrator_router)
 app.include_router(songs_router)
+
+REQUIRED_ENVIRONMENT_KEYS: List[str] = [
+    "SUPABASE_URL",
+    "SUPABASE_KEY",
+    "USER",
+    "PASSWORD",
+    "HOST",
+    "PORT",
+    "DBNAME",
+]
+
+
+@app.get("/health")
+def read_health():
+    """
+    Report application readiness with lightweight configuration checks.
+
+    Returns:
+        JSONResponse: Health status with missing environment keys (if any).
+    """
+    missing_env = [key for key in REQUIRED_ENVIRONMENT_KEYS if not os.getenv(key)]
+    is_healthy = not missing_env
+
+    return JSONResponse(
+        status_code=200 if is_healthy else 503,
+        content={
+            "status": "healthy" if is_healthy else "degraded",
+            "missingEnv": missing_env,
+        },
+    )
 
 
 @app.get("/")

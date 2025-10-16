@@ -1,10 +1,8 @@
-# Stage 1: Dependencies
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
+# System: Suno Automation Frontend
+# Module: Docker Runtime
+# File URL: frontend/Dockerfile
+# Purpose: Build and run the Remix frontend as a production-ready container with health monitoring.
 
-# Stage 2: Builder
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
@@ -12,22 +10,27 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Stage 3: Production
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
 FROM node:20-alpine
 WORKDIR /app
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
 
-# Copy production dependencies
+RUN apk add --no-cache curl
+
 COPY --from=deps /app/node_modules ./node_modules
-# Copy built application
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/public ./public
 COPY package.json ./
 
 EXPOSE 3000
-ENV NODE_ENV=production
-ENV PORT=3000
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:3000/health || exit 1
 
-CMD ["npm", "start"]
+CMD ["npx", "remix-serve", "build/server/index.js"]
