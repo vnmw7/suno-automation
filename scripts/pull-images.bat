@@ -52,7 +52,7 @@ echo AUTOMATIC PULL MODE
 echo ========================================
 echo Target Images:
 echo  - !strRegistry!/suno-frontend:!strTag!
-echo  - !strRegistry!/suno-backend:!strTag!
+echo  - !strRegistry!/suno-backend-startup:!strTag!
 echo ========================================
 echo.
 
@@ -71,9 +71,9 @@ if errorlevel 1 (
 echo [SUCCESS] Frontend image pulled successfully
 echo.
 
-echo [ACTION] Pulling backend image "!strRegistry!/suno-backend:!strTag!"...
-echo [DEBUG] Executing: docker pull "!strRegistry!/suno-backend:!strTag!"
-docker pull "!strRegistry!/suno-backend:!strTag!"
+echo [ACTION] Pulling backend image "!strRegistry!/suno-backend-startup:!strTag!"...
+echo [DEBUG] Executing: docker pull "!strRegistry!/suno-backend-startup:!strTag!"
+docker pull "!strRegistry!/suno-backend-startup:!strTag!"
 if errorlevel 1 (
     echo [ERROR] Failed to pull backend image
     goto error

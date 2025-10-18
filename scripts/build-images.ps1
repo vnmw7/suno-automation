@@ -68,10 +68,10 @@ if ($Push.IsPresent) {
 
 if ([string]::IsNullOrWhiteSpace($Registry)) {
     $strFrontendImage = "suno-frontend:$Tag"
-    $strBackendImage = "suno-backend:$Tag"
+    $strBackendImage = "suno-backend-startup:$Tag"
 } else {
     $strFrontendImage = "$Registry/suno-frontend:$Tag"
-    $strBackendImage = "$Registry/suno-backend:$Tag"
+    $strBackendImage = "$Registry/suno-backend-startup:$Tag"
 }
 
 Write-Host "Building frontend image -> $strFrontendImage ($strPlatforms)"

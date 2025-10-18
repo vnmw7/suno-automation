@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN python -m pip install --upgrade pip \
     && python -m pip install --no-cache-dir --prefix /install -r requirements.txt \
-    && python -m pip install --no-cache-dir "camoufox[geoip]"
+    && python -m pip install --no-cache-dir --prefix /install "camoufox[geoip]"
 
 COPY build/artifacts/camoufox/ ./artifacts/camoufox/
 RUN set -eux; \
@@ -116,6 +116,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /install /usr/local
 COPY --from=builder /build/camoufox-install /opt/camoufox
+
+# Fix browserforge missing data files by downloading them directly
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    mkdir -p /usr/local/lib/python3.11/site-packages/browserforge/headers/data && \
+    mkdir -p /usr/local/lib/python3.11/site-packages/browserforge/fingerprints/data && \
+    cd /usr/local/lib/python3.11/site-packages/browserforge/headers/data && \
+    curl -L -O https://github.com/daijro/browserforge/raw/main/browserforge/headers/data/input-network.zip && \
+    curl -L -O https://github.com/daijro/browserforge/raw/main/browserforge/headers/data/header-network.zip && \
+    curl -L -O https://github.com/daijro/browserforge/raw/main/browserforge/headers/data/browser-helper-file.json && \
+    curl -L -O https://github.com/daijro/browserforge/raw/main/browserforge/headers/data/headers-order.json && \
+    cd /usr/local/lib/python3.11/site-packages/browserforge/fingerprints/data && \
+    curl -L -O https://github.com/daijro/browserforge/raw/main/browserforge/fingerprints/data/fingerprint-network.zip && \
+    apt-get remove -y curl && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --shell /bin/bash suno-user \
     && mkdir -p /home/suno-user/.cache \

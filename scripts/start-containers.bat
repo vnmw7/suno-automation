@@ -15,6 +15,10 @@ setlocal EnableDelayedExpansion
 
 for %%I in ("%~dp0..") do set "BASE_DIR=%%~fI"
 
+REM Capture original CLI arguments before calling helper subroutines (call resets %1/%2)
+set "CLIFrontendImage=%~1"
+set "CLIBackendImage=%~2"
+
 REM Inline environment configuration with override support (no .env required)
 set "strBackendSupabaseUrl=!SUPABASE_URL!"
 if defined strBackendSupabaseUrl (
@@ -215,6 +219,38 @@ if not exist "!BASE_DIR!\container_health" (
 )
 call :log "SUCCESS" "SETUP" "All required directories verified/created"
 
+REM Ensure Browserforge datasets are available locally to avoid registry downloads
+set "strBrowserforgeHeadersDir=!BASE_DIR!\backend\browserforge_data\headers"
+set "strBrowserforgeFingerprintsDir=!BASE_DIR!\backend\browserforge_data\fingerprints"
+
+if not exist "!strBrowserforgeHeadersDir!" (
+    call :log "ERROR" "SETUP" "Missing browserforge headers dataset under backend\browserforge_data\headers"
+    echo [ERROR] Browserforge headers dataset not found at: !strBrowserforgeHeadersDir!
+    echo Please extract the dataset from apify_fingerprint_datapoints into backend\browserforge_data before retrying.
+    pause
+    exit /b 1
+)
+if not exist "!strBrowserforgeFingerprintsDir!" (
+    call :log "ERROR" "SETUP" "Missing browserforge fingerprints dataset under backend\browserforge_data\fingerprints"
+    echo [ERROR] Browserforge fingerprint dataset not found at: !strBrowserforgeFingerprintsDir!
+    echo Please extract the dataset from apify_fingerprint_datapoints into backend\browserforge_data before retrying.
+    pause
+    exit /b 1
+)
+if not exist "!strBrowserforgeHeadersDir!\input-network.zip" (
+    call :log "ERROR" "SETUP" "Browserforge headers dataset incomplete (input-network.zip missing)"
+    echo [ERROR] Browserforge dataset incomplete: input-network.zip missing.
+    pause
+    exit /b 1
+)
+if not exist "!strBrowserforgeFingerprintsDir!\fingerprint-network.zip" (
+    call :log "ERROR" "SETUP" "Browserforge fingerprint dataset incomplete (fingerprint-network.zip missing)"
+    echo [ERROR] Browserforge dataset incomplete: fingerprint-network.zip missing.
+    pause
+    exit /b 1
+)
+call :log "INFO" "SETUP" "Browserforge datasets found locally; mounting into backend container."
+
 REM Note configuration source without exposing secret values
 if /I "!strBackendSupabaseUrlSource!"=="default" (
     call :log "WARNING" "CONFIG" "Backend Supabase URL using bundled default (override with SUPABASE_URL or backend\.env)."
@@ -250,16 +286,16 @@ if /I "!strFrontendSupabaseKeySource!"=="default" (
 )
 
 REM Process input parameters or use defaults
-set "strFrontendImage=%~1"
-set "strBackendImage=%~2"
+set "strFrontendImage=!CLIFrontendImage!"
+set "strBackendImage=!CLIBackendImage!"
 
 if "!strFrontendImage!"=="" (
     set "strFrontendImage=vnmw7/suno-frontend:latest"
     call :log "INFO" "CONFIG" "Using default frontend image: vnmw7/suno-frontend:latest"
 )
 if "!strBackendImage!"=="" (
-    set "strBackendImage=vnmw7/suno-backend:latest"
-    call :log "INFO" "CONFIG" "Using default backend image: vnmw7/suno-backend:latest"
+    set "strBackendImage=vnmw7/suno-backend-startup:latest"
+    call :log "INFO" "CONFIG" "Using default backend image: vnmw7/suno-backend-startup:latest"
 )
 
 set "strFrontendName=suno-frontend-startup"
@@ -354,6 +390,8 @@ set "BACKEND_CMD=!BACKEND_CMD! !BACKEND_ENV_FILE!"
 set "BACKEND_CMD=!BACKEND_CMD! --mount type=bind,src=""!BASE_DIR!\logs"",dst=/app/logs"
 set "BACKEND_CMD=!BACKEND_CMD! --mount type=bind,src=""!BASE_DIR!\songs"",dst=/app/songs"
 set "BACKEND_CMD=!BACKEND_CMD! --mount type=bind,src=""!BASE_DIR!\camoufox_session_data"",dst=/app/camoufox_session_data"
+set "BACKEND_CMD=!BACKEND_CMD! --mount type=bind,src=""!strBrowserforgeHeadersDir!"",dst=/usr/local/lib/python3.11/site-packages/browserforge/headers/data"
+set "BACKEND_CMD=!BACKEND_CMD! --mount type=bind,src=""!strBrowserforgeFingerprintsDir!"",dst=/usr/local/lib/python3.11/site-packages/browserforge/fingerprints/data"
 set "BACKEND_CMD=!BACKEND_CMD! !strBackendImage!"
 
 call :log "DEBUG" "BACKEND" "Executing docker run with inline environment and bind mounts."

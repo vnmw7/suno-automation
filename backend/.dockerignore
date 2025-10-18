@@ -25,3 +25,9 @@ logs/*.log
 # Don't ignore songs folder structure, just the MP3s
 songs/**/*.mp3
 .ruff_cache/
+# Exclude large session data
+camoufox_session_data/
+*.mp3
+*.wav
+*.zip
+*.tar.gz
