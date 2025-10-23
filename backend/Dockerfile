@@ -27,6 +27,8 @@ RUN python -m pip install --upgrade pip \
     && python -m pip install --no-cache-dir --prefix /install -r requirements.txt \
     && python -m pip install --no-cache-dir --prefix /install "camoufox[geoip]"
 
+ENV PYTHONPATH=/install/lib/python3.11/site-packages
+
 COPY build/artifacts/camoufox/ ./artifacts/camoufox/
 RUN set -eux; \
     mkdir -p "${CAMOUFOX_INSTALL_ROOT}"; \
