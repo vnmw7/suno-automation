@@ -108,25 +108,54 @@ suno-automation/
 ```
 
 ## Getting Started
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
+
+### One-Click Windows Setup (Recommended)
+
+For Windows users, we provide an automated setup script that installs all prerequisites and configures the project:
+
+**Requirements:**
+- Windows 10 or later
+- Administrator privileges
+- Internet connection
+
+**Steps:**
+1. Download the repository or run the script from an existing clone
+2. Right-click on `setup-windows.bat` and select "Run as administrator"
+3. Follow the prompts to complete the installation
+4. Edit the generated `.env` files with your credentials
+5. Run `start.bat` to launch the application
+
+The script will automatically:
+- Install Git, Node.js (LTS ≥20), and Python 3.11 via Winget
+- Clone or update the repository
+- Set up the Python virtual environment and install dependencies
+- Download the Camoufox browser payload
+- Install frontend Node.js dependencies
+- Create `.env` files from templates
+
+### Manual Setup
+
+#### Prerequisites
+- Python 3.11+
+- Node.js 20+ (LTS)
+- Git
 - PostgreSQL database
 
-### Installation
+#### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/suno-automation.git
+   git clone https://github.com/vnmw7/suno-automation.git
    cd suno-automation
    ```
 
 2. Set up backend:
    ```bash
    cd backend
-   python -m venv venv
-   source venv/bin/activate  # Linux/Mac
-   venv\Scripts\activate     # Windows
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/Mac
+   .venv\Scripts\activate     # Windows
    pip install -r requirements.txt
+   camoufox fetch  # Download browser payload
    ```
 
 3. Set up frontend:
@@ -136,25 +165,38 @@ suno-automation/
    ```
 
 4. Create `.env` files:
-   - Backend: `backend/.env`
+   - Backend: `backend/.env` (copy from `backend/.env.example`)
      ```
-     DATABASE_URL=postgresql://user:password@localhost:5432/suno
-     SUNO_API_KEY=your_suno_api_key
+     SUPABASE_URL=your-supabase-url
+     SUPABASE_KEY=your-supabase-key
+     GOOGLE_AI_API_KEY=your-google-ai-api-key
      ```
-   - Frontend: `frontend/.env`
+   - Frontend: `frontend/.env` (copy from `frontend/.env.example`)
      ```
-     SUPABASE_URL=https://your-project.supabase.co
-     SUPABASE_ANON_KEY=your-anon-key
+     VITE_SUPABASE_URL=your_supabase_url_here
+     VITE_SUPABASE_KEY=your_supabase_key_here
+     VITE_API_URL=http://localhost:8000
      ```
 
 ### Running the Application
+
+#### Option 1: Using the Start Script (Recommended)
+After completing the setup, simply run:
+```bash
+start.bat
+```
+This will start both the backend and frontend services simultaneously.
+
+#### Option 2: Manual Start
 1. Start backend:
    ```bash
    cd backend
+   .venv\Scripts\activate  # Windows
+   source .venv/bin/activate  # Linux/Mac
    uvicorn main:app --reload
    ```
 
-2. Start frontend:
+2. Start frontend (in a new terminal):
    ```bash
    cd frontend
    npm run dev
