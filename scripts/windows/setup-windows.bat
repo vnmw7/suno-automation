@@ -41,7 +41,7 @@ echo ========================================
 echo  Suno Automation - Windows Setup Script
 echo ========================================
 echo.
-echo This script will install Git, Node.js, and Python 3.11,
+echo This script will install Git, Node.js, and Python 3.14,
 echo then set up the Suno Automation project environment.
 echo.
 
@@ -264,7 +264,7 @@ REM Function: ensurePython
 REM ========================================
 :ensurePython
 call :log "DEBUG" "Entering :ensurePython"
-call :log "INFO" "Checking Python 3.11 installation..."
+call :log "INFO" "Checking Python 3.14 installation..."
 set "strPythonVersion="
 set "intPythonMajor="
 set "intPythonMinor="
@@ -273,15 +273,15 @@ set "blnPythonNeedsUpgrade=0"
 python --version >> "%strLogFile%" 2>&1
 if errorlevel 1 (
     call :log "INFO" "Installing Python 3.11 via Winget..."
-    winget install --exact --accept-package-agreements --accept-source-agreements Python.Python.3.11 >> "%strLogFile%" 2>&1
+    winget install --exact --accept-package-agreements --accept-source-agreements Python.Python.3.14 >> "%strLogFile%" 2>&1
     if errorlevel 1 (
         set "blnSuccess=0"
-        set "strInstallReport=!strInstallReport!Failed to install Python 3.11\n"
-        call :log "ERROR" "Failed to install Python 3.11."
+        set "strInstallReport=!strInstallReport!Failed to install Python 3.14\n"
+        call :log "ERROR" "Failed to install Python 3.14."
         call :log "DEBUG" "Exiting :ensurePython"
         goto :eof
     )
-    call :log "SUCCESS" "Python 3.11 installed successfully."
+    call :log "SUCCESS" "Python 3.14 installed successfully."
     set "blnNeedsInstall=1"
     call :_refreshPythonPath
 )
@@ -312,12 +312,12 @@ if defined intPythonMajor (
 )
 
 if "!blnPythonNeedsUpgrade!"=="1" (
-    call :log "INFO" "Python version !intPythonMajor!.!intPythonMinor! does not meet the required %INT_PYTHON_MIN_MAJOR%.%INT_PYTHON_MIN_MINOR%. Installing Python.Python.3.11..."
-    winget upgrade --exact --accept-package-agreements --accept-source-agreements Python.Python.3.11 >> "%strLogFile%" 2>&1
+    call :log "INFO" "Python version !intPythonMajor!.!intPythonMinor! does not meet the required %INT_PYTHON_MIN_MAJOR%.%INT_PYTHON_MIN_MINOR%. Installing Python.Python.3.14..."
+    winget upgrade --exact --accept-package-agreements --accept-source-agreements Python.Python.3.14 >> "%strLogFile%" 2>&1
     if errorlevel 1 (
         call :log "WARNING" "Python upgrade failed. Continuing with existing version."
     ) else (
-        call :log "SUCCESS" "Python upgraded to 3.11."
+        call :log "SUCCESS" "Python upgraded to 3.14."
         set "blnNeedsInstall=1"
         call :_refreshPythonPath
     )
@@ -549,9 +549,9 @@ REM ========================================
 :_refreshPythonPath
 set "strPythonExe="
 for %%F in (
-    "%LocalAppData%\Programs\Python\Python311\python.exe"
-    "%ProgramFiles%\Python311\python.exe"
-    "%ProgramFiles%\Python\Python311\python.exe"
+    "%LocalAppData%\Programs\Python\Python314\python.exe"
+    "%ProgramFiles%\Python314\python.exe"
+    "%ProgramFiles%\Python\Python314\python.exe"
 ) do (
     if exist "%%~fF" set "strPythonExe=%%~fF"
 )
