@@ -81,9 +81,13 @@ call :log "SUCCESS" "Winget is available."
 echo.
 
 REM Ensure core toolchain
+call :log "DEBUG" "MAIN: Calling :ensureGit"
 call :ensureGit
+call :log "DEBUG" "MAIN: Returned from :ensureGit. Calling :ensureNodeJS"
 call :ensureNodeJS
+call :log "DEBUG" "MAIN: Returned from :ensureNodeJS. Calling :ensurePython"
 call :ensurePython
+call :log "DEBUG" "MAIN: Returned from :ensurePython"
 
 REM Fetch or refresh repository content
 call :setupRepository
@@ -538,7 +542,7 @@ for %%F in (
 if defined strNodeExe (
     for %%D in ("!strNodeExe!") do set "strNodeDir=%%~dpD"
     if defined strNodeDir (
-        set "PATH=!strNodeDir!;!PATH!"
+        set "PATH=!strPythonDir!;!PATH!"
     )
 )
 exit /b 0
