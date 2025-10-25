@@ -10,9 +10,17 @@ REM Initialize variables
 set "strRepoUrl=https://github.com/vnmw7/suno-automation.git"
 set "strRepoName=suno-automation"
 set "strScriptRoot=%~dp0"
+set "strProjectRoot="
+set "blnRootPushed=0"
 set "blnSuccess=1"
 set "strInstallReport="
 set "blnNeedsInstall=0"
+
+for %%I in ("%~dp0..\..") do set "strDefaultRepo=%%~fI"
+if exist "%strDefaultRepo%\.git" (
+    set "strProjectRoot=%strDefaultRepo%"
+)
+set "strDefaultRepo="
 
 REM Display header
 echo.
@@ -67,14 +75,40 @@ call :ensurePython
 REM Fetch or refresh repository content
 call :setupRepository
 
-REM Setup backend environment
-call :setupBackend
+REM Prepare project root context
+if defined strProjectRoot (
+    if exist "%strProjectRoot%" (
+        pushd "%strProjectRoot%"
+        set "blnRootPushed=1"
+    ) else (
+        echo [ERROR] Project root directory "%strProjectRoot%" not found.
+        set "blnSuccess=0"
+        set "strInstallReport=!strInstallReport!Project root directory missing\n"
+        set "strProjectRoot="
+    )
+) else (
+    echo [ERROR] Unable to determine project root directory.
+    set "blnSuccess=0"
+    set "strInstallReport=!strInstallReport!Project root not resolved\n"
+)
 
-REM Setup frontend dependencies
-call :setupFrontend
+if defined strProjectRoot (
+    REM Setup backend environment
+    call :setupBackend
 
-REM Provision environment files
-call :setupEnvironmentFiles
+    REM Setup frontend dependencies
+    call :setupFrontend
+
+    REM Provision environment files
+    call :setupEnvironmentFiles
+) else (
+    echo [WARNING] Skipping backend, frontend, and environment setup because the project root is unavailable.
+)
+
+if "!blnRootPushed!"=="1" (
+    popd
+    set "blnRootPushed=0"
+)
 
 REM Display final status
 call :displayFinalStatus
@@ -155,9 +189,9 @@ REM ========================================
 :setupRepository
 echo [INFO] Setting up repository...
 
-REM Check if we're in a git repository
-if exist ".git" (
-    echo [INFO] Repository detected, updating...
+if defined strProjectRoot (
+    echo [INFO] Repository detected at !strProjectRoot!, updating...
+    pushd "!strProjectRoot!"
     git fetch --all --prune
     if %errorLevel% neq 0 (
         echo [WARNING] Failed to fetch updates, continuing with local version.
@@ -169,30 +203,30 @@ if exist ".git" (
             echo [SUCCESS] Repository updated successfully.
         )
     )
-) else (
-    echo [INFO] No git repository found, cloning...
-    set "strTargetDir=%USERPROFILE%\%strRepoName%"
-    
-    REM Create target directory if it doesn't exist
-    if not exist "!strTargetDir!" (
-        mkdir "!strTargetDir!"
-    )
-    
-    REM Clone the repository
-    git clone "%strRepoUrl%" "!strTargetDir!"
-    if %errorLevel% neq 0 (
-        set "blnSuccess=0"
-        set "strInstallReport=!strInstallReport!Failed to clone repository\n"
-        echo [ERROR] Failed to clone repository.
-        goto :eof
-    ) else (
-        echo [SUCCESS] Repository cloned to !strTargetDir!
-        echo.
-        echo [INFO] Changing to cloned repository directory to continue setup...
-        cd /d "!strTargetDir!"
-        echo [INFO] Now continuing setup in !strTargetDir!
-    )
+    popd
+    goto :eof
 )
+
+echo [INFO] No git repository found, cloning...
+set "strTargetDir=%USERPROFILE%\%strRepoName%"
+
+REM Create target directory if it doesn't exist
+if not exist "!strTargetDir!" (
+    mkdir "!strTargetDir!"
+)
+
+REM Clone the repository
+git clone "%strRepoUrl%" "!strTargetDir!"
+if %errorLevel% neq 0 (
+    set "blnSuccess=0"
+    set "strInstallReport=!strInstallReport!Failed to clone repository\n"
+    echo [ERROR] Failed to clone repository.
+    goto :eof
+)
+
+echo [SUCCESS] Repository cloned to !strTargetDir!
+set "strProjectRoot=!strTargetDir!"
+echo [INFO] Project root set to !strProjectRoot!
 goto :eof
 
 REM ========================================
@@ -201,10 +235,22 @@ REM ========================================
 :setupBackend
 echo [INFO] Setting up backend environment...
 
-REM Navigate to backend directory
-cd backend
+if not defined strProjectRoot (
+    echo [ERROR] Project root is not defined. Unable to configure backend.
+    set "blnSuccess=0"
+    set "strInstallReport=!strInstallReport!Project root missing for backend setup\n"
+    goto :eof
+)
 
-REM Create virtual environment if it doesn't exist
+if not exist "%strProjectRoot%\backend" (
+    echo [ERROR] Backend directory not found at "%strProjectRoot%\backend".
+    set "blnSuccess=0"
+    set "strInstallReport=!strInstallReport!Backend directory not found\n"
+    goto :eof
+)
+
+pushd "%strProjectRoot%\backend"
+
 if not exist ".venv" (
     echo [INFO] Creating Python virtual environment...
     python -m venv .venv
@@ -212,31 +258,28 @@ if not exist ".venv" (
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Failed to create virtual environment\n"
         echo [ERROR] Failed to create virtual environment.
-        cd ..
+        popd
         goto :eof
     )
     echo [SUCCESS] Virtual environment created.
 )
 
-REM Activate virtual environment
 echo [INFO] Activating virtual environment...
 call .venv\Scripts\activate
 if %errorLevel% neq 0 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Failed to activate virtual environment\n"
     echo [ERROR] Failed to activate virtual environment.
-    cd ..
+    popd
     goto :eof
 )
 
-REM Upgrade pip
 echo [INFO] Upgrading pip...
 python -m pip install --upgrade pip
 if %errorLevel% neq 0 (
     echo [WARNING] Failed to upgrade pip, continuing with current version.
 )
 
-REM Install requirements
 echo [INFO] Installing Python dependencies...
 pip install -r requirements.txt
 if %errorLevel% neq 0 (
@@ -244,12 +287,11 @@ if %errorLevel% neq 0 (
     set "strInstallReport=!strInstallReport!Failed to install Python dependencies\n"
     echo [ERROR] Failed to install Python dependencies.
     call deactivate
-    cd ..
+    popd
     goto :eof
 )
 echo [SUCCESS] Python dependencies installed.
 
-REM Fetch Camoufox browser payload
 echo [INFO] Downloading Camoufox browser payload...
 camoufox fetch
 if %errorLevel% neq 0 (
@@ -258,10 +300,8 @@ if %errorLevel% neq 0 (
     echo [SUCCESS] Camoufox payload downloaded.
 )
 
-REM Deactivate virtual environment
 call deactivate
-
-cd ..
+popd
 echo [SUCCESS] Backend setup completed.
 goto :eof
 
@@ -272,15 +312,22 @@ REM ========================================
 echo [INFO] Setting up frontend dependencies...
 
 REM Check if frontend directory exists
-if not exist "frontend" (
-    echo [ERROR] Frontend directory not found.
+if not defined strProjectRoot (
+    echo [ERROR] Project root is not defined. Unable to configure frontend.
+    set "blnSuccess=0"
+    set "strInstallReport=!strInstallReport!Project root missing for frontend setup\n"
+    goto :eof
+)
+
+if not exist "%strProjectRoot%\frontend" (
+    echo [ERROR] Frontend directory not found at "%strProjectRoot%\frontend".
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Frontend directory not found\n"
     goto :eof
 )
 
 REM Navigate to frontend directory
-pushd frontend
+pushd "%strProjectRoot%\frontend"
 
 REM Configure npm to reduce output
 npm config set fund false
@@ -308,21 +355,35 @@ REM ========================================
 :setupEnvironmentFiles
 echo [INFO] Setting up environment files...
 
+if not defined strProjectRoot (
+    echo [ERROR] Project root is not defined. Unable to create environment files.
+    set "blnSuccess=0"
+    set "strInstallReport=!strInstallReport!Project root missing for environment files\n"
+    goto :eof
+)
+
+if not exist "%strProjectRoot%" (
+    echo [ERROR] Project root directory "%strProjectRoot%" not found. Unable to create environment files.
+    set "blnSuccess=0"
+    set "strInstallReport=!strInstallReport!Project root directory not found for environment files\n"
+    goto :eof
+)
+
 REM Create root .env file if it doesn't exist
-if not exist ".env" (
+if not exist "%strProjectRoot%\.env" (
     echo [INFO] Creating root .env file...
     (
         echo TAG=latest
         echo CAMOUFOX_SOURCE=auto
-    ) > .env
+    ) > "%strProjectRoot%\.env"
     echo [SUCCESS] Root .env file created.
 )
 
 REM Create backend .env file if it doesn't exist
-if not exist "backend\.env" (
+if not exist "%strProjectRoot%\backend\.env" (
     echo [INFO] Creating backend .env file...
-    if exist "backend\.env.example" (
-        copy "backend\.env.example" "backend\.env" >nul 2>&1
+    if exist "%strProjectRoot%\backend\.env.example" (
+        copy "%strProjectRoot%\backend\.env.example" "%strProjectRoot%\backend\.env" >nul 2>&1
         echo [SUCCESS] Backend .env file created from example.
     ) else (
         (
@@ -336,16 +397,16 @@ if not exist "backend\.env" (
             echo PORT=5432
             echo DBNAME=postgres
             echo GOOGLE_AI_API_KEY=your-google-ai-api-key
-        ) > "backend\.env"
+        ) > "%strProjectRoot%\backend\.env"
         echo [SUCCESS] Backend .env file created with defaults.
     )
 )
 
 REM Create frontend .env file if it doesn't exist
-if not exist "frontend\.env" (
+if not exist "%strProjectRoot%\frontend\.env" (
     echo [INFO] Creating frontend .env file...
-    if exist "frontend\.env.example" (
-        copy "frontend\.env.example" "frontend\.env" >nul 2>&1
+    if exist "%strProjectRoot%\frontend\.env.example" (
+        copy "%strProjectRoot%\frontend\.env.example" "%strProjectRoot%\frontend\.env" >nul 2>&1
         echo [SUCCESS] Frontend .env file created from example.
     ) else (
         (
@@ -353,7 +414,7 @@ if not exist "frontend\.env" (
             echo VITE_SUPABASE_KEY=your_supabase_key_here
             echo VITE_API_URL=http://localhost:8000
             echo NODE_ENV=production
-        ) > "frontend\.env"
+        ) > "%strProjectRoot%\frontend\.env"
         echo [SUCCESS] Frontend .env file created with defaults.
     )
 )
@@ -378,6 +439,11 @@ if %blnSuccess% equ 1 (
     echo.
     echo Your Suno Automation environment is ready to use.
     echo.
+    if defined strProjectRoot (
+        set "strStartScript=%strProjectRoot%\scripts\windows\start.bat"
+    ) else (
+        set "strStartScript=%strScriptRoot%start.bat"
+    )
     echo Next steps:
     echo 1. Edit the .env files to add your credentials:
     echo    - backend\.env: Add your Supabase and Google AI API keys
@@ -390,10 +456,10 @@ if %blnSuccess% equ 1 (
     set /p strStartApp="Would you like to start the application now? (y/n): "
     if /i "!strStartApp!"=="y" (
         echo [INFO] Starting application...
-        if exist "%strScriptRoot%start.bat" (
-            call "%strScriptRoot%start.bat"
+        if exist "!strStartScript!" (
+            call "!strStartScript!"
         ) else (
-            echo [WARNING] start.bat not found in scripts/windows directory. Please run it manually when ready.
+            echo [WARNING] start.bat not found at "!strStartScript!". Please run it manually when ready.
         )
     )
 ) else (
