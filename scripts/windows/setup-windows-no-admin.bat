@@ -64,7 +64,10 @@ if %errorLevel% neq 0 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Node.js is not installed\n"
 ) else (
-    for /f "tokens=*" %%i in ('node --version') do echo [SUCCESS] Node.js !strNodeVersion! is installed
+    setlocal DisableDelayedExpansion
+    for /f "tokens=*" %%i in ('node --version') do set "strNodeVersion=%%i"
+    call echo [SUCCESS] Detected Node.js %%strNodeVersion%%.
+    endlocal
 )
 
 REM Check Python
@@ -74,7 +77,10 @@ if %errorLevel% neq 0 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Python is not installed\n"
 ) else (
-    for /f "tokens=*" %%i in ('python --version') do echo [SUCCESS] Python !strPythonVersion! is installed
+    setlocal DisableDelayedExpansion
+    for /f "tokens=*" %%i in ('python --version') do set "strPythonVersion=%%i"
+    call echo [SUCCESS] Detected %%strPythonVersion%%.
+    endlocal
 )
 
 if %blnSuccess% neq 1 (

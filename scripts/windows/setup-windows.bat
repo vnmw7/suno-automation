@@ -15,6 +15,10 @@ set "blnRootPushed=0"
 set "blnSuccess=1"
 set "strInstallReport="
 set "blnNeedsInstall=0"
+set "INT_NODE_MIN_MAJOR=18"
+set "INT_NODE_MIN_MINOR=17"
+set "INT_PYTHON_MIN_MAJOR=3"
+set "INT_PYTHON_MIN_MINOR=11"
 
 for %%I in ("%~dp0..\..") do set "strDefaultRepo=%%~fI"
 if exist "%strDefaultRepo%\.git" (
@@ -34,7 +38,7 @@ echo.
 
 REM Check if running with administrator privileges
 net session >nul 2>&1
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     echo [ERROR] This script requires administrator privileges for installing software.
     echo Please right-click this script and select "Run as administrator".
     echo.
@@ -45,7 +49,7 @@ if %errorLevel% neq 0 (
 REM Check network connectivity
 echo [INFO] Checking network connectivity...
 ping -n 1 google.com >nul 2>&1
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     echo [ERROR] No internet connection detected. Please check your network and try again.
     echo.
     pause
@@ -57,7 +61,7 @@ echo.
 REM Check if winget is available
 echo [INFO] Checking for Winget...
 winget --version >nul 2>&1
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     echo [ERROR] Winget is not available on this system.
     echo Please install Windows Package Manager or update your Windows 10/11 installation.
     echo.
@@ -121,10 +125,10 @@ REM ========================================
 :ensureGit
 echo [INFO] Checking Git installation...
 git --version >nul 2>&1
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     echo [INFO] Installing Git via Winget...
     winget install --exact --accept-package-agreements --accept-source-agreements Git.Git
-    if %errorLevel% neq 0 (
+    if errorlevel 1 (
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Failed to install Git\n"
         echo [ERROR] Failed to install Git.
@@ -142,21 +146,73 @@ REM Function: ensureNodeJS
 REM ========================================
 :ensureNodeJS
 echo [INFO] Checking Node.js installation...
+set "strNodeVersion="
+set "intNodeMajor="
+set "intNodeMinor="
+set "blnNodeNeedsUpgrade=0"
+
 node --version >nul 2>&1
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     echo [INFO] Installing Node.js LTS via Winget...
     winget install --exact --accept-package-agreements --accept-source-agreements OpenJS.NodeJS.LTS
-    if %errorLevel% neq 0 (
+    if errorlevel 1 (
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Failed to install Node.js\n"
         echo [ERROR] Failed to install Node.js.
-    ) else (
-        echo [SUCCESS] Node.js installed successfully.
-        set "blnNeedsInstall=1"
+        goto :eof
+    )
+    echo [SUCCESS] Node.js installed successfully.
+    set "blnNeedsInstall=1"
+    call :_refreshNodePath
+)
+
+for /f "tokens=2,3 delims=v." %%A in ('node -v 2^>nul') do (
+    set "intNodeMajor=%%A"
+    set "intNodeMinor=%%B"
+)
+
+if defined intNodeMajor (
+    set /a intNodeMajor=intNodeMajor+0
+    set /a intNodeMinor=intNodeMinor+0
+    if !intNodeMajor! LSS %INT_NODE_MIN_MAJOR% (
+        set "blnNodeNeedsUpgrade=1"
+    ) else if !intNodeMajor! EQU %INT_NODE_MIN_MAJOR% if !intNodeMinor! LSS %INT_NODE_MIN_MINOR% (
+        set "blnNodeNeedsUpgrade=1"
     )
 ) else (
-    for /f "tokens=*" %%i in ('node --version') do set strNodeVersion=%%i
-    echo [SUCCESS] Node.js is already installed (!strNodeVersion!).
+    for /f "tokens=*" %%i in ('node --version 2^>nul') do set "strNodeVersion=%%i"
+    if defined strNodeVersion (
+        echo [WARNING] Unable to parse Node.js version from !strNodeVersion!. Proceeding with detected installation.
+    ) else (
+        echo [WARNING] Unable to determine Node.js version. Ensure Node.js >= %INT_NODE_MIN_MAJOR%.%INT_NODE_MIN_MINOR%.
+    )
+)
+
+if "!blnNodeNeedsUpgrade!"=="1" (
+    echo [INFO] Node.js version !intNodeMajor!.!intNodeMinor! does not meet the required %INT_NODE_MIN_MAJOR%.%INT_NODE_MIN_MINOR%. Upgrading to LTS...
+    winget upgrade --exact --accept-package-agreements --accept-source-agreements OpenJS.NodeJS.LTS
+    if errorlevel 1 (
+        echo [WARNING] Node.js upgrade failed. Continuing with existing version.
+    ) else (
+        echo [SUCCESS] Node.js upgraded to the latest LTS release.
+        set "blnNeedsInstall=1"
+        call :_refreshNodePath
+    )
+)
+
+node --version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Node.js is not available in this session after installation. Please restart your terminal once the script completes.
+    set "strInstallReport=!strInstallReport!Node.js unavailable in current session\n"
+    set "blnSuccess=0"
+    goto :eof
+)
+
+for /f "tokens=*" %%i in ('node --version 2^>nul') do set "strNodeVersion=%%i"
+if defined strNodeVersion (
+    echo [SUCCESS] Node.js is available (!strNodeVersion!).
+) else (
+    echo [SUCCESS] Node.js installation verified.
 )
 goto :eof
 
@@ -165,21 +221,73 @@ REM Function: ensurePython
 REM ========================================
 :ensurePython
 echo [INFO] Checking Python 3.11 installation...
+set "strPythonVersion="
+set "intPythonMajor="
+set "intPythonMinor="
+set "blnPythonNeedsUpgrade=0"
+
 python --version >nul 2>&1
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     echo [INFO] Installing Python 3.11 via Winget...
     winget install --exact --accept-package-agreements --accept-source-agreements Python.Python.3.11
-    if %errorLevel% neq 0 (
+    if errorlevel 1 (
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Failed to install Python 3.11\n"
         echo [ERROR] Failed to install Python 3.11.
-    ) else (
-        echo [SUCCESS] Python 3.11 installed successfully.
-        set "blnNeedsInstall=1"
+        goto :eof
+    )
+    echo [SUCCESS] Python 3.11 installed successfully.
+    set "blnNeedsInstall=1"
+    call :_refreshPythonPath
+)
+
+for /f "tokens=2,3 delims= ." %%A in ('python --version 2^>nul') do (
+    set "intPythonMajor=%%A"
+    set "intPythonMinor=%%B"
+)
+
+if defined intPythonMajor (
+    set /a intPythonMajor=intPythonMajor+0
+    set /a intPythonMinor=intPythonMinor+0
+    if !intPythonMajor! LSS %INT_PYTHON_MIN_MAJOR% (
+        set "blnPythonNeedsUpgrade=1"
+    ) else if !intPythonMajor! EQU %INT_PYTHON_MIN_MAJOR% if !intPythonMinor! LSS %INT_PYTHON_MIN_MINOR% (
+        set "blnPythonNeedsUpgrade=1"
     )
 ) else (
-    for /f "tokens=*" %%i in ('python --version') do set strPythonVersion=%%i
-    echo [SUCCESS] Python is already installed (!strPythonVersion!).
+    for /f "tokens=*" %%i in ('python --version 2^>nul') do set "strPythonVersion=%%i"
+    if defined strPythonVersion (
+        echo [WARNING] Unable to parse Python version from !strPythonVersion!. Proceeding with detected installation.
+    ) else (
+        echo [WARNING] Unable to determine Python version. Ensure Python >= %INT_PYTHON_MIN_MAJOR%.%INT_PYTHON_MIN_MINOR%.
+    )
+)
+
+if "!blnPythonNeedsUpgrade!"=="1" (
+    echo [INFO] Python version !intPythonMajor!.!intPythonMinor! does not meet the required %INT_PYTHON_MIN_MAJOR%.%INT_PYTHON_MIN_MINOR%. Installing Python.Python.3.11...
+    winget upgrade --exact --accept-package-agreements --accept-source-agreements Python.Python.3.11
+    if errorlevel 1 (
+        echo [WARNING] Python upgrade failed. Continuing with existing version.
+    ) else (
+        echo [SUCCESS] Python upgraded to 3.11.
+        set "blnNeedsInstall=1"
+        call :_refreshPythonPath
+    )
+)
+
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Python is not available in this session after installation. Please restart your terminal once the script completes.
+    set "strInstallReport=!strInstallReport!Python unavailable in current session\n"
+    set "blnSuccess=0"
+    goto :eof
+)
+
+for /f "tokens=*" %%i in ('python --version 2^>nul') do set "strPythonVersion=%%i"
+if defined strPythonVersion (
+    echo [SUCCESS] Python is available (!strPythonVersion!).
+) else (
+    echo [SUCCESS] Python installation verified.
 )
 goto :eof
 
@@ -193,11 +301,11 @@ if defined strProjectRoot (
     echo [INFO] Repository detected at !strProjectRoot!, updating...
     pushd "!strProjectRoot!"
     git fetch --all --prune
-    if %errorLevel% neq 0 (
+    if errorlevel 1 (
         echo [WARNING] Failed to fetch updates, continuing with local version.
     ) else (
         git pull
-        if %errorLevel% neq 0 (
+        if errorlevel 1 (
             echo [WARNING] Failed to pull updates, continuing with local version.
         ) else (
             echo [SUCCESS] Repository updated successfully.
@@ -217,7 +325,7 @@ if not exist "!strTargetDir!" (
 
 REM Clone the repository
 git clone "%strRepoUrl%" "!strTargetDir!"
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Failed to clone repository\n"
     echo [ERROR] Failed to clone repository.
@@ -254,7 +362,7 @@ pushd "%strProjectRoot%\backend"
 if not exist ".venv" (
     echo [INFO] Creating Python virtual environment...
     python -m venv .venv
-    if %errorLevel% neq 0 (
+    if errorlevel 1 (
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Failed to create virtual environment\n"
         echo [ERROR] Failed to create virtual environment.
@@ -266,7 +374,7 @@ if not exist ".venv" (
 
 echo [INFO] Activating virtual environment...
 call .venv\Scripts\activate
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Failed to activate virtual environment\n"
     echo [ERROR] Failed to activate virtual environment.
@@ -276,13 +384,13 @@ if %errorLevel% neq 0 (
 
 echo [INFO] Upgrading pip...
 python -m pip install --upgrade pip
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     echo [WARNING] Failed to upgrade pip, continuing with current version.
 )
 
 echo [INFO] Installing Python dependencies...
 pip install -r requirements.txt
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Failed to install Python dependencies\n"
     echo [ERROR] Failed to install Python dependencies.
@@ -294,7 +402,7 @@ echo [SUCCESS] Python dependencies installed.
 
 echo [INFO] Downloading Camoufox browser payload...
 camoufox fetch
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     echo [WARNING] Failed to download Camoufox payload. You may need to run 'camoufox fetch' manually.
 ) else (
     echo [SUCCESS] Camoufox payload downloaded.
@@ -329,13 +437,22 @@ if not exist "%strProjectRoot%\frontend" (
 REM Navigate to frontend directory
 pushd "%strProjectRoot%\frontend"
 
+where npm >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] npm not found on PATH. Please restart your terminal or rerun this script after reopening the shell.
+    set "blnSuccess=0"
+    set "strInstallReport=!strInstallReport!npm unavailable in current session\n"
+    popd
+    goto :eof
+)
+
 REM Configure npm to reduce output
 npm config set fund false
 
 REM Install dependencies
 echo [INFO] Installing Node.js dependencies...
 npm install
-if %errorLevel% neq 0 (
+if errorlevel 1 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Failed to install Node.js dependencies\n"
     echo [ERROR] Failed to install Node.js dependencies.
@@ -348,6 +465,48 @@ REM Return to original directory
 popd
 echo [SUCCESS] Frontend setup completed.
 goto :eof
+
+REM ========================================
+REM Function: _refreshNodePath
+REM ========================================
+:_refreshNodePath
+set "strNodeExe="
+for %%F in (
+    "%ProgramFiles%\nodejs\node.exe"
+    "%ProgramFiles(x86)%\nodejs\node.exe"
+    "%USERPROFILE%\AppData\Local\Programs\nodejs\node.exe"
+) do (
+    if exist "%%~fF" set "strNodeExe=%%~fF"
+)
+
+if defined strNodeExe (
+    for %%D in ("!strNodeExe!") do set "strNodeDir=%%~dpD"
+    if defined strNodeDir (
+        set "PATH=!strNodeDir!;!PATH!"
+    )
+)
+exit /b 0
+
+REM ========================================
+REM Function: _refreshPythonPath
+REM ========================================
+:_refreshPythonPath
+set "strPythonExe="
+for %%F in (
+    "%LocalAppData%\Programs\Python\Python311\python.exe"
+    "%ProgramFiles%\Python311\python.exe"
+    "%ProgramFiles%\Python\Python311\python.exe"
+) do (
+    if exist "%%~fF" set "strPythonExe=%%~fF"
+)
+
+if defined strPythonExe (
+    for %%D in ("!strPythonExe!") do set "strPythonDir=%%~dpD"
+    if defined strPythonDir (
+        set "PATH=!strPythonDir!;!PATH!"
+    )
+)
+exit /b 0
 
 REM ========================================
 REM Function: setupEnvironmentFiles
