@@ -15,6 +15,7 @@ set "blnRootPushed=0"
 set "blnSuccess=1"
 set "strInstallReport="
 set "blnNeedsInstall=0"
+REM NOTE: These are the latest versions as of Oct 2025. Adjust if necessary.
 set "INT_NODE_MIN_MAJOR=24"
 set "INT_NODE_MIN_MINOR=10"
 set "INT_PYTHON_MIN_MAJOR=3"
@@ -144,10 +145,8 @@ REM Determine event type based on log level
 if /i "%strLogLevel%"=="WARNING" set "strEventType=WARNING"
 if /i "%strLogLevel%"=="ERROR" set "strEventType=ERROR"
 
-REM Output to console (exclude DEBUG level)
-if /i not "%strLogLevel%"=="DEBUG" (
-    echo [%strLogLevel%] !strLogMessage!
-)
+REM Output to console (all levels)
+echo [%strLogLevel%] !strLogMessage!
 
 REM Output to log file (all levels)
 echo !strFormattedTime! [%strLogLevel%] !strLogMessage! >> "%strLogFile%"
@@ -287,7 +286,10 @@ if errorlevel 1 (
     call :_refreshPythonPath
 )
 
-for /f "tokens=2,3 delims= ." %%A in ('python --version 2^>^&1') do (
+for /f "tokens=*" %%v in ('python --version 2^>^&1') do (
+    set "strPythonVersionRaw=%%v"
+)
+for /f "tokens=2,3 delims=." %%A in ("!strPythonVersionRaw:python =!") do (
     set "intPythonMajor=%%A"
     set "intPythonMinor=%%B"
 )
