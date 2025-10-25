@@ -10,21 +10,29 @@ REM Initialize variables
 set "strRepoUrl=https://github.com/vnmw7/suno-automation.git"
 set "strRepoName=suno-automation"
 set "strScriptRoot=%~dp0"
-set "strProjectRoot="
+set "strProjectRoot=%USERPROFILE%\%strRepoName%"
 set "blnRootPushed=0"
 set "blnSuccess=1"
 set "strInstallReport="
 set "blnNeedsInstall=0"
-set "INT_NODE_MIN_MAJOR=18"
-set "INT_NODE_MIN_MINOR=17"
+set "INT_NODE_MIN_MAJOR=24"
+set "INT_NODE_MIN_MINOR=10"
 set "INT_PYTHON_MIN_MAJOR=3"
-set "INT_PYTHON_MIN_MINOR=11"
+set "INT_PYTHON_MIN_MINOR=14"
 
-for %%I in ("%~dp0..\..") do set "strDefaultRepo=%%~fI"
-if exist "%strDefaultRepo%\.git" (
-    set "strProjectRoot=%strDefaultRepo%"
-)
-set "strDefaultRepo="
+REM Initialize logging
+set "strEventSource=Suno Automation Setup"
+set "strLogDir=%strScriptRoot%logs"
+if not exist "%strLogDir%" mkdir "%strLogDir%"
+for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set "strDateTime=%%I"
+set "strLogFile=%strLogDir%\setup-windows-%strDateTime:~0,8%-%strDateTime:~8,6%.log"
+
+REM Create event source for Windows Event Viewer
+eventcreate /ID 1 /L APPLICATION /T INFORMATION /SO "%strEventSource%" /D "Setup script started." >nul 2>&1
+
+REM Log initial message
+call :log "INFO" "Suno Automation - Windows Setup Script started."
+call :log "INFO" "Log file: %strLogFile%"
 
 REM Display header
 echo.
@@ -37,38 +45,38 @@ echo then set up the Suno Automation project environment.
 echo.
 
 REM Check if running with administrator privileges
-net session >nul 2>&1
+net session >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [ERROR] This script requires administrator privileges for installing software.
-    echo Please right-click this script and select "Run as administrator".
+    call :log "ERROR" "This script requires administrator privileges for installing software."
+    call :log "INFO" "Please right-click this script and select \"Run as administrator\"."
     echo.
     pause
     exit /b 1
 )
 
 REM Check network connectivity
-echo [INFO] Checking network connectivity...
-ping -n 1 google.com >nul 2>&1
+call :log "INFO" "Checking network connectivity..."
+ping -n 1 google.com >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [ERROR] No internet connection detected. Please check your network and try again.
+    call :log "ERROR" "No internet connection detected. Please check your network and try again."
     echo.
     pause
     exit /b 1
 )
-echo [SUCCESS] Network connectivity confirmed.
+call :log "SUCCESS" "Network connectivity confirmed."
 echo.
 
 REM Check if winget is available
-echo [INFO] Checking for Winget...
-winget --version >nul 2>&1
+call :log "INFO" "Checking for Winget..."
+winget --version >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [ERROR] Winget is not available on this system.
-    echo Please install Windows Package Manager or update your Windows 10/11 installation.
+    call :log "ERROR" "Winget is not available on this system."
+    call :log "INFO" "Please install Windows Package Manager or update your Windows 10/11 installation."
     echo.
     pause
     exit /b 1
 )
-echo [SUCCESS] Winget is available.
+call :log "SUCCESS" "Winget is available."
 echo.
 
 REM Ensure core toolchain
@@ -85,13 +93,13 @@ if defined strProjectRoot (
         pushd "%strProjectRoot%"
         set "blnRootPushed=1"
     ) else (
-        echo [ERROR] Project root directory "%strProjectRoot%" not found.
+        call :log "ERROR" "Project root directory \"%strProjectRoot%\" not found."
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Project root directory missing\n"
         set "strProjectRoot="
     )
 ) else (
-    echo [ERROR] Unable to determine project root directory.
+    call :log "ERROR" "Unable to determine project root directory."
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Project root not resolved\n"
 )
@@ -120,53 +128,87 @@ call :displayFinalStatus
 goto :eof
 
 REM ========================================
+REM Function: log
+REM Purpose: Centralized logging to console, file, and Event Viewer
+REM ========================================
+:log
+set "strLogLevel=%~1"
+set "strLogMessage=%~2"
+set "strEventType=INFORMATION"
+
+REM Format timestamp
+for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set "strLogTime=%%I"
+set "strFormattedTime=!strLogTime:~0,4!-!strLogTime:~4,2!-!strLogTime:~6,2! !strLogTime:~8,2!:!strLogTime:~10,2!:!strLogTime:~12,2!"
+
+REM Determine event type based on log level
+if /i "%strLogLevel%"=="WARNING" set "strEventType=WARNING"
+if /i "%strLogLevel%"=="ERROR" set "strEventType=ERROR"
+
+REM Output to console (exclude DEBUG level)
+if /i not "%strLogLevel%"=="DEBUG" (
+    echo [%strLogLevel%] !strLogMessage!
+)
+
+REM Output to log file (all levels)
+echo !strFormattedTime! [%strLogLevel%] !strLogMessage! >> "%strLogFile%"
+
+REM Output to Event Viewer
+eventcreate /ID 1 /L APPLICATION /T %strEventType% /SO "%strEventSource%" /D "!strLogMessage!" >nul 2>&1
+
+goto :eof
+
+REM ========================================
 REM Function: ensureGit
 REM ========================================
 :ensureGit
-echo [INFO] Checking Git installation...
-git --version >nul 2>&1
+call :log "DEBUG" "Entering :ensureGit"
+call :log "INFO" "Checking Git installation..."
+git --version >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [INFO] Installing Git via Winget...
-    winget install --exact --accept-package-agreements --accept-source-agreements Git.Git
+    call :log "INFO" "Installing Git via Winget..."
+    winget install --exact --accept-package-agreements --accept-source-agreements Git.Git >> "%strLogFile%" 2>&1
     if errorlevel 1 (
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Failed to install Git\n"
-        echo [ERROR] Failed to install Git.
+        call :log "ERROR" "Failed to install Git."
     ) else (
-        echo [SUCCESS] Git installed successfully.
+        call :log "SUCCESS" "Git installed successfully."
         set "blnNeedsInstall=1"
     )
 ) else (
-    echo [SUCCESS] Git is already installed.
+    call :log "SUCCESS" "Git is already installed."
 )
+call :log "DEBUG" "Exiting :ensureGit"
 goto :eof
 
 REM ========================================
 REM Function: ensureNodeJS
 REM ========================================
 :ensureNodeJS
-echo [INFO] Checking Node.js installation...
+call :log "DEBUG" "Entering :ensureNodeJS"
+call :log "INFO" "Checking Node.js installation..."
 set "strNodeVersion="
 set "intNodeMajor="
 set "intNodeMinor="
 set "blnNodeNeedsUpgrade=0"
 
-node --version >nul 2>&1
+node --version >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [INFO] Installing Node.js LTS via Winget...
-    winget install --exact --accept-package-agreements --accept-source-agreements OpenJS.NodeJS.LTS
+    call :log "INFO" "Installing Node.js LTS via Winget..."
+    winget install --exact --accept-package-agreements --accept-source-agreements OpenJS.NodeJS.LTS >> "%strLogFile%" 2>&1
     if errorlevel 1 (
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Failed to install Node.js\n"
-        echo [ERROR] Failed to install Node.js.
+        call :log "ERROR" "Failed to install Node.js."
+        call :log "DEBUG" "Exiting :ensureNodeJS"
         goto :eof
     )
-    echo [SUCCESS] Node.js installed successfully.
+    call :log "SUCCESS" "Node.js installed successfully."
     set "blnNeedsInstall=1"
     call :_refreshNodePath
 )
 
-for /f "tokens=2,3 delims=v." %%A in ('node -v 2^>nul') do (
+for /f "tokens=2,3 delims=v." %%A in ('node -v 2^>^&1') do (
     set "intNodeMajor=%%A"
     set "intNodeMinor=%%B"
 )
@@ -180,68 +222,72 @@ if defined intNodeMajor (
         set "blnNodeNeedsUpgrade=1"
     )
 ) else (
-    for /f "tokens=*" %%i in ('node --version 2^>nul') do set "strNodeVersion=%%i"
+    for /f "tokens=*" %%i in ('node --version 2^>^&1') do set "strNodeVersion=%%i"
     if defined strNodeVersion (
-        echo [WARNING] Unable to parse Node.js version from !strNodeVersion!. Proceeding with detected installation.
+        call :log "WARNING" "Unable to parse Node.js version from !strNodeVersion!. Proceeding with detected installation."
     ) else (
-        echo [WARNING] Unable to determine Node.js version. Ensure Node.js >= %INT_NODE_MIN_MAJOR%.%INT_NODE_MIN_MINOR%.
+        call :log "WARNING" "Unable to determine Node.js version. Ensure Node.js >= %INT_NODE_MIN_MAJOR%.%INT_NODE_MIN_MINOR%."
     )
 )
 
 if "!blnNodeNeedsUpgrade!"=="1" (
-    echo [INFO] Node.js version !intNodeMajor!.!intNodeMinor! does not meet the required %INT_NODE_MIN_MAJOR%.%INT_NODE_MIN_MINOR%. Upgrading to LTS...
-    winget upgrade --exact --accept-package-agreements --accept-source-agreements OpenJS.NodeJS.LTS
+    call :log "INFO" "Node.js version !intNodeMajor!.!intNodeMinor! does not meet the required %INT_NODE_MIN_MAJOR%.%INT_NODE_MIN_MINOR%. Upgrading to LTS..."
+    winget upgrade --exact --accept-package-agreements --accept-source-agreements OpenJS.NodeJS.LTS >> "%strLogFile%" 2>&1
     if errorlevel 1 (
-        echo [WARNING] Node.js upgrade failed. Continuing with existing version.
+        call :log "WARNING" "Node.js upgrade failed. Continuing with existing version."
     ) else (
-        echo [SUCCESS] Node.js upgraded to the latest LTS release.
+        call :log "SUCCESS" "Node.js upgraded to the latest LTS release."
         set "blnNeedsInstall=1"
         call :_refreshNodePath
     )
 )
 
-node --version >nul 2>&1
+node --version >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [ERROR] Node.js is not available in this session after installation. Please restart your terminal once the script completes.
+    call :log "ERROR" "Node.js is not available in this session after installation. Please restart your terminal once the script completes."
     set "strInstallReport=!strInstallReport!Node.js unavailable in current session\n"
     set "blnSuccess=0"
+    call :log "DEBUG" "Exiting :ensureNodeJS"
     goto :eof
 )
 
-for /f "tokens=*" %%i in ('node --version 2^>nul') do set "strNodeVersion=%%i"
+for /f "tokens=*" %%i in ('node --version 2^>^&1') do set "strNodeVersion=%%i"
 if defined strNodeVersion (
-    echo [SUCCESS] Node.js is available (!strNodeVersion!).
+    call :log "SUCCESS" "Node.js is available (!strNodeVersion!)."
 ) else (
-    echo [SUCCESS] Node.js installation verified.
+    call :log "SUCCESS" "Node.js installation verified."
 )
+call :log "DEBUG" "Exiting :ensureNodeJS"
 goto :eof
 
 REM ========================================
 REM Function: ensurePython
 REM ========================================
 :ensurePython
-echo [INFO] Checking Python 3.11 installation...
+call :log "DEBUG" "Entering :ensurePython"
+call :log "INFO" "Checking Python 3.11 installation..."
 set "strPythonVersion="
 set "intPythonMajor="
 set "intPythonMinor="
 set "blnPythonNeedsUpgrade=0"
 
-python --version >nul 2>&1
+python --version >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [INFO] Installing Python 3.11 via Winget...
-    winget install --exact --accept-package-agreements --accept-source-agreements Python.Python.3.11
+    call :log "INFO" "Installing Python 3.11 via Winget..."
+    winget install --exact --accept-package-agreements --accept-source-agreements Python.Python.3.11 >> "%strLogFile%" 2>&1
     if errorlevel 1 (
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Failed to install Python 3.11\n"
-        echo [ERROR] Failed to install Python 3.11.
+        call :log "ERROR" "Failed to install Python 3.11."
+        call :log "DEBUG" "Exiting :ensurePython"
         goto :eof
     )
-    echo [SUCCESS] Python 3.11 installed successfully.
+    call :log "SUCCESS" "Python 3.11 installed successfully."
     set "blnNeedsInstall=1"
     call :_refreshPythonPath
 )
 
-for /f "tokens=2,3 delims= ." %%A in ('python --version 2^>nul') do (
+for /f "tokens=2,3 delims= ." %%A in ('python --version 2^>^&1') do (
     set "intPythonMajor=%%A"
     set "intPythonMinor=%%B"
 )
@@ -255,215 +301,223 @@ if defined intPythonMajor (
         set "blnPythonNeedsUpgrade=1"
     )
 ) else (
-    for /f "tokens=*" %%i in ('python --version 2^>nul') do set "strPythonVersion=%%i"
+    for /f "tokens=*" %%i in ('python --version 2^>^&1') do set "strPythonVersion=%%i"
     if defined strPythonVersion (
-        echo [WARNING] Unable to parse Python version from !strPythonVersion!. Proceeding with detected installation.
+        call :log "WARNING" "Unable to parse Python version from !strPythonVersion!. Proceeding with detected installation."
     ) else (
-        echo [WARNING] Unable to determine Python version. Ensure Python >= %INT_PYTHON_MIN_MAJOR%.%INT_PYTHON_MIN_MINOR%.
+        call :log "WARNING" "Unable to determine Python version. Ensure Python >= %INT_PYTHON_MIN_MAJOR%.%INT_PYTHON_MIN_MINOR%."
     )
 )
 
 if "!blnPythonNeedsUpgrade!"=="1" (
-    echo [INFO] Python version !intPythonMajor!.!intPythonMinor! does not meet the required %INT_PYTHON_MIN_MAJOR%.%INT_PYTHON_MIN_MINOR%. Installing Python.Python.3.11...
-    winget upgrade --exact --accept-package-agreements --accept-source-agreements Python.Python.3.11
+    call :log "INFO" "Python version !intPythonMajor!.!intPythonMinor! does not meet the required %INT_PYTHON_MIN_MAJOR%.%INT_PYTHON_MIN_MINOR%. Installing Python.Python.3.11..."
+    winget upgrade --exact --accept-package-agreements --accept-source-agreements Python.Python.3.11 >> "%strLogFile%" 2>&1
     if errorlevel 1 (
-        echo [WARNING] Python upgrade failed. Continuing with existing version.
+        call :log "WARNING" "Python upgrade failed. Continuing with existing version."
     ) else (
-        echo [SUCCESS] Python upgraded to 3.11.
+        call :log "SUCCESS" "Python upgraded to 3.11."
         set "blnNeedsInstall=1"
         call :_refreshPythonPath
     )
 )
 
-python --version >nul 2>&1
+python --version >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [ERROR] Python is not available in this session after installation. Please restart your terminal once the script completes.
+    call :log "ERROR" "Python is not available in this session after installation. Please restart your terminal once the script completes."
     set "strInstallReport=!strInstallReport!Python unavailable in current session\n"
     set "blnSuccess=0"
+    call :log "DEBUG" "Exiting :ensurePython"
     goto :eof
 )
 
-for /f "tokens=*" %%i in ('python --version 2^>nul') do set "strPythonVersion=%%i"
+for /f "tokens=*" %%i in ('python --version 2^>^&1') do set "strPythonVersion=%%i"
 if defined strPythonVersion (
-    echo [SUCCESS] Python is available (!strPythonVersion!).
+    call :log "SUCCESS" "Python is available (!strPythonVersion!)."
 ) else (
-    echo [SUCCESS] Python installation verified.
+    call :log "SUCCESS" "Python installation verified."
 )
+call :log "DEBUG" "Exiting :ensurePython"
 goto :eof
 
 REM ========================================
 REM Function: setupRepository
 REM ========================================
 :setupRepository
-echo [INFO] Setting up repository...
+call :log "DEBUG" "Entering :setupRepository"
+call :log "INFO" "Setting up repository at !strProjectRoot!..."
 
-if defined strProjectRoot (
-    echo [INFO] Repository detected at !strProjectRoot!, updating...
+REM Check if the repository directory already exists
+if exist "!strProjectRoot!\.git" (
+    call :log "INFO" "Existing repository found. Updating..."
     pushd "!strProjectRoot!"
-    git fetch --all --prune
+    git pull >> "%strLogFile%" 2>&1
     if errorlevel 1 (
-        echo [WARNING] Failed to fetch updates, continuing with local version.
+        call :log "WARNING" "Failed to pull updates. Continuing with the local version."
     ) else (
-        git pull
-        if errorlevel 1 (
-            echo [WARNING] Failed to pull updates, continuing with local version.
-        ) else (
-            echo [SUCCESS] Repository updated successfully.
-        )
+        call :log "SUCCESS" "Repository updated successfully."
     )
     popd
-    goto :eof
+) else (
+    call :log "INFO" "No existing repository found. Cloning a fresh copy..."
+    REM Create the target directory if it doesn't exist
+    if not exist "!strProjectRoot!" (
+        mkdir "!strProjectRoot!"
+    )
+    
+    REM Clone the repository
+    git clone "%strRepoUrl%" "!strProjectRoot!" >> "%strLogFile%" 2>&1
+    if errorlevel 1 (
+        set "blnSuccess=0"
+        set "strInstallReport=!strInstallReport!Failed to clone repository\n"
+        call :log "ERROR" "Failed to clone repository."
+        call :log "DEBUG" "Exiting :setupRepository"
+        goto :eof
+    )
+    call :log "SUCCESS" "Repository cloned to !strProjectRoot!"
 )
-
-echo [INFO] No git repository found, cloning...
-set "strTargetDir=%USERPROFILE%\%strRepoName%"
-
-REM Create target directory if it doesn't exist
-if not exist "!strTargetDir!" (
-    mkdir "!strTargetDir!"
-)
-
-REM Clone the repository
-git clone "%strRepoUrl%" "!strTargetDir!"
-if errorlevel 1 (
-    set "blnSuccess=0"
-    set "strInstallReport=!strInstallReport!Failed to clone repository\n"
-    echo [ERROR] Failed to clone repository.
-    goto :eof
-)
-
-echo [SUCCESS] Repository cloned to !strTargetDir!
-set "strProjectRoot=!strTargetDir!"
-echo [INFO] Project root set to !strProjectRoot!
+call :log "DEBUG" "Exiting :setupRepository"
 goto :eof
 
 REM ========================================
 REM Function: setupBackend
 REM ========================================
 :setupBackend
-echo [INFO] Setting up backend environment...
+call :log "DEBUG" "Entering :setupBackend"
+call :log "INFO" "Setting up backend environment..."
 
 if not defined strProjectRoot (
-    echo [ERROR] Project root is not defined. Unable to configure backend.
+    call :log "ERROR" "Project root is not defined. Unable to configure backend."
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Project root missing for backend setup\n"
+    call :log "DEBUG" "Exiting :setupBackend"
     goto :eof
 )
 
 if not exist "%strProjectRoot%\backend" (
-    echo [ERROR] Backend directory not found at "%strProjectRoot%\backend".
+    call :log "ERROR" "Backend directory not found at \"%strProjectRoot%\backend\"."
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Backend directory not found\n"
+    call :log "DEBUG" "Exiting :setupBackend"
     goto :eof
 )
 
 pushd "%strProjectRoot%\backend"
 
 if not exist ".venv" (
-    echo [INFO] Creating Python virtual environment...
-    python -m venv .venv
+    call :log "INFO" "Creating Python virtual environment..."
+    python -m venv .venv >> "%strLogFile%" 2>&1
     if errorlevel 1 (
         set "blnSuccess=0"
         set "strInstallReport=!strInstallReport!Failed to create virtual environment\n"
-        echo [ERROR] Failed to create virtual environment.
+        call :log "ERROR" "Failed to create virtual environment."
         popd
+        call :log "DEBUG" "Exiting :setupBackend"
         goto :eof
     )
-    echo [SUCCESS] Virtual environment created.
+    call :log "SUCCESS" "Virtual environment created."
 )
 
-echo [INFO] Activating virtual environment...
-call .venv\Scripts\activate
+call :log "INFO" "Activating virtual environment..."
+call .venv\Scripts\activate >> "%strLogFile%" 2>&1
 if errorlevel 1 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Failed to activate virtual environment\n"
-    echo [ERROR] Failed to activate virtual environment.
+    call :log "ERROR" "Failed to activate virtual environment."
     popd
+    call :log "DEBUG" "Exiting :setupBackend"
     goto :eof
 )
 
-echo [INFO] Upgrading pip...
-python -m pip install --upgrade pip
+call :log "INFO" "Upgrading pip..."
+python -m pip install --upgrade pip >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [WARNING] Failed to upgrade pip, continuing with current version.
+    call :log "WARNING" "Failed to upgrade pip, continuing with current version."
 )
 
-echo [INFO] Installing Python dependencies...
-pip install -r requirements.txt
+call :log "INFO" "Installing Python dependencies..."
+pip install -r requirements.txt >> "%strLogFile%" 2>&1
 if errorlevel 1 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Failed to install Python dependencies\n"
-    echo [ERROR] Failed to install Python dependencies.
+    call :log "ERROR" "Failed to install Python dependencies."
     call deactivate
     popd
+    call :log "DEBUG" "Exiting :setupBackend"
     goto :eof
 )
-echo [SUCCESS] Python dependencies installed.
+call :log "SUCCESS" "Python dependencies installed."
 
-echo [INFO] Downloading Camoufox browser payload...
-camoufox fetch
+call :log "INFO" "Downloading Camoufox browser payload..."
+camoufox fetch >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [WARNING] Failed to download Camoufox payload. You may need to run 'camoufox fetch' manually.
+    call :log "WARNING" "Failed to download Camoufox payload. You may need to run 'camoufox fetch' manually."
 ) else (
-    echo [SUCCESS] Camoufox payload downloaded.
+    call :log "SUCCESS" "Camoufox payload downloaded."
 )
 
 call deactivate
 popd
-echo [SUCCESS] Backend setup completed.
+call :log "SUCCESS" "Backend setup completed."
+call :log "DEBUG" "Exiting :setupBackend"
 goto :eof
 
 REM ========================================
 REM Function: setupFrontend
 REM ========================================
 :setupFrontend
-echo [INFO] Setting up frontend dependencies...
+call :log "DEBUG" "Entering :setupFrontend"
+call :log "INFO" "Setting up frontend dependencies..."
 
 REM Check if frontend directory exists
 if not defined strProjectRoot (
-    echo [ERROR] Project root is not defined. Unable to configure frontend.
+    call :log "ERROR" "Project root is not defined. Unable to configure frontend."
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Project root missing for frontend setup\n"
+    call :log "DEBUG" "Exiting :setupFrontend"
     goto :eof
 )
 
 if not exist "%strProjectRoot%\frontend" (
-    echo [ERROR] Frontend directory not found at "%strProjectRoot%\frontend".
+    call :log "ERROR" "Frontend directory not found at \"%strProjectRoot%\frontend\"."
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Frontend directory not found\n"
+    call :log "DEBUG" "Exiting :setupFrontend"
     goto :eof
 )
 
 REM Navigate to frontend directory
 pushd "%strProjectRoot%\frontend"
 
-where npm >nul 2>&1
+where npm >> "%strLogFile%" 2>&1
 if errorlevel 1 (
-    echo [ERROR] npm not found on PATH. Please restart your terminal or rerun this script after reopening the shell.
+    call :log "ERROR" "npm not found on PATH. Please restart your terminal or rerun this script after reopening the shell."
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!npm unavailable in current session\n"
     popd
+    call :log "DEBUG" "Exiting :setupFrontend"
     goto :eof
 )
 
 REM Configure npm to reduce output
-npm config set fund false
+npm config set fund false >> "%strLogFile%" 2>&1
 
 REM Install dependencies
-echo [INFO] Installing Node.js dependencies...
-npm install
+call :log "INFO" "Installing Node.js dependencies..."
+npm install >> "%strLogFile%" 2>&1
 if errorlevel 1 (
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Failed to install Node.js dependencies\n"
-    echo [ERROR] Failed to install Node.js dependencies.
+    call :log "ERROR" "Failed to install Node.js dependencies."
     popd
+    call :log "DEBUG" "Exiting :setupFrontend"
     goto :eof
 )
-echo [SUCCESS] Node.js dependencies installed.
+call :log "SUCCESS" "Node.js dependencies installed."
 
 REM Return to original directory
 popd
-echo [SUCCESS] Frontend setup completed.
+call :log "SUCCESS" "Frontend setup completed."
+call :log "DEBUG" "Exiting :setupFrontend"
 goto :eof
 
 REM ========================================
@@ -512,38 +566,41 @@ REM ========================================
 REM Function: setupEnvironmentFiles
 REM ========================================
 :setupEnvironmentFiles
-echo [INFO] Setting up environment files...
+call :log "DEBUG" "Entering :setupEnvironmentFiles"
+call :log "INFO" "Setting up environment files..."
 
 if not defined strProjectRoot (
-    echo [ERROR] Project root is not defined. Unable to create environment files.
+    call :log "ERROR" "Project root is not defined. Unable to create environment files."
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Project root missing for environment files\n"
+    call :log "DEBUG" "Exiting :setupEnvironmentFiles"
     goto :eof
 )
 
 if not exist "%strProjectRoot%" (
-    echo [ERROR] Project root directory "%strProjectRoot%" not found. Unable to create environment files.
+    call :log "ERROR" "Project root directory \"%strProjectRoot%\" not found. Unable to create environment files."
     set "blnSuccess=0"
     set "strInstallReport=!strInstallReport!Project root directory not found for environment files\n"
+    call :log "DEBUG" "Exiting :setupEnvironmentFiles"
     goto :eof
 )
 
 REM Create root .env file if it doesn't exist
 if not exist "%strProjectRoot%\.env" (
-    echo [INFO] Creating root .env file...
+    call :log "INFO" "Creating root .env file..."
     (
         echo TAG=latest
         echo CAMOUFOX_SOURCE=auto
     ) > "%strProjectRoot%\.env"
-    echo [SUCCESS] Root .env file created.
+    call :log "SUCCESS" "Root .env file created."
 )
 
 REM Create backend .env file if it doesn't exist
 if not exist "%strProjectRoot%\backend\.env" (
-    echo [INFO] Creating backend .env file...
+    call :log "INFO" "Creating backend .env file..."
     if exist "%strProjectRoot%\backend\.env.example" (
-        copy "%strProjectRoot%\backend\.env.example" "%strProjectRoot%\backend\.env" >nul 2>&1
-        echo [SUCCESS] Backend .env file created from example.
+        copy "%strProjectRoot%\backend\.env.example" "%strProjectRoot%\backend\.env" >> "%strLogFile%" 2>&1
+        call :log "SUCCESS" "Backend .env file created from example."
     ) else (
         (
             echo SUPABASE_URL=your-supabase-url
@@ -557,16 +614,16 @@ if not exist "%strProjectRoot%\backend\.env" (
             echo DBNAME=postgres
             echo GOOGLE_AI_API_KEY=your-google-ai-api-key
         ) > "%strProjectRoot%\backend\.env"
-        echo [SUCCESS] Backend .env file created with defaults.
+        call :log "SUCCESS" "Backend .env file created with defaults."
     )
 )
 
 REM Create frontend .env file if it doesn't exist
 if not exist "%strProjectRoot%\frontend\.env" (
-    echo [INFO] Creating frontend .env file...
+    call :log "INFO" "Creating frontend .env file..."
     if exist "%strProjectRoot%\frontend\.env.example" (
-        copy "%strProjectRoot%\frontend\.env.example" "%strProjectRoot%\frontend\.env" >nul 2>&1
-        echo [SUCCESS] Frontend .env file created from example.
+        copy "%strProjectRoot%\frontend\.env.example" "%strProjectRoot%\frontend\.env" >> "%strLogFile%" 2>&1
+        call :log "SUCCESS" "Frontend .env file created from example."
     ) else (
         (
             echo VITE_SUPABASE_URL=your_supabase_url_here
@@ -574,19 +631,20 @@ if not exist "%strProjectRoot%\frontend\.env" (
             echo VITE_API_URL=http://localhost:8000
             echo NODE_ENV=production
         ) > "%strProjectRoot%\frontend\.env"
-        echo [SUCCESS] Frontend .env file created with defaults.
+        call :log "SUCCESS" "Frontend .env file created with defaults."
     )
 )
 
-echo [INFO] Environment files have been created with default values.
-echo [IMPORTANT] Please edit the .env files to add your actual credentials and API keys.
-echo.
+call :log "INFO" "Environment files have been created with default values."
+call :log "IMPORTANT" "Please edit the .env files to add your actual credentials and API keys."
+call :log "DEBUG" "Exiting :setupEnvironmentFiles"
 goto :eof
 
 REM ========================================
 REM Function: displayFinalStatus
 REM ========================================
 :displayFinalStatus
+call :log "DEBUG" "Entering :displayFinalStatus"
 echo.
 echo ========================================
 echo  Setup Complete
@@ -594,7 +652,7 @@ echo ========================================
 echo.
 
 if %blnSuccess% equ 1 (
-    echo [SUCCESS] All components have been installed and configured successfully!
+    call :log "SUCCESS" "All components have been installed and configured successfully!"
     echo.
     echo Your Suno Automation environment is ready to use.
     echo.
@@ -614,23 +672,37 @@ if %blnSuccess% equ 1 (
     REM Ask if user wants to start the application
     set /p strStartApp="Would you like to start the application now? (y/n): "
     if /i "!strStartApp!"=="y" (
-        echo [INFO] Starting application...
+        call :log "INFO" "Starting application..."
         if exist "!strStartScript!" (
             call "!strStartScript!"
         ) else (
-            echo [WARNING] start.bat not found at "!strStartScript!". Please run it manually when ready.
+            call :log "WARNING" "start.bat not found at \"!strStartScript!\". Please run it manually when ready."
         )
     )
 ) else (
-    echo [ERROR] Some components failed to install or configure.
+    call :log "ERROR" "Setup failed. See details below."
     echo.
-    echo Installation report:
-    echo !strInstallReport!
+    echo ========================================
+    echo  Setup Failed
+    echo ========================================
     echo.
-    echo Please resolve the issues above and run the script again.
+    echo The following issues were reported:
+    if defined strInstallReport (
+        echo !strInstallReport!
+    ) else (
+        echo - An unexpected error occurred.
+    )
+    echo.
+    echo Please check the log file for a complete execution trace:
+    echo %strLogFile%
 )
 
+call :log "INFO" "Setup script completed. Log file saved to: %strLogFile%"
+echo.
+echo Log file saved to: %strLogFile%
+echo You can also check the Windows Event Viewer for 'Suno Automation Setup' events.
 echo.
 echo Press any key to exit...
 pause >nul
+call :log "DEBUG" "Exiting :displayFinalStatus"
 exit /b %blnSuccess%
